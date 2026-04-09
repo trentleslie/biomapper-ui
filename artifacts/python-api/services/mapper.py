@@ -60,9 +60,7 @@ class MapperService:
                 try:
                     result = await client.map_entity(
                         name=name,
-                        entity_type="biolink:SmallMolecule",
                         identifiers=identifiers,
-                        annotation_mode=config.annotation_mode,
                     )
                     return self._process_result(name, result)
 

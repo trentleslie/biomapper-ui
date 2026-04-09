@@ -40,7 +40,7 @@ kind = "api"
   run = "cd artifacts/python-api && python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
 
   [services.production.run]
-  args = ["python3", "-m", "uvicorn", "artifacts/python-api/main:app", "--host", "0.0.0.0", "--port", "8000"]
+  args = ["bash", "-c", "cd artifacts/python-api && python3 -m uvicorn main:app --host 0.0.0.0 --port 8000"]
 
   [services.production.run.env]
   PORT = "8000"
