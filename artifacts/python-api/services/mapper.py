@@ -57,6 +57,13 @@ class MapperService:
 
         async with BioMapperClient() as client:
             for attempt in range(max_retries):
+                if stop_event.is_set():
+                    return {
+                        "name": name,
+                        "resolved": False,
+                        "error": "Job aborted due to prior auth failure.",
+                        "error_type": "aborted",
+                    }
                 try:
                     result = await client.map_entity(
                         name=name,
@@ -64,7 +71,7 @@ class MapperService:
                     )
                     return self._process_result(name, result)
 
-                except BioMapperAuthError as e:
+                except BioMapperAuthError:
                     stop_event.set()
                     return {
                         "name": name,

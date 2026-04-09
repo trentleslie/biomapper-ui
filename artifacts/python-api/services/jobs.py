@@ -3,6 +3,7 @@ import time
 from typing import Any
 
 _TTL_SECONDS = 3600  # 1 hour
+_PURGE_INTERVAL = 300  # run purge at most every 5 minutes
 
 
 class Job:
@@ -32,13 +33,22 @@ class JobStore:
     def __init__(self) -> None:
         self._jobs: dict[str, Job] = {}
         self._lock = asyncio.Lock()
+        self._last_purge = time.time()
+
+    def _maybe_purge(self) -> None:
+        now = time.time()
+        if now - self._last_purge >= _PURGE_INTERVAL:
+            self._last_purge = now
+            self.purge_expired()
 
     def create(self, job_id: str, total: int) -> Job:
+        self._maybe_purge()
         job = Job(job_id, total)
         self._jobs[job_id] = job
         return job
 
     def get(self, job_id: str) -> Job | None:
+        self._maybe_purge()
         return self._jobs.get(job_id)
 
     def add_result(self, job_id: str, result: dict[str, Any]) -> None:
