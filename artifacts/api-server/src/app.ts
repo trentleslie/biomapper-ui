@@ -1,7 +1,7 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
-import { clerkMiddleware, getAuth } from "@clerk/express";
+import { clerkMiddleware, getAuth, clerkClient } from "@clerk/express";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { CLERK_PROXY_PATH, clerkProxyMiddleware } from "./middlewares/clerkProxyMiddleware";
 import router from "./routes";
@@ -9,6 +9,8 @@ import { logger } from "./lib/logger";
 
 const PYTHON_API_PORT = parseInt(process.env.PYTHON_API_PORT || "8000", 10);
 const PYTHON_API_BASE = `http://localhost:${PYTHON_API_PORT}`;
+
+const ALLOWED_DOMAINS = ["phenomehealth.org", "phenome.health", "phenomics.ai"];
 
 const app: Express = express();
 
@@ -41,14 +43,30 @@ app.use(cors({ credentials: true, origin: true }));
 // This populates auth state so getAuth() works for the map proxy auth guard below.
 app.use(clerkMiddleware());
 
-// Auth guard for map API: only allow authenticated users.
-// Must run after clerkMiddleware (which populates auth) but before the proxy.
-const requireMapAuth = (req: Request, res: Response, next: NextFunction) => {
+// Auth guard for map API: only allow authenticated users from allowed domains.
+// Runs after clerkMiddleware (which populates auth) but before the proxy.
+const requireMapAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const auth = getAuth(req);
   if (!auth?.userId) {
     res.status(401).json({ detail: "Authentication required." });
     return;
   }
+
+  try {
+    const user = await clerkClient.users.getUser(auth.userId);
+    const primaryEmail = user.primaryEmailAddress?.emailAddress || "";
+    const emailDomain = primaryEmail.split("@")[1]?.toLowerCase() || "";
+
+    if (!ALLOWED_DOMAINS.includes(emailDomain)) {
+      res.status(403).json({ detail: "Access restricted to PhenomeHealth team members." });
+      return;
+    }
+  } catch (err) {
+    logger.error({ err }, "Failed to validate user domain");
+    res.status(500).json({ detail: "Could not verify access permissions." });
+    return;
+  }
+
   next();
 };
 

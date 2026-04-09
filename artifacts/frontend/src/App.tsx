@@ -106,10 +106,21 @@ function Router() {
       <Route path="/sign-in/*?" component={SignInPage} />
       <Route path="/sign-up/*?" component={SignUpPage} />
 
+      {/* /login is a canonical alias to the sign-in page */}
+      <Route path="/login">
+        {() => <Redirect to="/sign-in" />}
+      </Route>
+
       <Route path="/upload">
         {() => <ProtectedRoute component={UploadPage} />}
       </Route>
 
+      {/* /job/:jobId is the spec-required canonical route for a mapping job dashboard */}
+      <Route path="/job/:jobId">
+        {() => <ProtectedRoute component={DashboardPage} />}
+      </Route>
+
+      {/* /dashboard/:jobId kept as alias for backward compatibility */}
       <Route path="/dashboard/:jobId">
         {() => <ProtectedRoute component={DashboardPage} />}
       </Route>

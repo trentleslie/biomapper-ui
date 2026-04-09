@@ -152,7 +152,7 @@ export default function UploadPage() {
       },
       {
         onSuccess: (data) => {
-          setLocation(`/dashboard/${data.job_id}?ontologies=${ontologiesParam}&confidence=${confidenceFilter}`);
+          setLocation(`/job/${data.job_id}?ontologies=${ontologiesParam}&confidence=${confidenceFilter}`);
         },
         onError: () => {
           toast({ title: "Failed to start mapping", description: "Unknown error", variant: "destructive" });

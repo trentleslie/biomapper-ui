@@ -18,11 +18,21 @@ export interface SankeyData {
 }
 
 const TIER_COLORS = {
-  high:    '#22c55e',  // green
-  medium:  '#f59e0b',  // amber
-  low:     '#f97316',  // orange
-  unknown: '#9ca3af',  // gray
+  high:    '#22c55e',
+  medium:  '#f59e0b',
+  low:     '#f97316',
+  unknown: '#9ca3af',
 };
+
+const ALL_NODES: SankeyNode[] = [
+  { id: 'input',        color: '#6b7280' },
+  { id: 'resolved',     color: '#14b8a6' },
+  { id: 'unresolved',   color: '#ef4444' },
+  { id: 'high',         color: TIER_COLORS.high },
+  { id: 'medium',       color: TIER_COLORS.medium },
+  { id: 'low',          color: TIER_COLORS.low },
+  { id: 'unknown_tier', color: TIER_COLORS.unknown },
+];
 
 export function buildSankeyData(
   summary: MappingSummary,
@@ -32,26 +42,30 @@ export function buildSankeyData(
   const unresolved = summary.uniqueNames - summary.resolved;
   const { high, medium, low, unknown: unknownCount } = summary.confidenceTierDistribution;
 
-  const nodes: SankeyNode[] = [
-    { id: 'input',      label: `Input (${summary.uniqueNames})`,   color: '#6b7280' },
-    { id: 'resolved',   label: `Resolved (${summary.resolved})`,   color: '#14b8a6' },
-    { id: 'unresolved', label: `Unresolved (${unresolved})`,       color: '#ef4444' },
-    { id: 'high',       label: `High (${high})`,                   color: TIER_COLORS.high },
-    { id: 'medium',     label: `Medium (${medium})`,               color: TIER_COLORS.medium },
-    { id: 'low',        label: `Low (${low})`,                     color: TIER_COLORS.low },
-    { id: 'unknown_tier', label: `Unknown (${unknownCount})`,      color: TIER_COLORS.unknown },
-  ];
+  const rawLinks: SankeyLink[] = [];
 
-  const links: SankeyLink[] = [
-    // Layer 1: resolution
-    { source: 'input',    target: 'resolved',     value: summary.resolved },
-    { source: 'input',    target: 'unresolved',   value: Math.max(unresolved, 1) }, // nivo requires value > 0
-    // Layer 2: confidence tiers (from resolved only)
-    { source: 'resolved', target: 'high',         value: high || 1 },
-    { source: 'resolved', target: 'medium',       value: medium || 1 },
-    { source: 'resolved', target: 'low',          value: low || 1 },
-    { source: 'resolved', target: 'unknown_tier', value: unknownCount || 1 },
-  ];
+  // Layer 1: resolution — only include links with value > 0 (no fake data)
+  if (summary.resolved > 0) {
+    rawLinks.push({ source: 'input', target: 'resolved', value: summary.resolved });
+  }
+  if (unresolved > 0) {
+    rawLinks.push({ source: 'input', target: 'unresolved', value: unresolved });
+  }
+
+  // Layer 2: confidence tiers — only include where count > 0
+  if (high > 0)         rawLinks.push({ source: 'resolved', target: 'high',         value: high });
+  if (medium > 0)       rawLinks.push({ source: 'resolved', target: 'medium',       value: medium });
+  if (low > 0)          rawLinks.push({ source: 'resolved', target: 'low',          value: low });
+  if (unknownCount > 0) rawLinks.push({ source: 'resolved', target: 'unknown_tier', value: unknownCount });
+
+  // Only include nodes that actually appear in a link (prevents dangling nodes)
+  const referencedIds = new Set(rawLinks.flatMap(l => [l.source, l.target]));
+  const nodes: SankeyNode[] = ALL_NODES
+    .filter(n => referencedIds.has(n.id))
+    .map(n => ({
+      ...n,
+      label: buildLabel(n.id, summary, unresolved),
+    }));
 
   if (includeVocabLayer && results.length > 0) {
     const vocabByTier: Record<string, Record<string, number>> = {};
@@ -82,16 +96,29 @@ export function buildSankeyData(
       .map(([vocab]) => vocab);
 
     for (const vocab of topVocabs) {
-      nodes.push({ id: `vocab_${vocab}`, label: vocab, color: '#3b82f6' });
+      nodes.push({ id: `vocab_${vocab}`, label: vocab.toUpperCase(), color: '#3b82f6' });
     }
     for (const [tier, counts] of Object.entries(vocabByTier)) {
       const tierId = tier === 'unknown' ? 'unknown_tier' : tier;
       for (const [vocab, count] of Object.entries(counts)) {
-        if (!topVocabs.includes(vocab)) continue;
-        links.push({ source: tierId, target: `vocab_${vocab}`, value: count });
+        if (!topVocabs.includes(vocab) || count === 0) continue;
+        rawLinks.push({ source: tierId, target: `vocab_${vocab}`, value: count });
       }
     }
   }
 
-  return { nodes, links };
+  return { nodes, links: rawLinks };
+}
+
+function buildLabel(id: string, summary: MappingSummary, unresolved: number): string {
+  switch (id) {
+    case 'input':        return `Input (${summary.uniqueNames})`;
+    case 'resolved':     return `Resolved (${summary.resolved})`;
+    case 'unresolved':   return `Unresolved (${unresolved})`;
+    case 'high':         return `High (${summary.confidenceTierDistribution.high})`;
+    case 'medium':       return `Medium (${summary.confidenceTierDistribution.medium})`;
+    case 'low':          return `Low (${summary.confidenceTierDistribution.low})`;
+    case 'unknown_tier': return `Unknown (${summary.confidenceTierDistribution.unknown})`;
+    default:             return id;
+  }
 }

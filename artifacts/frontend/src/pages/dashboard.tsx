@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/table";
 import {
   Download, AlertCircle, Loader2, ArrowLeft, LogOut,
-  ChevronDown, ChevronRight, ChevronUp, Search,
+  ChevronDown, ChevronRight, ChevronUp, Search, Flag, X,
 } from "lucide-react";
 
 const TIER_COLORS: Record<string, string> = {
@@ -59,6 +59,8 @@ export default function DashboardPage() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(1);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [flaggedNames, setFlaggedNames] = useState<Set<string>>(new Set());
+  const [dismissedNames, setDismissedNames] = useState<Set<string>>(new Set());
 
   const { jobState, done } = useMappingStream(jobId || "");
   const { data: finalResult, isLoading } = useGetMappingResult(jobId || "", {
@@ -137,7 +139,22 @@ export default function DashboardPage() {
 
   const totalPages = Math.max(1, Math.ceil(filteredResults.length / PAGE_SIZE));
   const pagedResults = filteredResults.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const needsReview = results.filter(r => r.needsReview || !r.resolved || r.confidenceTier === "unknown");
+  const needsReview = results.filter(r =>
+    (r.needsReview || !r.resolved || r.confidenceTier === "unknown") &&
+    !dismissedNames.has(r.name)
+  );
+
+  const flagReviewItem = (name: string) => {
+    setFlaggedNames(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+  };
+
+  const dismissReviewItem = (name: string) => {
+    setDismissedNames(prev => new Set([...prev, name]));
+  };
 
   const toggleSort = useCallback((field: SortField) => {
     if (sortField === field) {
@@ -440,8 +457,15 @@ export default function DashboardPage() {
                 <CardHeader className="flex flex-row items-center justify-between py-4">
                   <div>
                     <CardTitle>Needs Review <Badge variant="secondary" className="ml-2">{needsReview.length}</Badge></CardTitle>
-                    <CardDescription>Unresolved or low-confidence records requiring manual validation</CardDescription>
+                    <CardDescription>Unresolved or low-confidence records. Flag items for follow-up or dismiss once reviewed.</CardDescription>
                   </div>
+                  {flaggedNames.size > 0 && (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="destructive" className="text-xs">
+                        <Flag className="w-3 h-3 mr-1" /> {flaggedNames.size} flagged
+                      </Badge>
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent className="p-0">
                   <Table>
@@ -450,31 +474,66 @@ export default function DashboardPage() {
                         <TableHead>Name</TableHead>
                         <TableHead>Primary Curie</TableHead>
                         <TableHead>Tier</TableHead>
-                        <TableHead>Score</TableHead>
                         <TableHead>Reason</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {needsReview.slice(0, 15).map((row, i) => (
-                        <TableRow key={i} data-testid={`row-review-${i}`}>
-                          <TableCell className="font-mono text-sm">{row.name}</TableCell>
-                          <TableCell className="font-mono text-xs text-muted-foreground">{row.primaryCurie || "-"}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" style={{ color: TIER_COLORS[row.confidenceTier || "unknown"], borderColor: "currentColor" }}>
-                              {row.confidenceTier || "unresolved"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{row.confidenceScore ? row.confidenceScore.toFixed(2) : "-"}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
-                            {!row.resolved ? "No match found" : row.needsReview ? "Flagged for review" : "Low confidence"}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {needsReview.slice(0, 25).map((row, i) => {
+                        const isFlagged = flaggedNames.has(row.name);
+                        return (
+                          <TableRow
+                            key={i}
+                            data-testid={`row-review-${i}`}
+                            className={isFlagged ? "bg-amber-50 dark:bg-amber-950/20" : undefined}
+                          >
+                            <TableCell className="font-mono text-sm max-w-[200px] truncate" title={row.name}>
+                              {isFlagged && <Flag className="w-3 h-3 text-amber-500 inline mr-1" />}
+                              {row.name}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs text-muted-foreground">{row.primaryCurie || "-"}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" style={{ color: TIER_COLORS[row.confidenceTier || "unknown"], borderColor: "currentColor" }}>
+                                {row.confidenceTier || "unresolved"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {!row.resolved ? "No match found" : row.needsReview ? "Flagged by system" : "Low confidence"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-1">
+                                <Button
+                                  variant={isFlagged ? "default" : "outline"}
+                                  size="sm"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() => flagReviewItem(row.name)}
+                                  title={isFlagged ? "Remove flag" : "Flag for follow-up"}
+                                  data-testid={`btn-flag-review-${i}`}
+                                >
+                                  <Flag className="w-3 h-3 mr-1" />
+                                  {isFlagged ? "Flagged" : "Flag"}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs text-muted-foreground"
+                                  onClick={() => dismissReviewItem(row.name)}
+                                  title="Dismiss from review list"
+                                  data-testid={`btn-dismiss-review-${i}`}
+                                >
+                                  <X className="w-3 h-3 mr-1" />
+                                  Dismiss
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
-                  {needsReview.length > 15 && (
+                  {needsReview.length > 25 && (
                     <p className="text-xs text-center text-muted-foreground py-3">
-                      Showing 15 of {needsReview.length} items. Download TSV for full list.
+                      Showing 25 of {needsReview.length} items. Download TSV for full list.
                     </p>
                   )}
                 </CardContent>
