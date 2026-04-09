@@ -52,6 +52,15 @@ export default function UploadPage() {
     )];
   }, []);
 
+  // rawTotalRows = all non-empty values in selected column (before dedup)
+  // extractedNames = unique values (what gets sent to the API for mapping)
+  const rawTotalRows = selectedColumn && parsedRows.length > 0
+    ? parsedRows.filter(row => {
+        const val = row[selectedColumn];
+        return val !== null && val !== undefined && String(val).trim() !== "";
+      }).length
+    : 0;
+
   const extractedNames = selectedColumn && parsedRows.length > 0
     ? extractNamesFromRows(parsedRows, selectedColumn)
     : [];
@@ -152,7 +161,7 @@ export default function UploadPage() {
       },
       {
         onSuccess: (data) => {
-          setLocation(`/job/${data.job_id}?ontologies=${ontologiesParam}&confidence=${confidenceFilter}`);
+          setLocation(`/job/${data.job_id}?ontologies=${ontologiesParam}&confidence=${confidenceFilter}&totalRows=${rawTotalRows}`);
         },
         onError: () => {
           toast({ title: "Failed to start mapping", description: "Unknown error", variant: "destructive" });
@@ -243,7 +252,7 @@ export default function UploadPage() {
                   {extractedNames.length > 0 && (
                     <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-2">
                       <CheckCircle2 className="w-4 h-4 text-primary" />
-                      Found {extractedNames.length.toLocaleString()} unique names
+                      {rawTotalRows.toLocaleString()} rows → {extractedNames.length.toLocaleString()} unique names (after dedup)
                     </p>
                   )}
                 </div>

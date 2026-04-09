@@ -51,6 +51,8 @@ export default function DashboardPage() {
     ? new Set(params.get("ontologies")!.split(",") as OntologyKey[])
     : new Set<OntologyKey>(ALL_ONTOLOGIES);
   const initialConfidence = (params.get("confidence") as ConfidenceFilter) || "all";
+  // Total rows from the uploaded file (before dedup); passed from upload page via URL param
+  const urlTotalRows = params.get("totalRows") ? parseInt(params.get("totalRows")!, 10) : null;
 
   const [visibleOntologies] = useState<Set<OntologyKey>>(initialOntologies);
   const [confidenceFilter, setConfidenceFilter] = useState<ConfidenceFilter>(initialConfidence);
@@ -97,7 +99,9 @@ export default function DashboardPage() {
     });
 
     return {
-      totalRows: results.length,
+      // totalRows = original file row count (including duplicates) passed from upload page,
+      // or falls back to uniqueNames if URL param not available (e.g., direct navigation)
+      totalRows: urlTotalRows ?? uniqueNames,
       uniqueNames: Math.max(uniqueNames, 1),
       resolved,
       resolvedRate: uniqueNames > 0 ? resolved / uniqueNames : 0,
@@ -105,7 +109,7 @@ export default function DashboardPage() {
       confidenceTierDistribution: { high, medium, low, unknown: unknownCount },
       vocabularyCoverage: vocabCoverage,
     };
-  }, [jobData, results]);
+  }, [jobData, results, urlTotalRows]);
 
   const filteredResults = useMemo(() => {
     let filtered = results;
@@ -140,7 +144,7 @@ export default function DashboardPage() {
   const totalPages = Math.max(1, Math.ceil(filteredResults.length / PAGE_SIZE));
   const pagedResults = filteredResults.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const needsReview = results.filter(r =>
-    (r.needsReview || !r.resolved || r.confidenceTier === "unknown") &&
+    (r.needsReview || !r.resolved || r.confidenceTier === "unknown" || r.confidenceTier === "low") &&
     !dismissedNames.has(r.name)
   );
 
