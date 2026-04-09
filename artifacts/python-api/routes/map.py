@@ -70,8 +70,8 @@ async def _run_mapping(job_id: str, request: BatchRequest) -> None:
     try:
         async for result in mapper.map_batch(request.names, request.config):
             job_store.add_result(job_id, result)
-            if result.get("error_type") == "auth_failure":
-                job_store.error(job_id, result.get("error", "Auth failure"))
+            if result.get("error_type") in ("auth_failure", "config_error"):
+                job_store.error(job_id, result.get("error", "Fatal mapping error"))
                 return
         job_store.complete(job_id)
     except Exception as e:

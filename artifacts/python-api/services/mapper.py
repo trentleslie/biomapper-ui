@@ -4,6 +4,7 @@ from typing import Any, AsyncIterator
 from ddharmon import (
     BioMapperClient,
     BioMapperAuthError,
+    BioMapperConfigError,
     BioMapperRateLimitError,
     BioMapperError,
 )
@@ -30,7 +31,15 @@ class MapperService:
                 if stop_event.is_set():
                     await queue.put({"name": name, "skipped": True, "resolved": False})
                     return
-                result = await self._map_with_retry(name, config, stop_event)
+                try:
+                    result = await self._map_with_retry(name, config, stop_event)
+                except Exception as e:
+                    result = {
+                        "name": name,
+                        "resolved": False,
+                        "error": str(e),
+                        "error_type": "mapping_error",
+                    }
                 await queue.put(result)
 
         tasks = [asyncio.create_task(process_one(name)) for name in names]
@@ -55,7 +64,18 @@ class MapperService:
 
         last_error: str = "Unknown error"
 
-        async with BioMapperClient() as client:
+        try:
+            client_ctx = BioMapperClient()
+        except BioMapperConfigError as e:
+            stop_event.set()
+            return {
+                "name": name,
+                "resolved": False,
+                "error": f"API key not configured — {e}",
+                "error_type": "config_error",
+            }
+
+        async with client_ctx as client:
             for attempt in range(max_retries):
                 if stop_event.is_set():
                     return {
