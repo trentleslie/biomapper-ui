@@ -10,7 +10,15 @@ import { logger } from "./lib/logger";
 const PYTHON_API_PORT = parseInt(process.env.PYTHON_API_PORT || "8000", 10);
 const PYTHON_API_BASE = `http://localhost:${PYTHON_API_PORT}`;
 
-const ALLOWED_DOMAINS = ["phenomehealth.org", "phenome.health", "phenomics.ai"];
+// Configurable access policy (defaults to phenomehealth.org only per spec).
+// Set ALLOWED_EMAIL_DOMAINS or ALLOWED_EMAILS env vars to override without code changes.
+const rawDomains = process.env.ALLOWED_EMAIL_DOMAINS || "phenomehealth.org";
+const ALLOWED_EMAIL_DOMAINS = rawDomains.split(",").map(d => d.trim().toLowerCase()).filter(Boolean);
+
+const rawEmails = process.env.ALLOWED_EMAILS || "";
+const ALLOWED_EMAILS_SET = new Set(
+  rawEmails.split(",").map(e => e.trim().toLowerCase()).filter(Boolean)
+);
 
 const app: Express = express();
 
@@ -43,8 +51,15 @@ app.use(cors({ credentials: true, origin: true }));
 // This populates auth state so getAuth() works for the map proxy auth guard below.
 app.use(clerkMiddleware());
 
-// Auth guard for map API: only allow authenticated users from allowed domains.
-// Runs after clerkMiddleware (which populates auth) but before the proxy.
+/**
+ * requireMapAuth — server-side gate for /api/map/* routes.
+ *
+ * Requires the request to be from an authenticated Clerk user whose verified
+ * primary email EITHER belongs to an allowed domain (ALLOWED_EMAIL_DOMAINS)
+ * OR is listed explicitly in ALLOWED_EMAILS.
+ *
+ * The backend is the authoritative source of truth; frontend gating is UX-only.
+ */
 const requireMapAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const auth = getAuth(req);
   if (!auth?.userId) {
@@ -54,10 +69,14 @@ const requireMapAuth = async (req: Request, res: Response, next: NextFunction): 
 
   try {
     const user = await clerkClient.users.getUser(auth.userId);
-    const primaryEmail = user.primaryEmailAddress?.emailAddress || "";
-    const emailDomain = primaryEmail.split("@")[1]?.toLowerCase() || "";
+    const primaryEmail = (user.primaryEmailAddress?.emailAddress || "").toLowerCase();
+    const emailDomain = primaryEmail.split("@")[1] || "";
 
-    if (!ALLOWED_DOMAINS.includes(emailDomain)) {
+    const isAllowed =
+      ALLOWED_EMAILS_SET.has(primaryEmail) ||
+      ALLOWED_EMAIL_DOMAINS.includes(emailDomain);
+
+    if (!isAllowed) {
       res.status(403).json({ detail: "Access restricted to PhenomeHealth team members." });
       return;
     }

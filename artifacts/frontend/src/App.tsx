@@ -68,7 +68,14 @@ function ClerkQueryClientCacheInvalidator() {
   return null;
 }
 
-const ALLOWED_DOMAINS = ["@phenomehealth.org", "@phenome.health", "@phenomics.ai"];
+// Configurable allow-policy for UX gating (backend is authoritative source of truth).
+// Defaults to phenomehealth.org only. Override via VITE_ALLOWED_EMAIL_DOMAINS or
+// VITE_ALLOWED_EMAILS (comma-separated) environment variables.
+const rawFrontendDomains = (import.meta.env.VITE_ALLOWED_EMAIL_DOMAINS as string | undefined) || "phenomehealth.org";
+const ALLOWED_UX_DOMAINS = rawFrontendDomains.split(",").map((d: string) => d.trim().toLowerCase()).filter(Boolean);
+
+const rawFrontendEmails = (import.meta.env.VITE_ALLOWED_EMAILS as string | undefined) || "";
+const ALLOWED_UX_EMAILS = new Set(rawFrontendEmails.split(",").map((e: string) => e.trim().toLowerCase()).filter(Boolean));
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoaded, isSignedIn } = useUser();
@@ -76,8 +83,9 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   if (!isLoaded) return null;
   if (!isSignedIn) return <Redirect to="/" />;
 
-  const email = user.primaryEmailAddress?.emailAddress || "";
-  const isAllowed = ALLOWED_DOMAINS.some(domain => email.toLowerCase().endsWith(domain));
+  const email = (user.primaryEmailAddress?.emailAddress || "").toLowerCase();
+  const emailDomain = email.split("@")[1] || "";
+  const isAllowed = ALLOWED_UX_EMAILS.has(email) || ALLOWED_UX_DOMAINS.includes(emailDomain);
 
   if (!isAllowed) {
     return <AccessDeniedPage />;
