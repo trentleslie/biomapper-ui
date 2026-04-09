@@ -1,0 +1,11 @@
+Things to Verify or Correct Before Proceeding
+1. The agent plans to call BioMapper2 directly from Express if ddharmon isn't available
+The task description says "calling BioMapper2 via HTTP (since Python/ddharmon isn't the stack here)" in the agent's thinking notes. The actual task plan correctly specifies FastAPI + ddharmon, but watch that the agent doesn't drift toward a pure Node.js BioMapper2 client during implementation. The whole point of the FastAPI service is to exercise ddharmon. If it hedges and builds a Node.js HTTP client instead, push back.
+2. artifacts/python-api/ placement is unverified
+The agent is guessing at the monorepo's artifact convention. It says "or similar" — meaning it doesn't know if artifacts/ is the right directory. When it starts scaffolding, make sure it checks the actual artifact registration system before inventing a path. If it gets the path wrong the service won't get registered and won't run.
+3. The frontend task spec mentions Clerk, not NextAuth
+The frontend task says "Replit workspace uses Clerk or Replit Auth — use Clerk Auth" — this is the agent adapting to the Replit environment, which is reasonable. Just confirm this is acceptable to you. Clerk with Google provider restricted to phenomehealth.org domain + email whitelist is functionally equivalent to the NextAuth spec, but the implementation will be different. The agent correctly notes it will read the Clerk skill before implementing.
+4. annotators param deferred to Phase 3 in the backend task
+The backend task scope says "annotation_mode only for MVP" and defers annotator selection. This is a reasonable scope cut but worth confirming — the MappingConfig Pydantic model in the plan includes annotation_mode only anyway, so this is consistent.
+5. One genuine issue: the SSE proxy note in task 2
+The task says to use http-proxy-middleware for SSE-safe proxying, which is correct. However it also says "do NOT create an intermediate API route wrapper for SSE" — make sure the agent understands this applies to the SSE stream endpoint specifically (/api/map/stream/{job_id}). The batch POST and result GET endpoints can go through a normal Express route handler if needed; only the SSE stream must be a raw proxy pass-through to avoid buffering.
