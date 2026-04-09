@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useStartMappingBatch, MappingConfigAnnotationMode } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, UploadCloud, FileType, CheckCircle2, ArrowLeft } from "lucide-react";
+import { Loader2, UploadCloud, FileType, CheckCircle2 } from "lucide-react";
 
 const ALL_ONTOLOGIES = ["hmdb", "chebi", "pubchem", "refmet", "lipidmaps", "kegg", "umls", "mesh", "unii", "chembl"] as const;
 type OntologyKey = typeof ALL_ONTOLOGIES[number];
@@ -164,9 +164,6 @@ export default function UploadPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b border-border bg-card px-6 py-3 flex items-center gap-4 sticky top-0 z-10">
-        <Button variant="ghost" size="icon" onClick={() => setLocation("/")} data-testid="btn-back-home">
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
         <span className="font-semibold text-foreground tracking-tight">PhenomeHealth Linker</span>
       </header>
 

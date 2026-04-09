@@ -1,11 +1,10 @@
 import { useEffect, useRef } from "react";
-import { ClerkProvider, SignIn, SignUp, Show, useClerk, useUser } from '@clerk/react';
+import { ClerkProvider, SignIn, SignUp, useClerk, useUser } from '@clerk/react';
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from 'wouter';
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-import Home from "@/pages/home";
 import UploadPage from "@/pages/upload";
 import DashboardPage from "@/pages/dashboard";
 import AccessDeniedPage from "@/pages/access-denied";
@@ -26,22 +25,19 @@ function stripBase(path: string): string {
     : path;
 }
 
-function SignInPage() {
-  // To update login providers, app branding, or OAuth settings use the Auth
-  // pane in the workspace toolbar. More information can be found in the Replit docs.
+// /login is the canonical sign-in page per spec
+function LoginPage() {
   return (
     <div style={{ display: 'flex', justifyContent: 'center', marginTop: '2rem' }}>
-      <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
+      <SignIn routing="path" path={`${basePath}/login`} signUpUrl={`${basePath}/sign-up`} />
     </div>
   );
 }
 
 function SignUpPage() {
-  // To update login providers, app branding, or OAuth settings use the Auth
-  // pane in the workspace toolbar. More information can be found in the Replit docs.
   return (
     <div style={{ display: 'flex', justifyContent: 'center', marginTop: '2rem' }}>
-      <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
+      <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/login`} />
     </div>
   );
 }
@@ -81,7 +77,8 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   const { user, isLoaded, isSignedIn } = useUser();
 
   if (!isLoaded) return null;
-  if (!isSignedIn) return <Redirect to="/" />;
+  // Redirect unauthenticated users to /login (the canonical sign-in entry per spec)
+  if (!isSignedIn) return <Redirect to="/login" />;
 
   const email = (user.primaryEmailAddress?.emailAddress || "").toLowerCase();
   const emailDomain = email.split("@")[1] || "";
@@ -94,43 +91,37 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   return <Component />;
 }
 
-function HomeRedirect() {
-  return (
-    <>
-      <Show when="signed-in">
-        <Redirect to="/upload" />
-      </Show>
-      <Show when="signed-out">
-        <Home />
-      </Show>
-    </>
-  );
-}
-
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={HomeRedirect} />
-      <Route path="/sign-in/*?" component={SignInPage} />
-      <Route path="/sign-up/*?" component={SignUpPage} />
-
-      {/* /login is a canonical alias to the sign-in page */}
-      <Route path="/login">
-        {() => <Redirect to="/sign-in" />}
+      {/* / = upload+config page (spec-required canonical upload route) */}
+      <Route path="/">
+        {() => <ProtectedRoute component={UploadPage} />}
       </Route>
 
+      {/* /login = canonical sign-in entry per spec */}
+      <Route path="/login/*?" component={LoginPage} />
+
+      {/* /sign-in kept as alias for /login for Clerk compat */}
+      <Route path="/sign-in/*?">
+        {() => <Redirect to="/login" />}
+      </Route>
+
+      <Route path="/sign-up/*?" component={SignUpPage} />
+
+      {/* /upload kept as alias for / */}
       <Route path="/upload">
         {() => <ProtectedRoute component={UploadPage} />}
       </Route>
 
-      {/* /job/:jobId is the spec-required canonical route for a mapping job dashboard */}
+      {/* /job/:jobId = canonical dashboard route per spec */}
       <Route path="/job/:jobId">
         {() => <ProtectedRoute component={DashboardPage} />}
       </Route>
 
-      {/* /dashboard/:jobId kept as alias for backward compatibility */}
+      {/* /dashboard/:jobId redirects to canonical /job/:jobId */}
       <Route path="/dashboard/:jobId">
-        {() => <ProtectedRoute component={DashboardPage} />}
+        {(params) => <Redirect to={`/job/${params.jobId}`} />}
       </Route>
 
       <Route component={NotFound} />
