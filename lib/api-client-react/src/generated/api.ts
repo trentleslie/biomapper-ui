@@ -5,18 +5,27 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
+  MutationFunction,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { HealthStatus } from "./api.schemas";
+import type {
+  BatchMapRequest,
+  BatchMapResponse,
+  ErrorResponse,
+  HealthStatus,
+  JobResult,
+} from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
-import type { ErrorType } from "../custom-fetch";
+import type { ErrorType, BodyType } from "../custom-fetch";
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -92,6 +101,182 @@ export function useHealthCheck<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getHealthCheckQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Submit a list of compound/entity names for entity linking via BioMapper2.
+Maximum 10,000 names per job. Returns a job_id to poll for progress.
+
+ * @summary Start a batch mapping job
+ */
+export const getStartMappingBatchUrl = () => {
+  return `/api/map/batch`;
+};
+
+export const startMappingBatch = async (
+  batchMapRequest: BatchMapRequest,
+  options?: RequestInit,
+): Promise<BatchMapResponse> => {
+  return customFetch<BatchMapResponse>(getStartMappingBatchUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(batchMapRequest),
+  });
+};
+
+export const getStartMappingBatchMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof startMappingBatch>>,
+    TError,
+    { data: BodyType<BatchMapRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof startMappingBatch>>,
+  TError,
+  { data: BodyType<BatchMapRequest> },
+  TContext
+> => {
+  const mutationKey = ["startMappingBatch"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof startMappingBatch>>,
+    { data: BodyType<BatchMapRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return startMappingBatch(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type StartMappingBatchMutationResult = NonNullable<
+  Awaited<ReturnType<typeof startMappingBatch>>
+>;
+export type StartMappingBatchMutationBody = BodyType<BatchMapRequest>;
+export type StartMappingBatchMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Start a batch mapping job
+ */
+export const useStartMappingBatch = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof startMappingBatch>>,
+    TError,
+    { data: BodyType<BatchMapRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof startMappingBatch>>,
+  TError,
+  { data: BodyType<BatchMapRequest> },
+  TContext
+> => {
+  return useMutation(getStartMappingBatchMutationOptions(options));
+};
+
+/**
+ * @summary Get full mapping results for a completed job
+ */
+export const getGetMappingResultUrl = (jobId: string) => {
+  return `/api/map/result/${jobId}`;
+};
+
+export const getMappingResult = async (
+  jobId: string,
+  options?: RequestInit,
+): Promise<JobResult | ErrorResponse> => {
+  return customFetch<JobResult | ErrorResponse>(getGetMappingResultUrl(jobId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetMappingResultQueryKey = (jobId: string) => {
+  return [`/api/map/result/${jobId}`] as const;
+};
+
+export const getGetMappingResultQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMappingResult>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getMappingResult>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetMappingResultQueryKey(jobId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getMappingResult>>
+  > = ({ signal }) => getMappingResult(jobId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!jobId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMappingResult>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMappingResultQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMappingResult>>
+>;
+export type GetMappingResultQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get full mapping results for a completed job
+ */
+
+export function useGetMappingResult<
+  TData = Awaited<ReturnType<typeof getMappingResult>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getMappingResult>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMappingResultQueryOptions(jobId, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

@@ -8,3 +8,94 @@
 export interface HealthStatus {
   status: string;
 }
+
+export type MappingConfigAnnotationMode =
+  (typeof MappingConfigAnnotationMode)[keyof typeof MappingConfigAnnotationMode];
+
+export const MappingConfigAnnotationMode = {
+  missing: "missing",
+  all: "all",
+  none: "none",
+} as const;
+
+export type MappingConfigHints = {
+  [key: string]: { [key: string]: string | string[] };
+};
+
+export interface MappingConfig {
+  annotationMode?: MappingConfigAnnotationMode;
+  hints?: MappingConfigHints;
+}
+
+export interface BatchMapRequest {
+  /**
+   * List of entity names to map (max 10,000)
+   * @maxItems 10000
+   */
+  names: string[];
+  config?: MappingConfig;
+}
+
+export interface BatchMapResponse {
+  job_id: string;
+}
+
+export type MappingResultItemConfidenceTier =
+  | (typeof MappingResultItemConfidenceTier)[keyof typeof MappingResultItemConfidenceTier]
+  | null;
+
+export const MappingResultItemConfidenceTier = {
+  high: "high",
+  medium: "medium",
+  low: "low",
+  unknown: "unknown",
+} as const;
+
+export type MappingResultItemIdentifiers = {
+  hmdb?: string[];
+  chebi?: string[];
+  pubchem?: string[];
+  refmet?: string[];
+  lipidmaps?: string[];
+  kegg?: string[];
+  umls?: string[];
+  mesh?: string[];
+  unii?: string[];
+  chembl?: string[];
+};
+
+export interface MappingResultItem {
+  name: string;
+  resolved: boolean;
+  primaryCurie?: string | null;
+  confidenceScore?: number | null;
+  confidenceTier?: MappingResultItemConfidenceTier;
+  needsReview?: boolean;
+  identifiers?: MappingResultItemIdentifiers;
+  error?: string | null;
+  error_type?: string | null;
+}
+
+export type JobResultStatus =
+  (typeof JobResultStatus)[keyof typeof JobResultStatus];
+
+export const JobResultStatus = {
+  pending: "pending",
+  processing: "processing",
+  complete: "complete",
+  error: "error",
+} as const;
+
+export interface JobResult {
+  job_id: string;
+  status: JobResultStatus;
+  completed: number;
+  total: number;
+  error_count: number;
+  error_message?: string | null;
+  results: MappingResultItem[];
+}
+
+export interface ErrorResponse {
+  detail: string;
+}

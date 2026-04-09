@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: mapping
+    description: Entity linking / BioMapper2 mapping operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,66 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /map/batch:
+    post:
+      operationId: startMappingBatch
+      tags: [mapping]
+      summary: Start a batch mapping job
+      description: |
+        Submit a list of compound/entity names for entity linking via BioMapper2.
+        Maximum 10,000 names per job. Returns a job_id to poll for progress.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchMapRequest"
+      responses:
+        "200":
+          description: Job created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchMapResponse"
+        "400":
+          description: Invalid request (e.g. too many names)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /map/result/{jobId}:
+    get:
+      operationId: getMappingResult
+      tags: [mapping]
+      summary: Get full mapping results for a completed job
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Full job results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobResult"
+        "202":
+          description: Job not yet complete
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +96,152 @@ components:
       required:
         - status
 
+    MappingConfig:
+      type: object
+      properties:
+        annotationMode:
+          type: string
+          enum: [missing, all, none]
+          default: missing
+        hints:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties:
+              oneOf:
+                - type: string
+                - type: array
+                  items:
+                    type: string
+      required: []
+
+    BatchMapRequest:
+      type: object
+      properties:
+        names:
+          type: array
+          items:
+            type: string
+          maxItems: 10000
+          description: List of entity names to map (max 10,000)
+        config:
+          $ref: "#/components/schemas/MappingConfig"
+      required:
+        - names
+
+    BatchMapResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+      required:
+        - job_id
+
+    MappingResultItem:
+      type: object
+      properties:
+        name:
+          type: string
+        resolved:
+          type: boolean
+        primaryCurie:
+          type: string
+          nullable: true
+        confidenceScore:
+          type: number
+          nullable: true
+        confidenceTier:
+          type: string
+          enum: [high, medium, low, unknown]
+          nullable: true
+        needsReview:
+          type: boolean
+        identifiers:
+          type: object
+          properties:
+            hmdb:
+              type: array
+              items:
+                type: string
+            chebi:
+              type: array
+              items:
+                type: string
+            pubchem:
+              type: array
+              items:
+                type: string
+            refmet:
+              type: array
+              items:
+                type: string
+            lipidmaps:
+              type: array
+              items:
+                type: string
+            kegg:
+              type: array
+              items:
+                type: string
+            umls:
+              type: array
+              items:
+                type: string
+            mesh:
+              type: array
+              items:
+                type: string
+            unii:
+              type: array
+              items:
+                type: string
+            chembl:
+              type: array
+              items:
+                type: string
+        error:
+          type: string
+          nullable: true
+        error_type:
+          type: string
+          nullable: true
+      required:
+        - name
+        - resolved
+
+    JobResult:
+      type: object
+      properties:
+        job_id:
+          type: string
+        status:
+          type: string
+          enum: [pending, processing, complete, error]
+        completed:
+          type: integer
+        total:
+          type: integer
+        error_count:
+          type: integer
+        error_message:
+          type: string
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/MappingResultItem"
+      required:
+        - job_id
+        - status
+        - completed
+        - total
+        - error_count
+        - results
+
+    ErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+        - detail

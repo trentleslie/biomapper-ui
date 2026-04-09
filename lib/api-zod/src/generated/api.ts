@@ -14,3 +14,82 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * Submit a list of compound/entity names for entity linking via BioMapper2.
+Maximum 10,000 names per job. Returns a job_id to poll for progress.
+
+ * @summary Start a batch mapping job
+ */
+export const startMappingBatchBodyNamesMax = 10000;
+
+export const startMappingBatchBodyConfigAnnotationModeDefault = `missing`;
+
+export const StartMappingBatchBody = zod.object({
+  names: zod
+    .array(zod.string())
+    .max(startMappingBatchBodyNamesMax)
+    .describe("List of entity names to map (max 10,000)"),
+  config: zod
+    .object({
+      annotationMode: zod
+        .enum(["missing", "all", "none"])
+        .default(startMappingBatchBodyConfigAnnotationModeDefault),
+      hints: zod
+        .record(
+          zod.string(),
+          zod.record(
+            zod.string(),
+            zod.union([zod.string(), zod.array(zod.string())]),
+          ),
+        )
+        .optional(),
+    })
+    .optional(),
+});
+
+export const StartMappingBatchResponse = zod.object({
+  job_id: zod.string(),
+});
+
+/**
+ * @summary Get full mapping results for a completed job
+ */
+export const GetMappingResultParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const GetMappingResultResponse = zod.object({
+  job_id: zod.string(),
+  status: zod.enum(["pending", "processing", "complete", "error"]),
+  completed: zod.number(),
+  total: zod.number(),
+  error_count: zod.number(),
+  error_message: zod.string().nullish(),
+  results: zod.array(
+    zod.object({
+      name: zod.string(),
+      resolved: zod.boolean(),
+      primaryCurie: zod.string().nullish(),
+      confidenceScore: zod.number().nullish(),
+      confidenceTier: zod.enum(["high", "medium", "low", "unknown"]).nullish(),
+      needsReview: zod.boolean().optional(),
+      identifiers: zod
+        .object({
+          hmdb: zod.array(zod.string()).optional(),
+          chebi: zod.array(zod.string()).optional(),
+          pubchem: zod.array(zod.string()).optional(),
+          refmet: zod.array(zod.string()).optional(),
+          lipidmaps: zod.array(zod.string()).optional(),
+          kegg: zod.array(zod.string()).optional(),
+          umls: zod.array(zod.string()).optional(),
+          mesh: zod.array(zod.string()).optional(),
+          unii: zod.array(zod.string()).optional(),
+          chembl: zod.array(zod.string()).optional(),
+        })
+        .optional(),
+      error: zod.string().nullish(),
+      error_type: zod.string().nullish(),
+    }),
+  ),
+});

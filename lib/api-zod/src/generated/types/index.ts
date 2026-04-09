@@ -6,4 +6,15 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./batchMapRequest";
+export * from "./batchMapResponse";
+export * from "./errorResponse";
 export * from "./healthStatus";
+export * from "./jobResult";
+export * from "./jobResultStatus";
+export * from "./mappingConfig";
+export * from "./mappingConfigAnnotationMode";
+export * from "./mappingConfigHints";
+export * from "./mappingResultItem";
+export * from "./mappingResultItemConfidenceTier";
+export * from "./mappingResultItemIdentifiers";
