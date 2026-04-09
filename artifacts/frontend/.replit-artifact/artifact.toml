@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Entity Linker Dashboard"
+version = "1.0.0"
+id = "artifacts/frontend"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18130
+
+[services.development]
+run = "pnpm --filter @workspace/frontend run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/frontend", "run", "build" ]
+publicDir = "artifacts/frontend/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18130"
+BASE_PATH = "/"

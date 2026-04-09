@@ -1,7 +1,9 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
+import { clerkMiddleware } from "@clerk/express";
 import { createProxyMiddleware } from "http-proxy-middleware";
+import { CLERK_PROXY_PATH, clerkProxyMiddleware } from "./middlewares/clerkProxyMiddleware";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
@@ -29,11 +31,14 @@ app.use(
     },
   }),
 );
-app.use(cors());
+
+// Clerk proxy must be before body parsers (streams raw bytes)
+app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
+
+app.use(cors({ credentials: true, origin: true }));
 
 // Mount the map proxy BEFORE body parsers so the raw body stream is still intact.
 // The SSE stream endpoint (/api/map/stream/*) requires unbuffered pass-through.
-// The batch POST and result GET endpoints are also proxied here for simplicity.
 app.use(
   "/api/map",
   createProxyMiddleware({
@@ -56,6 +61,8 @@ app.use(
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.use(clerkMiddleware());
 
 app.use("/api", router);
 
