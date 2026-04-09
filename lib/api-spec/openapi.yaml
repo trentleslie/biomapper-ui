@@ -55,6 +55,37 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /map/stream/{jobId}:
+    get:
+      operationId: streamMappingProgress
+      tags: [mapping]
+      summary: Stream job progress via Server-Sent Events
+      description: |
+        Opens a persistent SSE connection that emits `progress` events until the job
+        reaches a terminal state (complete or error). Each event payload is a JobResult JSON object.
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: SSE stream of progress events
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  Server-Sent Events stream. Each event has format:
+                  `event: progress\ndata: <JobResult JSON>\n\n`
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /map/result/{jobId}:
     get:
       operationId: getMappingResult

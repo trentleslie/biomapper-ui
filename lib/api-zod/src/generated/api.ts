@@ -53,6 +53,16 @@ export const StartMappingBatchResponse = zod.object({
 });
 
 /**
+ * Opens a persistent SSE connection that emits `progress` events until the job
+reaches a terminal state (complete or error). Each event payload is a JobResult JSON object.
+
+ * @summary Stream job progress via Server-Sent Events
+ */
+export const StreamMappingProgressParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+/**
  * @summary Get full mapping results for a completed job
  */
 export const GetMappingResultParams = zod.object({

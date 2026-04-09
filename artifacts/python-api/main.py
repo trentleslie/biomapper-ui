@@ -1,6 +1,7 @@
 import os
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -18,6 +19,13 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(map_router.router, prefix="/map")
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    errors = exc.errors()
+    msg = errors[0]["msg"] if errors else "Validation error"
+    return JSONResponse(status_code=400, content={"detail": msg})
 
 
 @app.exception_handler(ValueError)

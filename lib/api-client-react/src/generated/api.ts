@@ -199,6 +199,98 @@ export const useStartMappingBatch = <
 };
 
 /**
+ * Opens a persistent SSE connection that emits `progress` events until the job
+reaches a terminal state (complete or error). Each event payload is a JobResult JSON object.
+
+ * @summary Stream job progress via Server-Sent Events
+ */
+export const getStreamMappingProgressUrl = (jobId: string) => {
+  return `/api/map/stream/${jobId}`;
+};
+
+export const streamMappingProgress = async (
+  jobId: string,
+  options?: RequestInit,
+): Promise<string> => {
+  return customFetch<string>(getStreamMappingProgressUrl(jobId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getStreamMappingProgressQueryKey = (jobId: string) => {
+  return [`/api/map/stream/${jobId}`] as const;
+};
+
+export const getStreamMappingProgressQueryOptions = <
+  TData = Awaited<ReturnType<typeof streamMappingProgress>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof streamMappingProgress>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getStreamMappingProgressQueryKey(jobId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof streamMappingProgress>>
+  > = ({ signal }) =>
+    streamMappingProgress(jobId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!jobId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof streamMappingProgress>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type StreamMappingProgressQueryResult = NonNullable<
+  Awaited<ReturnType<typeof streamMappingProgress>>
+>;
+export type StreamMappingProgressQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Stream job progress via Server-Sent Events
+ */
+
+export function useStreamMappingProgress<
+  TData = Awaited<ReturnType<typeof streamMappingProgress>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof streamMappingProgress>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getStreamMappingProgressQueryOptions(jobId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * @summary Get full mapping results for a completed job
  */
 export const getGetMappingResultUrl = (jobId: string) => {
