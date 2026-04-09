@@ -7,10 +7,28 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { useStartMappingBatch } from "@workspace/api-client-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useStartMappingBatch, MappingConfigAnnotationMode } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, UploadCloud, FileType, CheckCircle2, ArrowLeft } from "lucide-react";
-import { MappingConfigAnnotationMode } from "@workspace/api-client-react";
+
+const ALL_ONTOLOGIES = ["hmdb", "chebi", "pubchem", "refmet", "lipidmaps", "kegg", "umls", "mesh", "unii", "chembl"] as const;
+type OntologyKey = typeof ALL_ONTOLOGIES[number];
+
+const ONTOLOGY_LABELS: Record<OntologyKey, string> = {
+  hmdb: "HMDB",
+  chebi: "ChEBI",
+  pubchem: "PubChem",
+  refmet: "RefMet",
+  lipidmaps: "LIPIDMAPS",
+  kegg: "KEGG",
+  umls: "UMLS",
+  mesh: "MeSH",
+  unii: "UNII",
+  chembl: "ChEMBL",
+};
+
+export type ConfidenceFilter = "all" | "high_medium" | "high";
 
 export default function UploadPage() {
   const [, setLocation] = useLocation();
@@ -20,6 +38,8 @@ export default function UploadPage() {
   const [selectedColumn, setSelectedColumn] = useState<string>("");
   const [parsedRows, setParsedRows] = useState<Record<string, string>[]>([]);
   const [annotationMode, setAnnotationMode] = useState<MappingConfigAnnotationMode>("missing");
+  const [selectedOntologies, setSelectedOntologies] = useState<Set<OntologyKey>>(new Set(ALL_ONTOLOGIES));
+  const [confidenceFilter, setConfidenceFilter] = useState<ConfidenceFilter>("all");
 
   const startMapping = useStartMappingBatch();
 
@@ -49,25 +69,25 @@ export default function UploadPage() {
     setSelectedColumn(likelyNameCol);
   }, []);
 
-  const parseFile = useCallback((file: File) => {
+  const parseFile = useCallback((uploadedFile: File) => {
     const reader = new FileReader();
 
-    if (file.name.endsWith('.csv') || file.name.endsWith('.tsv')) {
+    if (uploadedFile.name.endsWith('.csv') || uploadedFile.name.endsWith('.tsv')) {
       reader.onload = (e) => {
         const text = e.target?.result as string;
-        Papa.parse(text, {
+        Papa.parse<Record<string, string>>(text, {
           header: true,
           skipEmptyLines: true,
           complete: (results) => {
-            processRows(results.data as Record<string, string>[]);
+            processRows(results.data);
           },
-          error: (err) => {
+          error: (err: Error) => {
             toast({ title: "Error parsing file", description: err.message, variant: "destructive" });
           }
         });
       };
-      reader.readAsText(file);
-    } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+      reader.readAsText(uploadedFile);
+    } else if (uploadedFile.name.endsWith('.xlsx') || uploadedFile.name.endsWith('.xls')) {
       reader.onload = (e) => {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array' });
@@ -76,7 +96,7 @@ export default function UploadPage() {
         const json = XLSX.utils.sheet_to_json(worksheet) as Record<string, string>[];
         processRows(json);
       };
-      reader.readAsArrayBuffer(file);
+      reader.readAsArrayBuffer(uploadedFile);
     }
   }, [processRows, toast]);
 
@@ -98,6 +118,18 @@ export default function UploadPage() {
     maxFiles: 1
   });
 
+  const toggleOntology = (key: OntologyKey) => {
+    setSelectedOntologies(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
   const handleSubmit = () => {
     if (extractedNames.length === 0) {
       toast({ title: "No names found", description: "Please select a column with valid data", variant: "destructive" });
@@ -109,6 +141,8 @@ export default function UploadPage() {
       return;
     }
 
+    const ontologiesParam = Array.from(selectedOntologies).join(",");
+
     startMapping.mutate(
       {
         data: {
@@ -118,10 +152,10 @@ export default function UploadPage() {
       },
       {
         onSuccess: (data) => {
-          setLocation(`/dashboard/${data.job_id}`);
+          setLocation(`/dashboard/${data.job_id}?ontologies=${ontologiesParam}&confidence=${confidenceFilter}`);
         },
-        onError: (err: any) => {
-          toast({ title: "Failed to start mapping", description: err?.detail || "Unknown error", variant: "destructive" });
+        onError: () => {
+          toast({ title: "Failed to start mapping", description: "Unknown error", variant: "destructive" });
         }
       }
     );
@@ -194,7 +228,7 @@ export default function UploadPage() {
             <Card className="animate-in fade-in slide-in-from-bottom-4">
               <CardHeader>
                 <CardTitle>2. Configure Mapping</CardTitle>
-                <CardDescription>Select the column containing the raw names and adjust settings.</CardDescription>
+                <CardDescription>Select the name column, mapping settings, and display preferences.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-3">
@@ -227,6 +261,39 @@ export default function UploadPage() {
                       <SelectItem value="missing">Missing (Only add annotations if not present)</SelectItem>
                       <SelectItem value="all">All (Force all annotators to run)</SelectItem>
                       <SelectItem value="none">None (Skip annotation phase)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-3">
+                  <Label>Target Ontologies <span className="text-muted-foreground font-normal text-xs ml-1">(controls which identifier columns appear in results)</span></Label>
+                  <div className="grid grid-cols-2 gap-2" data-testid="ontology-checkboxes">
+                    {ALL_ONTOLOGIES.map(key => (
+                      <div key={key} className="flex items-center gap-2">
+                        <Checkbox
+                          id={`ontology-${key}`}
+                          checked={selectedOntologies.has(key)}
+                          onCheckedChange={() => toggleOntology(key)}
+                          data-testid={`checkbox-ontology-${key}`}
+                        />
+                        <Label htmlFor={`ontology-${key}`} className="font-normal cursor-pointer">
+                          {ONTOLOGY_LABELS[key]}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Label htmlFor="confidence-filter">Confidence Filter <span className="text-muted-foreground font-normal text-xs ml-1">(filters which results appear in the dashboard table)</span></Label>
+                  <Select value={confidenceFilter} onValueChange={(v) => setConfidenceFilter(v as ConfidenceFilter)}>
+                    <SelectTrigger id="confidence-filter" data-testid="select-confidence-filter">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Show All Results</SelectItem>
+                      <SelectItem value="high_medium">High + Medium Only</SelectItem>
+                      <SelectItem value="high">High Confidence Only</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
