@@ -232,6 +232,27 @@ export default function DashboardPage() {
     URL.revokeObjectURL(url);
   };
 
+  // Display columns are derived from whatever vocabularies actually appear in
+  // the results (lowercased). If the upload page passed an `ontologies` filter,
+  // restrict to the intersection; otherwise show every vocabulary present.
+  // NOTE: hooks must run before any early return to keep call order stable.
+  const presentVocabKeys = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of results) {
+      if (!r.identifiers) continue;
+      for (const [k, v] of Object.entries(r.identifiers)) {
+        if (v && v.length > 0) s.add(k.toLowerCase());
+      }
+    }
+    return s;
+  }, [results]);
+  const visibleVocabCols = useMemo(() => {
+    const allowed = visibleOntologies.size > 0
+      ? Array.from(presentVocabKeys).filter(v => visibleOntologies.has(v))
+      : Array.from(presentVocabKeys);
+    return allowed.sort();
+  }, [presentVocabKeys, visibleOntologies]);
+
   const handleDownloadMarkdown = () => {
     if (!summary) return;
     const { confidenceTierDistribution: cd, vocabularyCoverage: vc } = summary;
@@ -337,26 +358,6 @@ export default function DashboardPage() {
     .map(([name, value]) => ({ name: name.toUpperCase(), value }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 10) : [];
-
-  // Display columns are derived from whatever vocabularies actually appear in
-  // the results (lowercased). If the upload page passed an `ontologies` filter,
-  // restrict to the intersection; otherwise show every vocabulary present.
-  const presentVocabKeys = useMemo(() => {
-    const s = new Set<string>();
-    for (const r of results) {
-      if (!r.identifiers) continue;
-      for (const [k, v] of Object.entries(r.identifiers)) {
-        if (v && v.length > 0) s.add(k.toLowerCase());
-      }
-    }
-    return s;
-  }, [results]);
-  const visibleVocabCols = useMemo(() => {
-    const allowed = visibleOntologies.size > 0
-      ? Array.from(presentVocabKeys).filter(v => visibleOntologies.has(v))
-      : Array.from(presentVocabKeys);
-    return allowed.sort();
-  }, [presentVocabKeys, visibleOntologies]);
 
   // Per-row case-insensitive identifier accessor.
   const lookupIds = (row: MappingResult, key: string): string[] | undefined => {
