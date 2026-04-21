@@ -1,0 +1,47 @@
+This is a clean split — the rename-as-checkpoint structure landed exactly right. A few tightenings on #4 before it goes to the agent:
+On the rename task (#4)
+1. Exception class names in 1.0 — verify, don't assume.
+Task 2 lists five exception imports (BioMapperClient, BioMapperAuthError, BioMapperConfigError, BioMapperRateLimitError, BioMapperError). The task language says "if any were renamed in 1.0, fix accordingly" — which is right in spirit, but in practice an agent will often find that all five resolve from biomapper and move on, missing the case where a symbol silently changed meaning (e.g. BioMapperError is now an alias with different MRO, or BioMapperRateLimitError now inherits differently and changes except ordering semantics).
+Tighten to:
+
+Confirm all imported symbols resolve from biomapper and that the exception hierarchy is unchanged (check __mro__ for each error class, or run the existing retry tests if present). If the hierarchy shifted, the except ordering in _map_with_retry may need to be reordered to catch subclasses first.
+
+This is the kind of thing that won't fail on a glucose/caffeine happy-path smoke test but will silently break retry behavior when BioMapper2 is rate-limiting.
+2. The grep specification has a small gap.
+You correctly excluded node_modules, .git, .pythonlibs, and .local/tasks/. Worth also excluding:
+
+.venv/ or venv/ (if the workspace has one)
+poetry.lock or uv.lock if present — transitive references to ddharmon in lockfiles are expected if any dev dependency pulled it in historically
+dist/ and build/
+
+And one addition: include .env.example and .replit in the search. It's easy to leave a stale DDHARMON_* env var name behind in example files even after the code is clean.
+Concretely:
+
+Workspace-wide search for ddharmon (case-insensitive) across *.py, *.ts, *.tsx, *.json, *.toml, *.txt, *.md, *.yaml, *.yml, .env*, .replit, excluding node_modules/, .git/, .pythonlibs/, .venv/, venv/, dist/, build/, and .local/tasks/. Lockfile hits (*.lock) are acceptable during transition and will clear on next lock regeneration.
+
+3. The startup version log should handle the import-error case.
+importlib.metadata.version("biomapper") is the right call, but it raises PackageNotFoundError if the package is somehow unavailable (e.g. dev environment where it's installed from a local path without metadata). Make the log line defensive:
+python# at startup
+try:
+    from importlib.metadata import version
+    biomapper_version = version("biomapper")
+except Exception as e:
+    biomapper_version = f"unknown ({e})"
+logger.info("biomapper version: %s", biomapper_version)
+Trivial but prevents the startup log line itself from becoming a source of crashes during the rename transition.
+4. Smoke test should also verify no ddharmon import succeeds.
+After the rename, attempting import ddharmon should fail with ModuleNotFoundError. That's a cheap one-line verification that the old package is genuinely gone from the environment, not just unreferenced:
+
+(6) Additionally verify: python -c "import ddharmon" fails with ModuleNotFoundError. If it succeeds, ddharmon is still installed from a prior pip install and should be uninstalled (pip uninstall ddharmon) so nothing can accidentally fall back to it.
+
+This catches the scenario where the requirements.txt was updated and biomapper was installed, but ddharmon was never uninstalled — imports still resolve from the old package, and the "rename" was a no-op.
+On the dependency ordering
+One thing to state explicitly at the top of #6 that isn't there yet:
+
+Depends on: Task #4 (rename) must be merged and smoke-tested before this begins. This task assumes from biomapper import ... works throughout services/mapper.py.
+
+If you're running these through Replit's agent in sequence, this is obvious. If either task could get picked up independently, the dependency line prevents #6 from being started against the old ddharmon import surface.
+Minor
+
+Task 4 (in #4) says "Update replit.md to say 'biomapper' instead of 'ddharmon' in any architecture notes." — also check README.md if the project has one, and any CLAUDE.md or agent instructions file. Docs drift fast.
+The "startup log line confirms the biomapper version" is in "Done looks like" but the actual task is #3 — worth cross-referencing them explicitly ("Done (3): biomapper version: 1.0.1 appears in startup logs").

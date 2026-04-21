@@ -1,0 +1,62 @@
+This is a clean, well-scoped backend task. A few things I'd push back on or tighten before handoff:
+Strong parts
+
+Rename + discovery + parameter pass-through as one unit is the right grouping — they're the prerequisites the frontend task (#5) depends on, and splitting them would just create coordination overhead.
+Fail-closed on discovery (register routes even if warmup fails, 502 from handler) is exactly right. The frontend already has a fallback to hardcoded small-molecule presets, so a 502 degrades gracefully instead of blocking uploads.
+Keeping biomapper imports quarantined to services/mapper.py and routes/discovery.py preserves the SDK-swap property you'd want if the 1.0 API shifts under you.
+
+Things I'd tighten
+1. Cache strategy for discovery is under-specified.
+"Cache responses for the lifetime of the process" is fine in principle but leaves two things ambiguous:
+
+Do you warmup at startup, or lazy-cache on first request? Lazy is simpler and avoids blocking app start on BioMapper2 availability. Given the fail-closed requirement, lazy is the obvious choice — but the task language ("warmup" appears in architectural notes) implies eager. Pick one.
+Is there a manual invalidation path? For a long-running Replit process this matters less, but if BioMapper2 adds a new annotator you'd have to restart the service to pick it up. Worth at least one line: "No invalidation; process restart required to refresh."
+
+Suggested language:
+
+Cache responses lazily on first request for the lifetime of the process. No invalidation mechanism — a process restart refreshes the cache. If the first call fails, cache the failure for a short window (e.g. 30s) to avoid hammering a flapping upstream on every frontend refresh.
+
+The 30s negative-cache is the non-obvious bit — without it, a broken BioMapper2 means every page load on the frontend retries all three endpoints.
+2. annotators: list[str] | None = None semantics should be spelled out.
+The frontend task (#5) says "leaving it empty means 'use all annotators'" and uses an explicit sentinel for empty selection. The backend task should match that contract explicitly:
+
+annotators=None and annotators=[] are both treated as "use all annotators" — forward None to client.map_entity in both cases. Do not send an empty list to biomapper; check the 1.0 client's behavior first (it may interpret [] as "use zero annotators" which would silently produce empty results).
+
+This is the kind of off-by-one that'll cost an afternoon of debugging when a user's multi-select happens to be empty and everything returns unresolved.
+3. BIOMAPPER_BASE_URL — "read once at module import" is a small footgun.
+Reading env vars at import time works but makes testing awkward (you can't monkeypatch it per-test without reimporting). Consider:
+python# Module-level lazy accessor
+def _get_base_url() -> str | None:
+    return os.environ.get("BIOMAPPER_BASE_URL") or None
+
+class MapperService:
+    def __init__(self) -> None:
+        base_url = _get_base_url()
+        kwargs: dict[str, Any] = {}
+        if base_url:
+            kwargs["base_url"] = base_url
+        self._client = BioMapperClient(**kwargs)
+Read on MapperService construction rather than import. Same runtime behavior in production, much friendlier to pytest.
+4. Missing: what happens to in-flight jobs during the rename?
+If the service is restarted mid-batch (which it will be during the rename step), the in-memory job store loses state and any open SSE connections drop. That's acceptable per the MVP scope, but worth one line in the task:
+
+Note: This rollout requires a service restart, which will abort any in-flight jobs. In-memory job store is not persisted. Communicate to users before deploying.
+
+Probably irrelevant on Replit for a single-user dev context, but worth making explicit.
+5. Smoke-test should include the parameter pass-through, not just the happy path.
+Task 5 verifies the discovery endpoints and that a default job still works. Add a fourth check:
+
+(d) Submit a batch with a non-default entityType (e.g. "biolink:Protein") and a specific annotators selection; verify via backend logs that the forwarded client.map_entity(...) call received those exact values.
+
+Otherwise you can ship this whole task and the parameter forwarding could silently be a no-op — the default behavior would still look correct.
+One structural suggestion
+Task 1 (rename) is genuinely independent of tasks 2–4 and could ship on its own as a trivial PR. If you're running this through Replit's agent, consider splitting:
+
+4a: Rename-only (requirements.txt + imports + grep). Ship and verify baseline still works.
+4b: Discovery + parameters + base URL.
+
+The rename touching services/mapper.py alongside the parameter pass-through changes in the same file means if either breaks, bisecting is harder than it needs to be. A clean rename commit as a checkpoint is cheap insurance.
+Minor language nits
+
+"live lists from the BioMapper2 API" — clarify whether these are the biomapper 1.0 client's discovery methods (e.g. client.list_annotators()) or direct BioMapper2 REST calls. Task 1 says biomapper is installed; Task 2 should say "delegate to client.list_entity_types(), client.list_annotators(), client.list_vocabularies()" (or whatever the 1.0 API actually calls them — worth confirming against the biomapper 1.0 changelog before handing off).
+"Setting BIOMAPPER_BASE_URL in .env changes which BioMapper2 instance the backend talks to (verifiable by hitting a wrong URL and seeing connection errors)" — good. Consider also requiring the value to appear in a startup log line so it's obvious which instance a given deployment is pointing at.

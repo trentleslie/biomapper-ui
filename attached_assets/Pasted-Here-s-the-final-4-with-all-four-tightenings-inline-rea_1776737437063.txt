@@ -1,0 +1,67 @@
+Here's the final #4 with all four tightenings inline, ready to paste:
+
+---
+
+# #4 - Biomapper Backend — ddharmon → biomapper Rename
+
+## What & Why
+
+The Python package `ddharmon` was renamed to `biomapper` (v1.0.1 on PyPI). Doing this rename as its own clean checkpoint — separate from the discovery + parameter pass-through work that follows — keeps the diff small, makes regressions easy to bisect, and lets us verify that baseline mapping still works against production BioMapper2 before changing anything else in `services/mapper.py`.
+
+## Done looks like
+
+- `pip install` of the project pulls in `biomapper>=1.0.0`; `ddharmon` is no longer a dependency.
+- `python -c "import ddharmon"` fails with `ModuleNotFoundError` (i.e. the old package is not just unreferenced but actually uninstalled).
+- A workspace-wide case-insensitive search for `ddharmon` returns zero hits across `*.py`, `*.ts`, `*.tsx`, `*.json`, `*.toml`, `*.txt`, `*.md`, `*.yaml`, `*.yml`, `.env*`, and `.replit`, excluding `node_modules/`, `.git/`, `.pythonlibs/`, `.venv/`, `venv/`, `dist/`, `build/`, and `.local/tasks/`. Lockfile hits (`*.lock`) are acceptable during transition and will clear on next lock regeneration.
+- The existing batch flow (upload `glucose`, `caffeine` → SSE stream → results) still completes in seconds against production BioMapper2 with no behavior change.
+- A startup log line confirms the biomapper version in use, e.g. `biomapper version: 1.0.1` (task 3).
+
+## Out of scope
+
+- Discovery endpoints, new mapping parameters, and `BIOMAPPER_BASE_URL` support (handled in the dependent functionality task, #6).
+- Frontend changes.
+- Any change to error handling, retry logic, or job storage.
+
+## Caveats
+
+This rollout requires a Python service restart, which will abort any in-flight jobs (in-memory job store is not persisted). For the dev-on-Replit single-user context this is fine; worth noting if anyone is mid-batch when the restart happens.
+
+## Tasks
+
+1. **Update package dependency** — In `artifacts/python-api/requirements.txt`, replace the existing `ddharmon>=…` pin with `biomapper>=1.0.0`. Install the new package, then explicitly `pip uninstall ddharmon` so the old package is gone from the environment (not just unreferenced in requirements).
+
+2. **Update imports and verify exception hierarchy** — In `artifacts/python-api/services/mapper.py`, change `from ddharmon import (...)` to `from biomapper import (...)`. Confirm all imported symbols (`BioMapperClient`, `BioMapperAuthError`, `BioMapperConfigError`, `BioMapperRateLimitError`, `BioMapperError`) still resolve from the new package. **Also verify the exception hierarchy is unchanged**: check `__mro__` for each error class (or run the existing retry tests if present). If the hierarchy shifted in 1.0, the `except` ordering in `_map_with_retry` may need to be reordered to catch subclasses first — this kind of regression won't fail a happy-path smoke test but will silently break retry behavior under rate limiting.
+
+3. **Add a version log line (defensive)** — In `main.py` (or wherever startup logging lives), log the imported `biomapper` package version once at startup. Wrap the metadata lookup in a try/except so a missing `importlib.metadata` entry never crashes app startup:
+
+   ```python:artifacts/python-api/main.py
+   try:
+       from importlib.metadata import version
+       biomapper_version = version("biomapper")
+   except Exception as e:
+       biomapper_version = f"unknown ({e})"
+   logger.info("biomapper version: %s", biomapper_version)
+   ```
+
+4. **Verify zero remaining references** — Run the workspace-wide grep specified under "Done looks like." Also grep `.env.example` and `.replit` for any stale `DDHARMON_*` env var names. Update `replit.md`, `README.md` (if present), and any `CLAUDE.md` or agent instructions file to say "biomapper" instead of "ddharmon" in architecture notes.
+
+5. **Smoke-test baseline** — Restart the Python API workflow, then verify:
+   - (a) `biomapper version: <something>` appears in startup logs.
+   - (b) `python -c "import ddharmon"` fails with `ModuleNotFoundError`. If it succeeds, `ddharmon` is still installed from a prior `pip install` — uninstall it and retry.
+   - (c) Submit a 2-name batch (`glucose`, `caffeine`), verify it completes in seconds with the same fields populated as before. No new behavior expected.
+
+## Relevant files
+
+- `artifacts/python-api/requirements.txt`
+- `artifacts/python-api/services/mapper.py`
+- `artifacts/python-api/main.py`
+- `replit.md`
+- `README.md` / `CLAUDE.md` (if present)
+
+---
+
+And the one edit for #6 — add this line near the top, right after "What & Why":
+
+> **Depends on:** Task #4 (rename) must be merged and smoke-tested before this begins. This task assumes `from biomapper import ...` works throughout `services/mapper.py`.
+
+That's it. #4 is ready to ship to the Replit agent as a self-contained checkpoint, and #6 now has the dependency stated explicitly so it can't be picked up against the old `ddharmon` import surface.
