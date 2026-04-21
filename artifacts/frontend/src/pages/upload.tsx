@@ -404,7 +404,7 @@ export default function UploadPage() {
                     <SelectTrigger id="column-select" data-testid="select-name-col">
                       <SelectValue placeholder="Select column..." />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="max-h-72 overflow-y-auto">
                       {columns.map(col => (
                         <SelectItem key={col} value={col}>{col}</SelectItem>
                       ))}
