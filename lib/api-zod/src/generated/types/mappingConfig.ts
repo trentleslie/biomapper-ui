@@ -10,5 +10,9 @@ import type { MappingConfigHints } from "./mappingConfigHints";
 
 export interface MappingConfig {
   annotationMode?: MappingConfigAnnotationMode;
+  /** Biolink entity type (e.g. biolink:SmallMolecule, biolink:Drug, biolink:Protein). */
+  entityType?: string;
+  /** Optional list of annotator slugs to restrict mapping to. Null/omitted means use all available annotators. */
+  annotators?: string[] | null;
   hints?: MappingConfigHints;
 }

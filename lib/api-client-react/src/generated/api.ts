@@ -17,11 +17,14 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  Annotator,
   BatchMapRequest,
   BatchMapResponse,
+  EntityType,
   ErrorResponse,
   HealthStatus,
   JobResult,
+  Vocabulary,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -282,6 +285,231 @@ export function useStreamMappingProgress<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getStreamMappingProgressQueryOptions(jobId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List supported entity types
+ */
+export const getListEntityTypesUrl = () => {
+  return `/api/discovery/entity-types`;
+};
+
+export const listEntityTypes = async (
+  options?: RequestInit,
+): Promise<EntityType[]> => {
+  return customFetch<EntityType[]>(getListEntityTypesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListEntityTypesQueryKey = () => {
+  return [`/api/discovery/entity-types`] as const;
+};
+
+export const getListEntityTypesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listEntityTypes>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listEntityTypes>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListEntityTypesQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listEntityTypes>>> = ({
+    signal,
+  }) => listEntityTypes({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listEntityTypes>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListEntityTypesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listEntityTypes>>
+>;
+export type ListEntityTypesQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary List supported entity types
+ */
+
+export function useListEntityTypes<
+  TData = Awaited<ReturnType<typeof listEntityTypes>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listEntityTypes>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListEntityTypesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List available annotators
+ */
+export const getListAnnotatorsUrl = () => {
+  return `/api/discovery/annotators`;
+};
+
+export const listAnnotators = async (
+  options?: RequestInit,
+): Promise<Annotator[]> => {
+  return customFetch<Annotator[]>(getListAnnotatorsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAnnotatorsQueryKey = () => {
+  return [`/api/discovery/annotators`] as const;
+};
+
+export const getListAnnotatorsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAnnotators>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listAnnotators>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListAnnotatorsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAnnotators>>> = ({
+    signal,
+  }) => listAnnotators({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAnnotators>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAnnotatorsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAnnotators>>
+>;
+export type ListAnnotatorsQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary List available annotators
+ */
+
+export function useListAnnotators<
+  TData = Awaited<ReturnType<typeof listAnnotators>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listAnnotators>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAnnotatorsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List supported vocabularies
+ */
+export const getListVocabulariesUrl = () => {
+  return `/api/discovery/vocabularies`;
+};
+
+export const listVocabularies = async (
+  options?: RequestInit,
+): Promise<Vocabulary[]> => {
+  return customFetch<Vocabulary[]>(getListVocabulariesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListVocabulariesQueryKey = () => {
+  return [`/api/discovery/vocabularies`] as const;
+};
+
+export const getListVocabulariesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listVocabularies>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listVocabularies>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListVocabulariesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listVocabularies>>
+  > = ({ signal }) => listVocabularies({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listVocabularies>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListVocabulariesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listVocabularies>>
+>;
+export type ListVocabulariesQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary List supported vocabularies
+ */
+
+export function useListVocabularies<
+  TData = Awaited<ReturnType<typeof listVocabularies>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listVocabularies>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListVocabulariesQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

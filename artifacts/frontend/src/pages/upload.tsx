@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useDropzone } from "react-dropzone";
 import * as XLSX from "xlsx";
@@ -8,10 +8,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useStartMappingBatch, MappingConfigAnnotationMode } from "@workspace/api-client-react";
+import {
+  useStartMappingBatch,
+  useListEntityTypes,
+  useListAnnotators,
+  getListEntityTypesQueryKey,
+  getListAnnotatorsQueryKey,
+  MappingConfigAnnotationMode,
+  MappingConfigHints,
+} from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, UploadCloud, FileType, CheckCircle2 } from "lucide-react";
 
+// Display vocabularies — these are the keys the backend currently emits in
+// MappingResultItem.identifiers. The set is fixed by services/mapper.py.
 const ALL_ONTOLOGIES = ["hmdb", "chebi", "pubchem", "refmet", "lipidmaps", "kegg", "umls", "mesh", "unii", "chembl"] as const;
 type OntologyKey = typeof ALL_ONTOLOGIES[number];
 
@@ -28,6 +38,39 @@ const ONTOLOGY_LABELS: Record<OntologyKey, string> = {
   chembl: "ChEMBL",
 };
 
+// Per-entity-type display defaults. Backend always returns the same 10 keys,
+// but we surface the most relevant subset by default.
+const ENTITY_TYPE_DEFAULT_VOCABS: Record<string, OntologyKey[]> = {
+  "biolink:SmallMolecule": ["hmdb", "chebi", "refmet", "lipidmaps", "pubchem"],
+  "biolink:Drug":          ["chembl", "unii", "mesh", "chebi", "pubchem"],
+  "biolink:ChemicalEntity":["chebi", "pubchem", "hmdb", "lipidmaps", "kegg"],
+};
+const FALLBACK_VOCABS: OntologyKey[] = [...ALL_ONTOLOGIES];
+
+// Common ID column heuristics — map column-name fragments to a CURIE prefix.
+// Used to auto-suggest a vocabulary when a user picks a "Provided ID column".
+const COLUMN_PREFIX_HINTS: Array<[RegExp, string]> = [
+  [/hmdb/i,                     "HMDB"],
+  [/chebi/i,                    "CHEBI"],
+  [/pubchem|cid/i,              "PUBCHEM.COMPOUND"],
+  [/refmet/i,                   "refmet_id"],
+  [/lipid\s*maps?|lmid|lm[_-]?id/i, "LIPIDMAPS"],
+  [/kegg/i,                     "KEGG.COMPOUND"],
+  [/umls/i,                     "UMLS"],
+  [/mesh/i,                     "MESH"],
+  [/unii/i,                     "UNII"],
+  [/chembl/i,                   "ChEMBL"],
+  [/inchikey/i,                 "INCHIKEY"],
+  [/^cas$|cas[_-]?(number|no|rn)/i, "CAS"],
+];
+
+function inferPrefix(columnName: string): string | null {
+  for (const [re, prefix] of COLUMN_PREFIX_HINTS) {
+    if (re.test(columnName)) return prefix;
+  }
+  return null;
+}
+
 export type ConfidenceFilter = "all" | "high_medium" | "high";
 
 export default function UploadPage() {
@@ -38,10 +81,40 @@ export default function UploadPage() {
   const [selectedColumn, setSelectedColumn] = useState<string>("");
   const [parsedRows, setParsedRows] = useState<Record<string, string>[]>([]);
   const [annotationMode, setAnnotationMode] = useState<MappingConfigAnnotationMode>("missing");
-  const [selectedOntologies, setSelectedOntologies] = useState<Set<OntologyKey>>(new Set(ALL_ONTOLOGIES));
+  const [entityType, setEntityType] = useState<string>("biolink:SmallMolecule");
+  const [selectedAnnotators, setSelectedAnnotators] = useState<Set<string>>(new Set());
+  const [selectedOntologies, setSelectedOntologies] = useState<Set<OntologyKey>>(new Set(ENTITY_TYPE_DEFAULT_VOCABS["biolink:SmallMolecule"]));
+  const [hintColumns, setHintColumns] = useState<Set<string>>(new Set());
   const [confidenceFilter, setConfidenceFilter] = useState<ConfidenceFilter>("all");
 
+  // Discovery — long staleTime since these are slow-moving reference data.
+  const entityTypesQuery = useListEntityTypes({
+    query: { queryKey: getListEntityTypesQueryKey(), staleTime: 60 * 60 * 1000, retry: 1 },
+  });
+  const annotatorsQuery = useListAnnotators({
+    query: { queryKey: getListAnnotatorsQueryKey(), staleTime: 60 * 60 * 1000, retry: 1 },
+  });
+
   const startMapping = useStartMappingBatch();
+
+  // When entity type changes, swap the default vocab display preset.
+  useEffect(() => {
+    const preset = ENTITY_TYPE_DEFAULT_VOCABS[entityType] ?? FALLBACK_VOCABS;
+    setSelectedOntologies(new Set(preset));
+  }, [entityType]);
+
+  // If the user picks a name column that was previously selected as a hint
+  // column, drop it from hintColumns so it can't silently produce hints
+  // (the column would also disappear from the rendered hint list).
+  useEffect(() => {
+    if (!selectedColumn) return;
+    setHintColumns(prev => {
+      if (!prev.has(selectedColumn)) return prev;
+      const next = new Set(prev);
+      next.delete(selectedColumn);
+      return next;
+    });
+  }, [selectedColumn]);
 
   const extractNamesFromRows = useCallback((rows: Record<string, string>[], column: string) => {
     return [...new Set(
@@ -52,8 +125,6 @@ export default function UploadPage() {
     )];
   }, []);
 
-  // rawTotalRows = all non-empty values in selected column (before dedup)
-  // extractedNames = unique values (what gets sent to the API for mapping)
   const rawTotalRows = selectedColumn && parsedRows.length > 0
     ? parsedRows.filter(row => {
         const val = row[selectedColumn];
@@ -61,9 +132,47 @@ export default function UploadPage() {
       }).length
     : 0;
 
-  const extractedNames = selectedColumn && parsedRows.length > 0
-    ? extractNamesFromRows(parsedRows, selectedColumn)
-    : [];
+  const extractedNames = useMemo(
+    () => (selectedColumn && parsedRows.length > 0 ? extractNamesFromRows(parsedRows, selectedColumn) : []),
+    [selectedColumn, parsedRows, extractNamesFromRows]
+  );
+
+  // Map of selected hint column -> resolved CURIE prefix (skipping any that
+  // we can't auto-detect). The user sees which columns are mappable.
+  const hintColumnPrefixMap = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const col of hintColumns) {
+      // Defensive: never derive hints from the active name column even if
+      // state cleanup hasn't yet propagated (race during column switch).
+      if (col === selectedColumn) continue;
+      const prefix = inferPrefix(col);
+      if (prefix) m[col] = prefix;
+    }
+    return m;
+  }, [hintColumns, selectedColumn]);
+
+  // Build hints payload: { name -> { PREFIX -> id } } for rows where at least
+  // one selected ID column has a value.
+  const hintsPayload = useMemo<MappingConfigHints | undefined>(() => {
+    if (!selectedColumn || hintColumns.size === 0) return undefined;
+    const result: MappingConfigHints = {};
+    for (const row of parsedRows) {
+      const name = row[selectedColumn];
+      if (name === null || name === undefined || String(name).trim() === "") continue;
+      const trimmedName = String(name).trim();
+      const perRow: Record<string, string | string[]> = {};
+      for (const [col, prefix] of Object.entries(hintColumnPrefixMap)) {
+        const val = row[col];
+        if (val === null || val === undefined || String(val).trim() === "") continue;
+        perRow[prefix] = String(val).trim();
+      }
+      if (Object.keys(perRow).length > 0) {
+        // Last-wins on duplicate names is fine for hints (idempotent merge).
+        result[trimmedName] = { ...(result[trimmedName] || {}), ...perRow };
+      }
+    }
+    return Object.keys(result).length > 0 ? result : undefined;
+  }, [parsedRows, selectedColumn, hintColumns, hintColumnPrefixMap]);
 
   const processRows = useCallback((rows: Record<string, string>[]) => {
     if (rows.length === 0) return;
@@ -76,6 +185,7 @@ export default function UploadPage() {
       f.toLowerCase().includes('metabolite')
     ) || cols[0];
     setSelectedColumn(likelyNameCol);
+    setHintColumns(new Set());
   }, []);
 
   const parseFile = useCallback((uploadedFile: File) => {
@@ -130,11 +240,23 @@ export default function UploadPage() {
   const toggleOntology = (key: OntologyKey) => {
     setSelectedOntologies(prev => {
       const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleAnnotator = (slug: string) => {
+    setSelectedAnnotators(prev => {
+      const next = new Set(prev);
+      if (next.has(slug)) next.delete(slug); else next.add(slug);
+      return next;
+    });
+  };
+
+  const toggleHintColumn = (col: string) => {
+    setHintColumns(prev => {
+      const next = new Set(prev);
+      if (next.has(col)) next.delete(col); else next.add(col);
       return next;
     });
   };
@@ -151,17 +273,30 @@ export default function UploadPage() {
     }
 
     const ontologiesParam = Array.from(selectedOntologies).join(",");
+    const annotatorsList = Array.from(selectedAnnotators);
 
     startMapping.mutate(
       {
         data: {
           names: extractedNames,
-          config: { annotationMode }
+          config: {
+            annotationMode,
+            entityType,
+            // null/undefined means "use all annotators" on the backend.
+            annotators: annotatorsList.length > 0 ? annotatorsList : null,
+            ...(hintsPayload ? { hints: hintsPayload } : {}),
+          },
         }
       },
       {
         onSuccess: (data) => {
-          setLocation(`/job/${data.job_id}?ontologies=${ontologiesParam}&confidence=${confidenceFilter}&totalRows=${rawTotalRows}`);
+          const params = new URLSearchParams({
+            ontologies: ontologiesParam,
+            confidence: confidenceFilter,
+            totalRows: String(rawTotalRows),
+            entityType,
+          });
+          setLocation(`/job/${data.job_id}?${params.toString()}`);
         },
         onError: () => {
           toast({ title: "Failed to start mapping", description: "Unknown error", variant: "destructive" });
@@ -169,6 +304,12 @@ export default function UploadPage() {
       }
     );
   };
+
+  const entityTypes = entityTypesQuery.data || [];
+  const annotators = annotatorsQuery.data || [];
+  // Available hint columns = all columns except the selected name column.
+  const availableHintColumns = columns.filter(c => c !== selectedColumn);
+  const hintRowCount = hintsPayload ? Object.keys(hintsPayload).length : 0;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -213,6 +354,7 @@ export default function UploadPage() {
                       setColumns([]);
                       setParsedRows([]);
                       setSelectedColumn("");
+                      setHintColumns(new Set());
                     }} className="mt-2" data-testid="btn-remove-file">
                       Remove File
                     </Button>
@@ -257,6 +399,83 @@ export default function UploadPage() {
                   )}
                 </div>
 
+                {availableHintColumns.length > 0 && (
+                  <div className="space-y-3">
+                    <Label>
+                      Provided ID Columns
+                      <span className="text-muted-foreground font-normal text-xs ml-1">
+                        (optional — pre-fill known cross-references as hints to BioMapper)
+                      </span>
+                    </Label>
+                    <div className="grid grid-cols-2 gap-2" data-testid="hint-column-checkboxes">
+                      {availableHintColumns.map(col => {
+                        const prefix = inferPrefix(col);
+                        const isSelected = hintColumns.has(col);
+                        return (
+                          <div key={col} className="flex items-center gap-2">
+                            <Checkbox
+                              id={`hint-col-${col}`}
+                              checked={isSelected}
+                              onCheckedChange={() => toggleHintColumn(col)}
+                              disabled={!prefix}
+                              data-testid={`checkbox-hint-${col}`}
+                            />
+                            <Label
+                              htmlFor={`hint-col-${col}`}
+                              className={`font-normal cursor-pointer text-sm ${!prefix ? "text-muted-foreground/60" : ""}`}
+                              title={prefix ? `Will be sent as ${prefix} hints` : "No vocabulary recognized in column name"}
+                            >
+                              {col}
+                              {prefix && (
+                                <span className="ml-1.5 text-xs text-muted-foreground">→ {prefix}</span>
+                              )}
+                            </Label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {hintColumns.size > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {hintRowCount > 0
+                          ? `Hints will be sent for ${hintRowCount.toLocaleString()} unique name${hintRowCount === 1 ? "" : "s"}.`
+                          : "No usable hint values found in selected columns."}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  <Label htmlFor="entity-type">
+                    Entity Type
+                    <span className="text-muted-foreground font-normal text-xs ml-1">
+                      (Biolink class — controls which annotators are valid)
+                    </span>
+                  </Label>
+                  <Select value={entityType} onValueChange={setEntityType} disabled={entityTypesQuery.isLoading}>
+                    <SelectTrigger id="entity-type" data-testid="select-entity-type">
+                      <SelectValue placeholder={entityTypesQuery.isLoading ? "Loading..." : "Select entity type"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {entityTypes.length === 0 && !entityTypesQuery.isLoading && (
+                        <SelectItem value="biolink:SmallMolecule">biolink:SmallMolecule (default)</SelectItem>
+                      )}
+                      {entityTypes.map(et => (
+                        <SelectItem key={et.type} value={et.type}>
+                          {et.type}
+                          {et.aliases && et.aliases.length > 0 && (
+                            <span className="text-xs text-muted-foreground ml-2">({et.aliases.join(", ")})</span>
+                          )}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {entityTypesQuery.isError && (
+                    <p className="text-xs text-amber-600">
+                      Couldn't load entity types — defaulting to biolink:SmallMolecule.
+                    </p>
+                  )}
+                </div>
+
                 <div className="space-y-3">
                   <Label htmlFor="annotation-mode">Annotation Mode</Label>
                   <Select value={annotationMode} onValueChange={(v) => setAnnotationMode(v as MappingConfigAnnotationMode)}>
@@ -272,7 +491,38 @@ export default function UploadPage() {
                 </div>
 
                 <div className="space-y-3">
-                  <Label>Target Ontologies <span className="text-muted-foreground font-normal text-xs ml-1">(controls which identifier columns appear in results)</span></Label>
+                  <Label>
+                    Annotators
+                    <span className="text-muted-foreground font-normal text-xs ml-1">
+                      (leave all unchecked to use the BioMapper default set)
+                    </span>
+                  </Label>
+                  {annotatorsQuery.isLoading ? (
+                    <p className="text-xs text-muted-foreground">Loading annotators…</p>
+                  ) : annotatorsQuery.isError ? (
+                    <p className="text-xs text-amber-600">Couldn't load annotators — leaving unspecified (server defaults).</p>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-2" data-testid="annotator-checkboxes">
+                      {annotators.map(a => (
+                        <div key={a.slug} className="flex items-center gap-2">
+                          <Checkbox
+                            id={`annotator-${a.slug}`}
+                            checked={selectedAnnotators.has(a.slug)}
+                            onCheckedChange={() => toggleAnnotator(a.slug)}
+                            data-testid={`checkbox-annotator-${a.slug}`}
+                          />
+                          <Label htmlFor={`annotator-${a.slug}`} className="font-normal cursor-pointer text-sm">
+                            <span className="font-mono text-xs">{a.slug}</span>
+                            <span className="text-muted-foreground ml-2">{a.name}</span>
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <Label>Display Vocabularies <span className="text-muted-foreground font-normal text-xs ml-1">(controls which identifier columns appear in results)</span></Label>
                   <div className="grid grid-cols-2 gap-2" data-testid="ontology-checkboxes">
                     {ALL_ONTOLOGIES.map(key => (
                       <div key={key} className="flex items-center gap-2">

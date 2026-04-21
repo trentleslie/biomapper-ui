@@ -112,6 +112,27 @@ app.use(
   }),
 );
 
+// Discovery endpoints — same auth gate as /api/map (read-only, but we keep
+// the PhenomeHealth domain restriction consistent across the BioMapper surface).
+app.use(
+  "/api/discovery",
+  requireMapAuth,
+  createProxyMiddleware({
+    target: PYTHON_API_BASE,
+    changeOrigin: true,
+    pathRewrite: (path: string) => "/discovery" + path,
+    on: {
+      error: (_err, _req, res) => {
+        if (!("headersSent" in res && res.headersSent)) {
+          (res as express.Response)
+            .status(502)
+            .json({ detail: "Discovery service unavailable. Please try again later." });
+        }
+      },
+    },
+  }),
+);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

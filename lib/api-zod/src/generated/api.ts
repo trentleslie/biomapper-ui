@@ -24,6 +24,7 @@ Maximum 10,000 names per job. Returns a job_id to poll for progress.
 export const startMappingBatchBodyNamesMax = 10000;
 
 export const startMappingBatchBodyConfigAnnotationModeDefault = `missing`;
+export const startMappingBatchBodyConfigEntityTypeDefault = `biolink:SmallMolecule`;
 
 export const StartMappingBatchBody = zod.object({
   names: zod
@@ -35,6 +36,18 @@ export const StartMappingBatchBody = zod.object({
       annotationMode: zod
         .enum(["missing", "all", "none"])
         .default(startMappingBatchBodyConfigAnnotationModeDefault),
+      entityType: zod
+        .string()
+        .default(startMappingBatchBodyConfigEntityTypeDefault)
+        .describe(
+          "Biolink entity type (e.g. biolink:SmallMolecule, biolink:Drug, biolink:Protein).",
+        ),
+      annotators: zod
+        .array(zod.string())
+        .nullish()
+        .describe(
+          "Optional list of annotator slugs to restrict mapping to. Null\/omitted means use all available annotators.",
+        ),
       hints: zod
         .record(
           zod.string(),
@@ -61,6 +74,35 @@ reaches a terminal state (complete or error). Each event payload is a JobResult 
 export const StreamMappingProgressParams = zod.object({
   jobId: zod.coerce.string(),
 });
+
+/**
+ * @summary List supported entity types
+ */
+export const ListEntityTypesResponseItem = zod.object({
+  type: zod.string(),
+  aliases: zod.array(zod.string()).optional(),
+});
+export const ListEntityTypesResponse = zod.array(ListEntityTypesResponseItem);
+
+/**
+ * @summary List available annotators
+ */
+export const ListAnnotatorsResponseItem = zod.object({
+  slug: zod.string(),
+  name: zod.string(),
+  description: zod.string().nullish(),
+});
+export const ListAnnotatorsResponse = zod.array(ListAnnotatorsResponseItem);
+
+/**
+ * @summary List supported vocabularies
+ */
+export const ListVocabulariesResponseItem = zod.object({
+  prefix: zod.string(),
+  iri: zod.string().nullish(),
+  aliases: zod.array(zod.string()).optional(),
+});
+export const ListVocabulariesResponse = zod.array(ListVocabulariesResponseItem);
 
 /**
  * @summary Get full mapping results for a completed job
