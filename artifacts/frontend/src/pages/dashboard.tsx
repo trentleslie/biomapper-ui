@@ -30,9 +30,6 @@ const TIER_COLORS: Record<string, string> = {
   unknown: '#9ca3af',
 };
 
-const ALL_ONTOLOGIES = ["hmdb", "chebi", "pubchem", "refmet", "lipidmaps", "kegg", "umls", "mesh", "unii", "chembl"] as const;
-type OntologyKey = typeof ALL_ONTOLOGIES[number];
-
 type SortField = "name" | "confidenceTier" | "confidenceScore";
 type SortDir = "asc" | "desc";
 type ConfidenceFilter = "all" | "high_medium" | "high";
@@ -47,14 +44,16 @@ export default function DashboardPage() {
   const { signOut } = useClerk();
   const { user } = useUser();
 
+  // Vocabularies the user picked on the upload page (lowercased CURIE prefixes).
+  // Empty set => fall back to "show every vocabulary actually present in results".
   const initialOntologies = params.get("ontologies")
-    ? new Set(params.get("ontologies")!.split(",") as OntologyKey[])
-    : new Set<OntologyKey>(ALL_ONTOLOGIES);
+    ? new Set(params.get("ontologies")!.split(",").map(v => v.toLowerCase()).filter(Boolean))
+    : new Set<string>();
   const initialConfidence = (params.get("confidence") as ConfidenceFilter) || "all";
   // Total rows from the uploaded file (before dedup); passed from upload page via URL param
   const urlTotalRows = params.get("totalRows") ? parseInt(params.get("totalRows")!, 10) : null;
 
-  const [visibleOntologies] = useState<Set<OntologyKey>>(initialOntologies);
+  const [visibleOntologies] = useState<Set<string>>(initialOntologies);
   const [confidenceFilter, setConfidenceFilter] = useState<ConfidenceFilter>(initialConfidence);
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState<SortField>("name");
@@ -95,7 +94,8 @@ export default function DashboardPage() {
       if (r.identifiers) {
         Object.entries(r.identifiers).forEach(([vocab, ids]) => {
           if (ids && ids.length > 0) {
-            vocabCoverage[vocab] = (vocabCoverage[vocab] || 0) + 1;
+            const key = vocab.toLowerCase();
+            vocabCoverage[key] = (vocabCoverage[key] || 0) + 1;
           }
         });
       }
@@ -196,7 +196,10 @@ export default function DashboardPage() {
     results.forEach(r => {
       if (r.identifiers) Object.keys(r.identifiers).forEach(k => allVocabs.add(k));
     });
-    const vocabCols = Array.from(allVocabs).filter(v => visibleOntologies.has(v as OntologyKey));
+    const vocabCols = Array.from(allVocabs)
+      .map(v => v.toLowerCase())
+      .filter(v => visibleOntologies.size === 0 || visibleOntologies.has(v))
+      .sort();
     const headers = ["Original Name", "Resolved", "Primary Curie", "Confidence Tier", "Confidence Score", "Needs Review", ...vocabCols];
     const rows = results.map(r => {
       const row = [
@@ -207,8 +210,15 @@ export default function DashboardPage() {
         r.confidenceScore?.toString() || "",
         r.needsReview ? "true" : "false",
       ];
+      // Identifier keys come from the backend in their native case; resolve case-insensitively.
+      const idMap: Record<string, string[] | undefined> = {};
+      if (r.identifiers) {
+        for (const [k, val] of Object.entries(r.identifiers)) {
+          idMap[k.toLowerCase()] = val as string[] | undefined;
+        }
+      }
       vocabCols.forEach(v => {
-        row.push(r.identifiers?.[v as OntologyKey]?.join("|") || "");
+        row.push(idMap[v]?.join("|") || "");
       });
       return row.join("\t");
     });
@@ -328,7 +338,36 @@ export default function DashboardPage() {
     .sort((a, b) => b.value - a.value)
     .slice(0, 10) : [];
 
-  const visibleVocabCols = ALL_ONTOLOGIES.filter(k => visibleOntologies.has(k));
+  // Display columns are derived from whatever vocabularies actually appear in
+  // the results (lowercased). If the upload page passed an `ontologies` filter,
+  // restrict to the intersection; otherwise show every vocabulary present.
+  const presentVocabKeys = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of results) {
+      if (!r.identifiers) continue;
+      for (const [k, v] of Object.entries(r.identifiers)) {
+        if (v && v.length > 0) s.add(k.toLowerCase());
+      }
+    }
+    return s;
+  }, [results]);
+  const visibleVocabCols = useMemo(() => {
+    const allowed = visibleOntologies.size > 0
+      ? Array.from(presentVocabKeys).filter(v => visibleOntologies.has(v))
+      : Array.from(presentVocabKeys);
+    return allowed.sort();
+  }, [presentVocabKeys, visibleOntologies]);
+
+  // Per-row case-insensitive identifier accessor.
+  const lookupIds = (row: MappingResult, key: string): string[] | undefined => {
+    if (!row.identifiers) return undefined;
+    const direct = (row.identifiers as Record<string, string[] | undefined>)[key];
+    if (direct) return direct;
+    for (const [k, v] of Object.entries(row.identifiers)) {
+      if (k.toLowerCase() === key) return v as string[] | undefined;
+    }
+    return undefined;
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -661,7 +700,7 @@ export default function DashboardPage() {
                             </TableCell>
                             {visibleVocabCols.map(v => (
                               <TableCell key={v} className="font-mono text-xs text-muted-foreground max-w-[100px] truncate">
-                                {row.identifiers?.[v]?.join(", ") || "-"}
+                                {lookupIds(row, v)?.join(", ") || "-"}
                               </TableCell>
                             ))}
                           </TableRow>,

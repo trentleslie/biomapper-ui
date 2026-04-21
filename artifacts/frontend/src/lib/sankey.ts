@@ -68,40 +68,37 @@ export function buildSankeyData(
     }));
 
   if (includeVocabLayer && results.length > 0) {
+    // Aggregate hits per (confidenceTier, vocabulary) directly from results.
+    // All resolved tiers are included (high/medium/low/unknown) so the funnel
+    // surfaces vocabulary coverage even for low-confidence rows.
     const vocabByTier: Record<string, Record<string, number>> = {};
 
     for (const result of results) {
       if (!result.resolved) continue;
       const tier = result.confidenceTier || 'unknown';
-      if (tier !== 'high' && tier !== 'medium') continue;
+      if (!result.identifiers) continue;
 
-      if (result.identifiers) {
-        for (const [vocab, ids] of Object.entries(result.identifiers)) {
-          if (!ids || ids.length === 0) continue;
-          if (!vocabByTier[tier]) vocabByTier[tier] = {};
-          vocabByTier[tier][vocab] = (vocabByTier[tier][vocab] || 0) + 1;
-        }
+      for (const [vocab, ids] of Object.entries(result.identifiers)) {
+        if (!ids || ids.length === 0) continue;
+        if (!vocabByTier[tier]) vocabByTier[tier] = {};
+        vocabByTier[tier][vocab] = (vocabByTier[tier][vocab] || 0) + 1;
       }
     }
 
-    const vocabTotals: Record<string, number> = {};
-    for (const tierCounts of Object.values(vocabByTier)) {
-      for (const [vocab, count] of Object.entries(tierCounts)) {
-        vocabTotals[vocab] = (vocabTotals[vocab] || 0) + count;
+    const allVocabs = new Set<string>();
+    for (const counts of Object.values(vocabByTier)) {
+      for (const vocab of Object.keys(counts)) {
+        allVocabs.add(vocab);
       }
     }
-    const topVocabs = Object.entries(vocabTotals)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 5)
-      .map(([vocab]) => vocab);
 
-    for (const vocab of topVocabs) {
+    for (const vocab of Array.from(allVocabs).sort()) {
       nodes.push({ id: `vocab_${vocab}`, label: vocab.toUpperCase(), color: '#3b82f6' });
     }
     for (const [tier, counts] of Object.entries(vocabByTier)) {
       const tierId = tier === 'unknown' ? 'unknown_tier' : tier;
       for (const [vocab, count] of Object.entries(counts)) {
-        if (!topVocabs.includes(vocab) || count === 0) continue;
+        if (count === 0) continue;
         rawLinks.push({ source: tierId, target: `vocab_${vocab}`, value: count });
       }
     }

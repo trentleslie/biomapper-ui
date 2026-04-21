@@ -301,47 +301,16 @@ components:
           type: boolean
         identifiers:
           type: object
-          properties:
-            hmdb:
-              type: array
-              items:
-                type: string
-            chebi:
-              type: array
-              items:
-                type: string
-            pubchem:
-              type: array
-              items:
-                type: string
-            refmet:
-              type: array
-              items:
-                type: string
-            lipidmaps:
-              type: array
-              items:
-                type: string
-            kegg:
-              type: array
-              items:
-                type: string
-            umls:
-              type: array
-              items:
-                type: string
-            mesh:
-              type: array
-              items:
-                type: string
-            unii:
-              type: array
-              items:
-                type: string
-            chembl:
-              type: array
-              items:
-                type: string
+          description: |
+            Map of vocabulary key → list of CURIEs/identifiers found for this entity.
+            Keys are vocabulary identifiers (e.g. "hmdb", "chebi", "uniprot").
+            Open record — backend may emit any vocabulary key the underlying
+            BioMapper run produces, including ones not in the small-molecule
+            preset.
+          additionalProperties:
+            type: array
+            items:
+              type: string
         error:
           type: string
           nullable: true

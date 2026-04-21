@@ -127,19 +127,11 @@ export const GetMappingResultResponse = zod.object({
       confidenceTier: zod.enum(["high", "medium", "low", "unknown"]).nullish(),
       needsReview: zod.boolean().optional(),
       identifiers: zod
-        .object({
-          hmdb: zod.array(zod.string()).optional(),
-          chebi: zod.array(zod.string()).optional(),
-          pubchem: zod.array(zod.string()).optional(),
-          refmet: zod.array(zod.string()).optional(),
-          lipidmaps: zod.array(zod.string()).optional(),
-          kegg: zod.array(zod.string()).optional(),
-          umls: zod.array(zod.string()).optional(),
-          mesh: zod.array(zod.string()).optional(),
-          unii: zod.array(zod.string()).optional(),
-          chembl: zod.array(zod.string()).optional(),
-        })
-        .optional(),
+        .record(zod.string(), zod.array(zod.string()))
+        .optional()
+        .describe(
+          'Map of vocabulary key → list of CURIEs\/identifiers found for this entity.\nKeys are vocabulary identifiers (e.g. \"hmdb\", \"chebi\", \"uniprot\").\nOpen record — backend may emit any vocabulary key the underlying\nBioMapper run produces, including ones not in the small-molecule\npreset.\n',
+        ),
       error: zod.string().nullish(),
       error_type: zod.string().nullish(),
     }),

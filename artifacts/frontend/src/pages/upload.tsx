@@ -8,47 +8,40 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import {
   useStartMappingBatch,
   useListEntityTypes,
   useListAnnotators,
+  useListVocabularies,
   getListEntityTypesQueryKey,
   getListAnnotatorsQueryKey,
+  getListVocabulariesQueryKey,
   MappingConfigAnnotationMode,
   MappingConfigHints,
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, UploadCloud, FileType, CheckCircle2 } from "lucide-react";
 
-// Display vocabularies — these are the keys the backend currently emits in
-// MappingResultItem.identifiers. The set is fixed by services/mapper.py.
-const ALL_ONTOLOGIES = ["hmdb", "chebi", "pubchem", "refmet", "lipidmaps", "kegg", "umls", "mesh", "unii", "chembl"] as const;
-type OntologyKey = typeof ALL_ONTOLOGIES[number];
-
-const ONTOLOGY_LABELS: Record<OntologyKey, string> = {
-  hmdb: "HMDB",
-  chebi: "ChEBI",
-  pubchem: "PubChem",
-  refmet: "RefMet",
-  lipidmaps: "LIPIDMAPS",
-  kegg: "KEGG",
-  umls: "UMLS",
-  mesh: "MeSH",
-  unii: "UNII",
-  chembl: "ChEMBL",
+// Default selected vocabularies per entity type. These act as a UX preset;
+// the full list of selectable vocabularies is fetched from /discovery/vocabularies.
+// Keys are CURIE prefixes as returned by BioMapper discovery (uppercase).
+const ENTITY_TYPE_DEFAULT_PREFIXES: Record<string, string[]> = {
+  "biolink:SmallMolecule":  ["HMDB", "CHEBI", "REFMET", "LIPIDMAPS", "PUBCHEM.COMPOUND"],
+  "biolink:Drug":           ["CHEMBL", "UNII", "MESH", "CHEBI", "PUBCHEM.COMPOUND"],
+  "biolink:ChemicalEntity": ["CHEBI", "PUBCHEM.COMPOUND", "HMDB", "LIPIDMAPS", "KEGG.COMPOUND"],
+  "biolink:Protein":        ["UNIPROT", "NCBIGENE", "ENSEMBL"],
+  "biolink:Gene":           ["NCBIGENE", "ENSEMBL", "HGNC"],
+  "biolink:Pathway":        ["REACT", "KEGG.PATHWAY", "WIKIPATHWAYS"],
+  "biolink:Disease":        ["MONDO", "DOID", "MESH"],
+  "biolink:PhenotypicFeature": ["HP", "MESH"],
+  "biolink:ClinicalFinding":   ["LOINC", "SNOMEDCT"],
 };
 
-// Per-entity-type display defaults. Backend always returns the same 10 keys,
-// but we surface the most relevant subset by default.
-const ENTITY_TYPE_DEFAULT_VOCABS: Record<string, OntologyKey[]> = {
-  "biolink:SmallMolecule": ["hmdb", "chebi", "refmet", "lipidmaps", "pubchem"],
-  "biolink:Drug":          ["chembl", "unii", "mesh", "chebi", "pubchem"],
-  "biolink:ChemicalEntity":["chebi", "pubchem", "hmdb", "lipidmaps", "kegg"],
-};
-const FALLBACK_VOCABS: OntologyKey[] = [...ALL_ONTOLOGIES];
-
-// Common ID column heuristics — map column-name fragments to a CURIE prefix.
-// Used to auto-suggest a vocabulary when a user picks a "Provided ID column".
+// Heuristic suggestion for "Provided ID Columns" — maps column-name fragments
+// to a CURIE prefix. Used for auto-default only; the user can still select
+// any column (the column name uppercased is sent as the prefix when no
+// heuristic match is found).
 const COLUMN_PREFIX_HINTS: Array<[RegExp, string]> = [
   [/hmdb/i,                     "HMDB"],
   [/chebi/i,                    "CHEBI"],
@@ -62,13 +55,18 @@ const COLUMN_PREFIX_HINTS: Array<[RegExp, string]> = [
   [/chembl/i,                   "ChEMBL"],
   [/inchikey/i,                 "INCHIKEY"],
   [/^cas$|cas[_-]?(number|no|rn)/i, "CAS"],
+  [/uniprot/i,                  "UNIPROT"],
+  [/ensembl/i,                  "ENSEMBL"],
+  [/ncbi[_-]?gene|entrez/i,     "NCBIGENE"],
+  [/hgnc/i,                     "HGNC"],
 ];
 
-function inferPrefix(columnName: string): string | null {
+function inferPrefix(columnName: string): string {
   for (const [re, prefix] of COLUMN_PREFIX_HINTS) {
     if (re.test(columnName)) return prefix;
   }
-  return null;
+  // Fallback: use the column name itself (uppercased, normalized).
+  return columnName.trim().toUpperCase().replace(/\s+/g, "_");
 }
 
 export type ConfidenceFilter = "all" | "high_medium" | "high";
@@ -83,7 +81,11 @@ export default function UploadPage() {
   const [annotationMode, setAnnotationMode] = useState<MappingConfigAnnotationMode>("missing");
   const [entityType, setEntityType] = useState<string>("biolink:SmallMolecule");
   const [selectedAnnotators, setSelectedAnnotators] = useState<Set<string>>(new Set());
-  const [selectedOntologies, setSelectedOntologies] = useState<Set<OntologyKey>>(new Set(ENTITY_TYPE_DEFAULT_VOCABS["biolink:SmallMolecule"]));
+  const [selectedVocabPrefixes, setSelectedVocabPrefixes] = useState<Set<string>>(
+    new Set(ENTITY_TYPE_DEFAULT_PREFIXES["biolink:SmallMolecule"])
+  );
+  const [showAllVocabs, setShowAllVocabs] = useState(false);
+  const [vocabSearch, setVocabSearch] = useState("");
   const [hintColumns, setHintColumns] = useState<Set<string>>(new Set());
   const [confidenceFilter, setConfidenceFilter] = useState<ConfidenceFilter>("all");
 
@@ -94,18 +96,19 @@ export default function UploadPage() {
   const annotatorsQuery = useListAnnotators({
     query: { queryKey: getListAnnotatorsQueryKey(), staleTime: 60 * 60 * 1000, retry: 1 },
   });
+  const vocabulariesQuery = useListVocabularies({
+    query: { queryKey: getListVocabulariesQueryKey(), staleTime: 60 * 60 * 1000, retry: 1 },
+  });
 
   const startMapping = useStartMappingBatch();
 
-  // When entity type changes, swap the default vocab display preset.
+  // When entity type changes, swap the default vocab selection preset.
   useEffect(() => {
-    const preset = ENTITY_TYPE_DEFAULT_VOCABS[entityType] ?? FALLBACK_VOCABS;
-    setSelectedOntologies(new Set(preset));
+    const preset = ENTITY_TYPE_DEFAULT_PREFIXES[entityType] ?? [];
+    setSelectedVocabPrefixes(new Set(preset));
   }, [entityType]);
 
-  // If the user picks a name column that was previously selected as a hint
-  // column, drop it from hintColumns so it can't silently produce hints
-  // (the column would also disappear from the rendered hint list).
+  // Reconcile hint columns when name column changes (drop collisions).
   useEffect(() => {
     if (!selectedColumn) return;
     setHintColumns(prev => {
@@ -137,16 +140,13 @@ export default function UploadPage() {
     [selectedColumn, parsedRows, extractNamesFromRows]
   );
 
-  // Map of selected hint column -> resolved CURIE prefix (skipping any that
-  // we can't auto-detect). The user sees which columns are mappable.
+  // Per-hint-column → CURIE prefix (column name is the auto-suggested key).
   const hintColumnPrefixMap = useMemo(() => {
     const m: Record<string, string> = {};
     for (const col of hintColumns) {
-      // Defensive: never derive hints from the active name column even if
-      // state cleanup hasn't yet propagated (race during column switch).
+      // Defensive: never derive hints from the active name column.
       if (col === selectedColumn) continue;
-      const prefix = inferPrefix(col);
-      if (prefix) m[col] = prefix;
+      m[col] = inferPrefix(col);
     }
     return m;
   }, [hintColumns, selectedColumn]);
@@ -167,7 +167,6 @@ export default function UploadPage() {
         perRow[prefix] = String(val).trim();
       }
       if (Object.keys(perRow).length > 0) {
-        // Last-wins on duplicate names is fine for hints (idempotent merge).
         result[trimmedName] = { ...(result[trimmedName] || {}), ...perRow };
       }
     }
@@ -237,10 +236,10 @@ export default function UploadPage() {
     maxFiles: 1
   });
 
-  const toggleOntology = (key: OntologyKey) => {
-    setSelectedOntologies(prev => {
+  const toggleVocab = (prefix: string) => {
+    setSelectedVocabPrefixes(prev => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
+      if (next.has(prefix)) next.delete(prefix); else next.add(prefix);
       return next;
     });
   };
@@ -272,7 +271,9 @@ export default function UploadPage() {
       return;
     }
 
-    const ontologiesParam = Array.from(selectedOntologies).join(",");
+    // URL ontologies param uses lowercase prefix (matches the case backend uses
+    // in MappingResultItem.identifiers keys).
+    const ontologiesParam = Array.from(selectedVocabPrefixes).map(p => p.toLowerCase()).join(",");
     const annotatorsList = Array.from(selectedAnnotators);
 
     startMapping.mutate(
@@ -282,7 +283,6 @@ export default function UploadPage() {
           config: {
             annotationMode,
             entityType,
-            // null/undefined means "use all annotators" on the backend.
             annotators: annotatorsList.length > 0 ? annotatorsList : null,
             ...(hintsPayload ? { hints: hintsPayload } : {}),
           },
@@ -307,7 +307,26 @@ export default function UploadPage() {
 
   const entityTypes = entityTypesQuery.data || [];
   const annotators = annotatorsQuery.data || [];
-  // Available hint columns = all columns except the selected name column.
+  const allVocabularies = vocabulariesQuery.data || [];
+
+  // Vocab list shown by default = entity-type preset + currently selected.
+  // "Show all" reveals the full discovery list (310 entries), with optional search.
+  const presetPrefixes = ENTITY_TYPE_DEFAULT_PREFIXES[entityType] ?? [];
+  const featuredPrefixSet = new Set<string>([...presetPrefixes, ...selectedVocabPrefixes]);
+  const visibleVocabs = useMemo(() => {
+    if (!showAllVocabs) {
+      // Show featured set, sorted with selected first.
+      return allVocabularies
+        .filter(v => featuredPrefixSet.has(v.prefix))
+        .sort((a, b) => a.prefix.localeCompare(b.prefix));
+    }
+    const q = vocabSearch.trim().toLowerCase();
+    return allVocabularies
+      .filter(v => !q || v.prefix.toLowerCase().includes(q) || (v.aliases || []).some(a => a.toLowerCase().includes(q)))
+      .sort((a, b) => a.prefix.localeCompare(b.prefix))
+      .slice(0, 200); // safety cap to avoid rendering 310 rows when search is empty
+  }, [allVocabularies, showAllVocabs, vocabSearch, featuredPrefixSet]);
+
   const availableHintColumns = columns.filter(c => c !== selectedColumn);
   const hintRowCount = hintsPayload ? Object.keys(hintsPayload).length : 0;
 
@@ -320,14 +339,14 @@ export default function UploadPage() {
       <div className="max-w-3xl w-full mx-auto mt-10 px-6 pb-16">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground tracking-tight mb-2">New Mapping Job</h1>
-          <p className="text-muted-foreground">Upload a dataset to link compound names to biological ontologies.</p>
+          <p className="text-muted-foreground">Upload a dataset to link entity names to biological vocabularies.</p>
         </div>
 
         <div className="grid gap-6">
           <Card>
             <CardHeader>
               <CardTitle>1. Upload Dataset</CardTitle>
-              <CardDescription>Drag and drop a CSV, TSV, or Excel file containing compound names.</CardDescription>
+              <CardDescription>Drag and drop a CSV, TSV, or Excel file containing entity names.</CardDescription>
             </CardHeader>
             <CardContent>
               <div
@@ -409,7 +428,7 @@ export default function UploadPage() {
                     </Label>
                     <div className="grid grid-cols-2 gap-2" data-testid="hint-column-checkboxes">
                       {availableHintColumns.map(col => {
-                        const prefix = inferPrefix(col);
+                        const inferred = inferPrefix(col);
                         const isSelected = hintColumns.has(col);
                         return (
                           <div key={col} className="flex items-center gap-2">
@@ -417,18 +436,15 @@ export default function UploadPage() {
                               id={`hint-col-${col}`}
                               checked={isSelected}
                               onCheckedChange={() => toggleHintColumn(col)}
-                              disabled={!prefix}
                               data-testid={`checkbox-hint-${col}`}
                             />
                             <Label
                               htmlFor={`hint-col-${col}`}
-                              className={`font-normal cursor-pointer text-sm ${!prefix ? "text-muted-foreground/60" : ""}`}
-                              title={prefix ? `Will be sent as ${prefix} hints` : "No vocabulary recognized in column name"}
+                              className="font-normal cursor-pointer text-sm"
+                              title={`Will be sent as ${inferred} hints`}
                             >
                               {col}
-                              {prefix && (
-                                <span className="ml-1.5 text-xs text-muted-foreground">→ {prefix}</span>
-                              )}
+                              <span className="ml-1.5 text-xs text-muted-foreground">→ {inferred}</span>
                             </Label>
                           </div>
                         );
@@ -448,7 +464,7 @@ export default function UploadPage() {
                   <Label htmlFor="entity-type">
                     Entity Type
                     <span className="text-muted-foreground font-normal text-xs ml-1">
-                      (Biolink class — controls which annotators are valid)
+                      (Biolink class — drives default vocabulary preset)
                     </span>
                   </Label>
                   <Select value={entityType} onValueChange={setEntityType} disabled={entityTypesQuery.isLoading}>
@@ -522,22 +538,64 @@ export default function UploadPage() {
                 </div>
 
                 <div className="space-y-3">
-                  <Label>Display Vocabularies <span className="text-muted-foreground font-normal text-xs ml-1">(controls which identifier columns appear in results)</span></Label>
-                  <div className="grid grid-cols-2 gap-2" data-testid="ontology-checkboxes">
-                    {ALL_ONTOLOGIES.map(key => (
-                      <div key={key} className="flex items-center gap-2">
-                        <Checkbox
-                          id={`ontology-${key}`}
-                          checked={selectedOntologies.has(key)}
-                          onCheckedChange={() => toggleOntology(key)}
-                          data-testid={`checkbox-ontology-${key}`}
-                        />
-                        <Label htmlFor={`ontology-${key}`} className="font-normal cursor-pointer">
-                          {ONTOLOGY_LABELS[key]}
-                        </Label>
-                      </div>
-                    ))}
+                  <div className="flex items-center justify-between">
+                    <Label>
+                      Display Vocabularies
+                      <span className="text-muted-foreground font-normal text-xs ml-1">
+                        (controls which identifier columns appear in results)
+                      </span>
+                    </Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowAllVocabs(v => !v)}
+                      disabled={vocabulariesQuery.isLoading || vocabulariesQuery.isError}
+                      data-testid="btn-toggle-all-vocabs"
+                    >
+                      {showAllVocabs ? "Show preset only" : `Show all (${allVocabularies.length})`}
+                    </Button>
                   </div>
+
+                  {showAllVocabs && (
+                    <Input
+                      placeholder="Search vocabularies (e.g. UNIPROT, ENSEMBL, REACT)…"
+                      value={vocabSearch}
+                      onChange={(e) => setVocabSearch(e.target.value)}
+                      data-testid="input-vocab-search"
+                    />
+                  )}
+
+                  {vocabulariesQuery.isLoading ? (
+                    <p className="text-xs text-muted-foreground">Loading vocabularies…</p>
+                  ) : vocabulariesQuery.isError ? (
+                    <p className="text-xs text-amber-600">
+                      Couldn't load vocabularies — display columns will be derived from results.
+                    </p>
+                  ) : visibleVocabs.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      {showAllVocabs ? "No vocabularies match your search." : "No preset for this entity type — use \"Show all\" to pick vocabularies."}
+                    </p>
+                  ) : (
+                    <div
+                      className={`grid grid-cols-2 gap-2 ${showAllVocabs ? "max-h-64 overflow-y-auto pr-2" : ""}`}
+                      data-testid="vocab-checkboxes"
+                    >
+                      {visibleVocabs.map(v => (
+                        <div key={v.prefix} className="flex items-center gap-2">
+                          <Checkbox
+                            id={`vocab-${v.prefix}`}
+                            checked={selectedVocabPrefixes.has(v.prefix)}
+                            onCheckedChange={() => toggleVocab(v.prefix)}
+                            data-testid={`checkbox-vocab-${v.prefix}`}
+                          />
+                          <Label htmlFor={`vocab-${v.prefix}`} className="font-normal cursor-pointer text-sm font-mono">
+                            {v.prefix}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-3">

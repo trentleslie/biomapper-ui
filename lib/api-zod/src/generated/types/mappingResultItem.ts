@@ -15,6 +15,12 @@ export interface MappingResultItem {
   confidenceScore?: number | null;
   confidenceTier?: MappingResultItemConfidenceTier;
   needsReview?: boolean;
+  /** Map of vocabulary key → list of CURIEs/identifiers found for this entity.
+Keys are vocabulary identifiers (e.g. "hmdb", "chebi", "uniprot").
+Open record — backend may emit any vocabulary key the underlying
+BioMapper run produces, including ones not in the small-molecule
+preset.
+ */
   identifiers?: MappingResultItemIdentifiers;
   error?: string | null;
   error_type?: string | null;

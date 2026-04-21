@@ -72,18 +72,15 @@ export const MappingResultItemConfidenceTier = {
   unknown: "unknown",
 } as const;
 
-export type MappingResultItemIdentifiers = {
-  hmdb?: string[];
-  chebi?: string[];
-  pubchem?: string[];
-  refmet?: string[];
-  lipidmaps?: string[];
-  kegg?: string[];
-  umls?: string[];
-  mesh?: string[];
-  unii?: string[];
-  chembl?: string[];
-};
+/**
+ * Map of vocabulary key → list of CURIEs/identifiers found for this entity.
+Keys are vocabulary identifiers (e.g. "hmdb", "chebi", "uniprot").
+Open record — backend may emit any vocabulary key the underlying
+BioMapper run produces, including ones not in the small-molecule
+preset.
+
+ */
+export type MappingResultItemIdentifiers = { [key: string]: string[] };
 
 export interface MappingResultItem {
   name: string;
@@ -92,6 +89,12 @@ export interface MappingResultItem {
   confidenceScore?: number | null;
   confidenceTier?: MappingResultItemConfidenceTier;
   needsReview?: boolean;
+  /** Map of vocabulary key → list of CURIEs/identifiers found for this entity.
+Keys are vocabulary identifiers (e.g. "hmdb", "chebi", "uniprot").
+Open record — backend may emit any vocabulary key the underlying
+BioMapper run produces, including ones not in the small-molecule
+preset.
+ */
   identifiers?: MappingResultItemIdentifiers;
   error?: string | null;
   error_type?: string | null;
