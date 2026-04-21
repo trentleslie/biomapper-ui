@@ -6,7 +6,9 @@ from typing import Literal
 class MappingConfig(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
+    entity_type: str = "biolink:SmallMolecule"
     annotation_mode: Literal["missing", "all", "none"] = "missing"
+    annotators: list[str] | None = None
     hints: dict[str, dict[str, str | list[str]]] = {}
 
 

@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import os
 from typing import Any, AsyncIterator
 
 from biomapper import (
@@ -11,11 +13,29 @@ from biomapper import (
 
 from models.schemas import MappingConfig
 
+logger = logging.getLogger("entity-linker.mapper")
+
 MAX_CONCURRENCY = 10
 MAX_RETRIES = 3
 
 
 class MapperService:
+    def __init__(self) -> None:
+        self.base_url = self._get_base_url()
+
+    @staticmethod
+    def _get_base_url() -> str | None:
+        value = os.environ.get("BIOMAPPER_BASE_URL")
+        if value:
+            value = value.strip()
+        return value or None
+
+    def _client_kwargs(self) -> dict[str, Any]:
+        kwargs: dict[str, Any] = {}
+        if self.base_url:
+            kwargs["base_url"] = self.base_url
+        return kwargs
+
     async def map_batch(
         self,
         names: list[str],
@@ -62,10 +82,15 @@ class MapperService:
         if hints:
             identifiers = {k: (v[0] if isinstance(v, list) else v) for k, v in hints.items()}
 
+        # Treat both None and [] as "use all annotators" — forward None to
+        # the client. Passing an empty list could be interpreted as "use zero
+        # annotators" and silently produce empty results.
+        annotators_arg: list[str] | None = config.annotators or None
+
         last_error: str = "Unknown error"
 
         try:
-            client_ctx = BioMapperClient()
+            client_ctx = BioMapperClient(**self._client_kwargs())
         except BioMapperConfigError as e:
             stop_event.set()
             return {
@@ -85,9 +110,20 @@ class MapperService:
                         "error_type": "aborted",
                     }
                 try:
+                    logger.debug(
+                        "map_entity name=%r entity_type=%r annotation_mode=%r annotators=%r identifiers=%r",
+                        name,
+                        config.entity_type,
+                        config.annotation_mode,
+                        annotators_arg,
+                        identifiers,
+                    )
                     result = await client.map_entity(
                         name=name,
+                        entity_type=config.entity_type,
                         identifiers=identifiers,
+                        annotation_mode=config.annotation_mode,
+                        annotators=annotators_arg,
                     )
                     return self._process_result(name, result)
 

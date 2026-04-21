@@ -11,7 +11,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from routes import health, map as map_router
+from routes import health, map as map_router, discovery as discovery_router
+from services.mapper import MapperService
 
 logger = logging.getLogger("entity-linker")
 logging.basicConfig(level=logging.INFO)
@@ -22,6 +23,9 @@ try:
 except Exception as e:
     biomapper_version = f"unknown ({e})"
 logger.info("biomapper version: %s", biomapper_version)
+
+_resolved_base_url = MapperService._get_base_url()
+logger.info("biomapper base_url: %s", _resolved_base_url or "default")
 
 app = FastAPI(title="Entity Linker API", version="0.1.0")
 
@@ -35,6 +39,7 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(map_router.router, prefix="/map")
+app.include_router(discovery_router.router, prefix="/discovery")
 
 
 @app.exception_handler(RequestValidationError)

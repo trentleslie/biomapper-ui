@@ -52,6 +52,9 @@ Browser → React Frontend (/) → Express (/api) → FastAPI Python (:8000) →
 | POST | `/api/map/batch` | Start mapping job (max 10,000 names) → `{job_id}` |
 | GET | `/api/map/stream/{job_id}` | SSE stream of job progress (`text/event-stream`) |
 | GET | `/api/map/result/{job_id}` | Full results for completed job |
+| GET | `/api/discovery/entity-types` | List Biolink entity types from BioMapper2 (cached) |
+| GET | `/api/discovery/annotators` | List available annotators from BioMapper2 (cached) |
+| GET | `/api/discovery/vocabularies` | List supported vocabularies from BioMapper2 (cached) |
 
 ## Key Files
 
@@ -81,6 +84,8 @@ Browser → React Frontend (/) → Express (/api) → FastAPI Python (:8000) →
 - `CLERK_SECRET_KEY` — Clerk secret key (server-side, prod only)
 - `VITE_CLERK_PROXY_URL` — Clerk proxy URL (set automatically in production)
 - `PYTHON_API_PORT` — Port for Python FastAPI (default: 8000)
+- `BIOMAPPER_API_KEY` — API key for BioMapper2 (required for live mapping)
+- `BIOMAPPER_BASE_URL` — Optional override for the BioMapper2 base URL; when unset the biomapper SDK default applies. Resolved value is logged at startup.
 
 ## Auth Domain Restriction
 
