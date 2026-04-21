@@ -1,7 +1,7 @@
 import asyncio
 from typing import Any, AsyncIterator
 
-from ddharmon import (
+from biomapper import (
     BioMapperClient,
     BioMapperAuthError,
     BioMapperConfigError,

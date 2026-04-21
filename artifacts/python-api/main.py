@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 
@@ -11,6 +12,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from routes import health, map as map_router
+
+logger = logging.getLogger("entity-linker")
+logging.basicConfig(level=logging.INFO)
+
+try:
+    from importlib.metadata import version as _pkg_version
+    biomapper_version = _pkg_version("biomapper")
+except Exception as e:
+    biomapper_version = f"unknown ({e})"
+logger.info("biomapper version: %s", biomapper_version)
 
 app = FastAPI(title="Entity Linker API", version="0.1.0")
 

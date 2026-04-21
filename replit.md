@@ -2,7 +2,7 @@
 
 ## Overview
 
-PhenomeHealth Entity Linking Dashboard — a scientific tool for metabolomics researchers to map raw compound names to biological ontologies (BioMapper2 via ddharmon).
+PhenomeHealth Entity Linking Dashboard — a scientific tool for metabolomics researchers to map raw compound names to biological ontologies (BioMapper2 via the `biomapper` Python package, v1.0.1).
 
 pnpm workspace monorepo, TypeScript + Python.
 
@@ -29,7 +29,7 @@ Browser → React Frontend (/) → Express (/api) → FastAPI Python (:8000) →
 - The Express API server (`artifacts/api-server`) is the public entrypoint at `/api`
 - `/api/map/*` requests are proxied (unbuffered) to the FastAPI Python service via `http-proxy-middleware`
 - The proxy is mounted BEFORE body parsers in `app.ts` to preserve the raw request body stream
-- The Python FastAPI service (`artifacts/python-api`) uses `ddharmon` v0.2.0 to call BioMapper2
+- The Python FastAPI service (`artifacts/python-api`) uses `biomapper` v1.0+ to call BioMapper2
 - SSE streams from FastAPI flow through the proxy without buffering (`X-Accel-Buffering: no`)
 - Clerk middleware is mounted in `app.ts` for server-side auth validation
 - Clerk proxy middleware (`clerkProxyMiddleware.ts`) is active in production only
@@ -65,7 +65,7 @@ Browser → React Frontend (/) → Express (/api) → FastAPI Python (:8000) →
 - `artifacts/api-server/src/app.ts` — Express app (Clerk + map proxy)
 - `artifacts/api-server/src/middlewares/clerkProxyMiddleware.ts` — Clerk FAPI proxy (prod only)
 - `artifacts/python-api/main.py` — FastAPI app
-- `artifacts/python-api/services/mapper.py` — ddharmon integration
+- `artifacts/python-api/services/mapper.py` — biomapper integration
 - `lib/api-spec/openapi.yaml` — OpenAPI spec
 - `lib/api-client-react/src/generated/api.ts` — Orval-generated React hooks
 
