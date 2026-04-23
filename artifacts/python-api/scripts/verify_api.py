@@ -34,7 +34,7 @@ class ExpectedCompound:
 
 FIXTURES: list[ExpectedCompound] = [
     ExpectedCompound("L-Histidine",  "HMDB0000177", "CHEBI:15971"),
-    ExpectedCompound("Glucose",      "HMDB0000122", "CHEBI:17234"),
+    ExpectedCompound("D-Glucose",     "HMDB0000122", "CHEBI:17634"),
     ExpectedCompound("Acetyl-CoA",   "HMDB0001206", "CHEBI:15351"),
     ExpectedCompound("Creatinine",   "HMDB0000562", "CHEBI:16737"),
     ExpectedCompound("Tryptophan",   "HMDB0000929", "CHEBI:16828"),
