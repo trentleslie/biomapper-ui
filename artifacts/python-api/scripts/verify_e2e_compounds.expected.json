@@ -1,0 +1,82 @@
+{
+    "job_id": "4055079b-d9c2-4a3f-81b4-f72a600648b7",
+    "status": "complete",
+    "completed": 3,
+    "total": 3,
+    "error_count": 0,
+    "error_message": null,
+    "results": [
+        {
+            "name": "L-Histidine",
+            "resolved": true,
+            "primaryCurie": "CHEBI:15971",
+            "confidenceScore": 2.4898567923359374,
+            "confidenceTier": "high",
+            "needsReview": false,
+            "identifiers": {
+                "hmdb": [],
+                "chebi": [
+                    "15971"
+                ],
+                "pubchem": [],
+                "refmet": [
+                    "RM0129894"
+                ],
+                "lipidmaps": [],
+                "kegg": [],
+                "umls": [],
+                "mesh": [],
+                "unii": [],
+                "chembl": []
+            }
+        },
+        {
+            "name": "D-Glucose",
+            "resolved": true,
+            "primaryCurie": "CHEBI:17634",
+            "confidenceScore": 2.482089514658613,
+            "confidenceTier": "high",
+            "needsReview": false,
+            "identifiers": {
+                "hmdb": [],
+                "chebi": [
+                    "17634"
+                ],
+                "pubchem": [],
+                "refmet": [
+                    "RM0135901"
+                ],
+                "lipidmaps": [],
+                "kegg": [],
+                "umls": [],
+                "mesh": [],
+                "unii": [],
+                "chembl": []
+            }
+        },
+        {
+            "name": "Caffeine",
+            "resolved": true,
+            "primaryCurie": "RM:0032992",
+            "confidenceScore": 2.4919335630415884,
+            "confidenceTier": "high",
+            "needsReview": false,
+            "identifiers": {
+                "hmdb": [],
+                "chebi": [
+                    "27732"
+                ],
+                "pubchem": [],
+                "refmet": [
+                    "RM0032992"
+                ],
+                "lipidmaps": [],
+                "kegg": [],
+                "umls": [],
+                "mesh": [],
+                "unii": [],
+                "chembl": []
+            }
+        }
+    ]
+}
