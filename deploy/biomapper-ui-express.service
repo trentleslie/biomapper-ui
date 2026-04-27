@@ -29,7 +29,6 @@ SyslogIdentifier=biomapper-ui-express
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ProtectHome=read-only
 ReadWritePaths=$DEPLOY_DIR
 
 [Install]

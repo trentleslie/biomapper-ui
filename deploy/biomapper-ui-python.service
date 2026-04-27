@@ -27,7 +27,6 @@ SyslogIdentifier=biomapper-ui-python
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ProtectHome=read-only
 ReadWritePaths=$DEPLOY_DIR
 
 [Install]
