@@ -22,6 +22,8 @@ import {
 } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, UploadCloud, FileType, CheckCircle2 } from "lucide-react";
+import { FieldTooltip } from "@/components/field-tooltip";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Default selected vocabularies per entity type. These act as a UX preset;
 // the full list of selectable vocabularies is fetched from /discovery/vocabularies.
@@ -61,6 +63,13 @@ const COLUMN_PREFIX_HINTS: Array<[RegExp, string]> = [
   [/hgnc/i,                     "HGNC"],
 ];
 
+const ANNOTATOR_DESCRIPTION_FALLBACKS: Record<string, string> = {
+  "kestrel-hybrid-search": "Combines text and semantic vector search for comprehensive matching",
+  "kestrel-text-search": "Exact and fuzzy text matching against entity name databases",
+  "kestrel-vector-search": "Semantic similarity matching using vector embeddings",
+  "metabolomics-workbench": "Lookup against the Metabolomics Workbench reference database",
+};
+
 function inferPrefix(columnName: string): string {
   for (const [re, prefix] of COLUMN_PREFIX_HINTS) {
     if (re.test(columnName)) return prefix;
@@ -74,6 +83,7 @@ export type ConfidenceFilter = "all" | "high_medium" | "high";
 export default function UploadPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [mode, setMode] = useState<'link' | 'benchmark'>('link');
   const [file, setFile] = useState<File | null>(null);
   const [columns, setColumns] = useState<string[]>([]);
   const [selectedColumn, setSelectedColumn] = useState<string>("");
@@ -342,6 +352,33 @@ export default function UploadPage() {
           <p className="text-muted-foreground">Upload a dataset to link entity names to biological vocabularies.</p>
         </div>
 
+        <div className="flex items-center gap-2 mb-6">
+          <Tabs value={mode} onValueChange={(v) => setMode(v as 'link' | 'benchmark')}>
+            <TabsList>
+              <TabsTrigger value="link">Entity Linking</TabsTrigger>
+              <TabsTrigger value="benchmark">Benchmark</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <div className="ml-auto">
+            <FieldTooltip label="Help: Mode">
+              Entity Linking maps your compound names to standardized identifiers. Benchmark mode (coming soon) lets you evaluate mapping accuracy against known-correct data.
+            </FieldTooltip>
+          </div>
+        </div>
+
+        {mode === 'benchmark' ? (
+          <Card>
+            <CardHeader className="text-center">
+              <CardTitle>Benchmark Mode</CardTitle>
+              <CardDescription className="text-lg">Coming Soon</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-center text-muted-foreground">
+                {"Evaluate BioMapper's accuracy by comparing results against your known-correct identifiers. Upload a dataset with answer columns to measure precision, recall, and confidence calibration."}
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
         <div className="grid gap-6">
           <Card>
             <CardHeader>
@@ -399,7 +436,7 @@ export default function UploadPage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-3">
-                  <Label htmlFor="column-select">Name Column</Label>
+                  <Label htmlFor="column-select">Name Column <FieldTooltip label="Help: Name Column">Select the column containing entity names to map (e.g., compound names, metabolite names). Each unique name will be sent to BioMapper for identification.</FieldTooltip></Label>
                   <Select value={selectedColumn} onValueChange={setSelectedColumn}>
                     <SelectTrigger id="column-select" data-testid="select-name-col">
                       <SelectValue placeholder="Select column..." />
@@ -422,6 +459,7 @@ export default function UploadPage() {
                   <div className="space-y-3">
                     <Label>
                       Provided ID Columns
+                      <FieldTooltip label="Help: Provided ID Columns">Columns with known identifiers (e.g., HMDB IDs, CHEBI IDs) that help BioMapper confirm or improve matches. These act as hints, not constraints.</FieldTooltip>
                       <span className="text-muted-foreground font-normal text-xs ml-1">
                         (optional — pre-fill known cross-references as hints to BioMapper)
                       </span>
@@ -463,6 +501,7 @@ export default function UploadPage() {
                 <div className="space-y-3">
                   <Label htmlFor="entity-type">
                     Entity Type
+                    <FieldTooltip label="Help: Entity Type">The Biolink ontology class for your entities. This determines which vocabularies and identification strategies are used. SmallMolecule is correct for most metabolomics data.</FieldTooltip>
                     <span className="text-muted-foreground font-normal text-xs ml-1">
                       (Biolink class — drives default vocabulary preset)
                     </span>
@@ -493,7 +532,7 @@ export default function UploadPage() {
                 </div>
 
                 <div className="space-y-3">
-                  <Label htmlFor="annotation-mode">Annotation Mode</Label>
+                  <Label htmlFor="annotation-mode">Annotation Mode <FieldTooltip label="Help: Annotation Mode">Controls how BioMapper handles identifier annotation. 'Missing' only annotates entities without existing IDs. 'All' re-annotates everything. 'None' skips annotation entirely.</FieldTooltip></Label>
                   <Select value={annotationMode} onValueChange={(v) => setAnnotationMode(v as MappingConfigAnnotationMode)}>
                     <SelectTrigger id="annotation-mode" data-testid="select-annotation-mode">
                       <SelectValue />
@@ -509,6 +548,7 @@ export default function UploadPage() {
                 <div className="space-y-3">
                   <Label>
                     Annotators
+                    <FieldTooltip label="Help: Annotators">Select specific annotators to use, or leave all unchecked to use the full default set. Each annotator uses a different strategy (text search, vector similarity, etc.) to find matches.</FieldTooltip>
                     <span className="text-muted-foreground font-normal text-xs ml-1">
                       (leave all unchecked to use the BioMapper default set)
                     </span>
@@ -519,20 +559,25 @@ export default function UploadPage() {
                     <p className="text-xs text-amber-600">Couldn't load annotators — leaving unspecified (server defaults).</p>
                   ) : (
                     <div className="grid grid-cols-1 gap-2" data-testid="annotator-checkboxes">
-                      {annotators.map(a => (
-                        <div key={a.slug} className="flex items-center gap-2">
-                          <Checkbox
-                            id={`annotator-${a.slug}`}
-                            checked={selectedAnnotators.has(a.slug)}
-                            onCheckedChange={() => toggleAnnotator(a.slug)}
-                            data-testid={`checkbox-annotator-${a.slug}`}
-                          />
-                          <Label htmlFor={`annotator-${a.slug}`} className="font-normal cursor-pointer text-sm">
-                            <span className="font-mono text-xs">{a.slug}</span>
-                            <span className="text-muted-foreground ml-2">{a.name}</span>
-                          </Label>
-                        </div>
-                      ))}
+                      {annotators.map(a => {
+                        const desc = a.description || ANNOTATOR_DESCRIPTION_FALLBACKS[a.slug] || "(no description available)";
+                        return (
+                          <div key={a.slug} className="flex items-start gap-2">
+                            <Checkbox
+                              id={`annotator-${a.slug}`}
+                              checked={selectedAnnotators.has(a.slug)}
+                              onCheckedChange={() => toggleAnnotator(a.slug)}
+                              data-testid={`checkbox-annotator-${a.slug}`}
+                              className="mt-0.5"
+                            />
+                            <Label htmlFor={`annotator-${a.slug}`} className="font-normal cursor-pointer text-sm">
+                              <span className="font-mono text-xs">{a.slug}</span>
+                              <span className="text-muted-foreground ml-2">{a.name}</span>
+                              <span className="block text-xs text-muted-foreground mt-0.5">{desc}</span>
+                            </Label>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -541,6 +586,7 @@ export default function UploadPage() {
                   <div className="flex items-center justify-between">
                     <Label>
                       Display Vocabularies
+                      <FieldTooltip label="Help: Display Vocabularies">Choose which identifier vocabularies appear as columns in the results table. Presets are based on entity type; switch to 'Show all' to search across 300+ vocabularies.</FieldTooltip>
                       <span className="text-muted-foreground font-normal text-xs ml-1">
                         (controls which identifier columns appear in results)
                       </span>
@@ -599,7 +645,7 @@ export default function UploadPage() {
                 </div>
 
                 <div className="space-y-3">
-                  <Label htmlFor="confidence-filter">Confidence Filter <span className="text-muted-foreground font-normal text-xs ml-1">(filters which results appear in the dashboard table)</span></Label>
+                  <Label htmlFor="confidence-filter">Confidence Filter <FieldTooltip label="Help: Confidence Filter">Filter which results appear in the dashboard. 'High + Medium' hides uncertain matches. 'High Only' shows only the most confident identifications.</FieldTooltip> <span className="text-muted-foreground font-normal text-xs ml-1">(filters which results appear in the dashboard table)</span></Label>
                   <Select value={confidenceFilter} onValueChange={(v) => setConfidenceFilter(v as ConfidenceFilter)}>
                     <SelectTrigger id="confidence-filter" data-testid="select-confidence-filter">
                       <SelectValue />
@@ -632,6 +678,7 @@ export default function UploadPage() {
             </Card>
           )}
         </div>
+        )}
       </div>
     </div>
   );

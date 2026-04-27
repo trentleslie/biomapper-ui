@@ -15,9 +15,8 @@ const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 const queryClient = new QueryClient();
 
-if (!clerkPubKey) {
-  throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY in .env file');
-}
+// Clerk is optional — if no publishable key is set, the app runs without auth
+const clerkEnabled = !!clerkPubKey && clerkPubKey !== 'placeholder_will_update_later';
 
 function stripBase(path: string): string {
   return basePath && path.startsWith(basePath)
@@ -74,6 +73,13 @@ const rawFrontendEmails = (import.meta.env.VITE_ALLOWED_EMAILS as string | undef
 const ALLOWED_UX_EMAILS = new Set(rawFrontendEmails.split(",").map((e: string) => e.trim().toLowerCase()).filter(Boolean));
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+  // When Clerk is disabled, skip auth checks entirely
+  if (!clerkEnabled) return <Component />;
+
+  return <ClerkProtectedRoute component={Component} />;
+}
+
+function ClerkProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoaded, isSignedIn } = useUser();
 
   if (!isLoaded) return null;
@@ -150,10 +156,21 @@ function ClerkProviderWithRoutes() {
   );
 }
 
+function NoAuthRoutes() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Router />
+        <Toaster />
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+}
+
 function App() {
   return (
     <WouterRouter base={basePath}>
-      <ClerkProviderWithRoutes />
+      {clerkEnabled ? <ClerkProviderWithRoutes /> : <NoAuthRoutes />}
     </WouterRouter>
   );
 }

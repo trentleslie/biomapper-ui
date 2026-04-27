@@ -20,6 +20,9 @@ const ALLOWED_EMAILS_SET = new Set(
   rawEmails.split(",").map(e => e.trim().toLowerCase()).filter(Boolean)
 );
 
+// Clerk is optional — if no CLERK_SECRET_KEY is set, auth is skipped entirely
+const clerkEnabled = !!process.env.CLERK_SECRET_KEY;
+
 const app: Express = express();
 
 app.use(
@@ -42,14 +45,20 @@ app.use(
   }),
 );
 
-// Clerk proxy must be before body parsers (streams raw bytes to Clerk FAPI)
-app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
+if (clerkEnabled) {
+  // Clerk proxy must be before body parsers (streams raw bytes to Clerk FAPI)
+  app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
+}
 
 app.use(cors({ credentials: true, origin: true }));
 
-// clerkMiddleware only reads headers/cookies — safe to mount before body parsers.
-// This populates auth state so getAuth() works for the map proxy auth guard below.
-app.use(clerkMiddleware());
+if (clerkEnabled) {
+  // clerkMiddleware only reads headers/cookies — safe to mount before body parsers.
+  // This populates auth state so getAuth() works for the map proxy auth guard below.
+  app.use(clerkMiddleware());
+} else {
+  logger.warn("CLERK_SECRET_KEY not set — running without authentication");
+}
 
 /**
  * requireMapAuth — server-side gate for /api/map/* routes.
@@ -93,7 +102,7 @@ const requireMapAuth = async (req: Request, res: Response, next: NextFunction): 
 // The SSE stream endpoint (/api/map/stream/*) requires unbuffered pass-through.
 app.use(
   "/api/map",
-  requireMapAuth,
+  ...(clerkEnabled ? [requireMapAuth] : []),
   createProxyMiddleware({
     target: PYTHON_API_BASE,
     changeOrigin: true,
@@ -116,7 +125,7 @@ app.use(
 // the PhenomeHealth domain restriction consistent across the BioMapper surface).
 app.use(
   "/api/discovery",
-  requireMapAuth,
+  ...(clerkEnabled ? [requireMapAuth] : []),
   createProxyMiddleware({
     target: PYTHON_API_BASE,
     changeOrigin: true,
