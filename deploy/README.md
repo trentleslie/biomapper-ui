@@ -38,8 +38,8 @@ cd biomapper-ui
 corepack enable
 pnpm install
 
-# Python dependencies (in packages/python-api)
-cd packages/python-api
+# Python dependencies (in artifacts/python-api)
+cd artifacts/python-api
 uv venv && uv pip install -r requirements.txt
 # or: python3 -m venv .venv && pip install -r requirements.txt
 cd ../..
