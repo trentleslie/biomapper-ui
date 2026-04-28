@@ -16,5 +16,5 @@ export interface MappingSummary {
 }
 
 export interface MappingResult extends MappingResultItem {
-  // We extend if we need frontend-specific properties, but MappingResultItem is mostly sufficient
+  kg_equivalent_ids?: string[];
 }

@@ -7,7 +7,7 @@ _PURGE_INTERVAL = 300  # run purge at most every 5 minutes
 
 
 class Job:
-    def __init__(self, job_id: str, total: int):
+    def __init__(self, job_id: str, total: int, env: str = "production"):
         self.job_id = job_id
         self.status = "pending"
         self.completed = 0
@@ -16,6 +16,7 @@ class Job:
         self.error_message: str | None = None
         self.results: list[dict[str, Any]] = []
         self.created_at = time.time()
+        self.env = env
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -26,6 +27,7 @@ class Job:
             "error_count": self.error_count,
             "error_message": self.error_message,
             "results": self.results,
+            "env": self.env,
         }
 
 
@@ -41,9 +43,9 @@ class JobStore:
             self._last_purge = now
             self.purge_expired()
 
-    def create(self, job_id: str, total: int) -> Job:
+    def create(self, job_id: str, total: int, env: str = "production") -> Job:
         self._maybe_purge()
-        job = Job(job_id, total)
+        job = Job(job_id, total, env=env)
         self._jobs[job_id] = job
         return job
 

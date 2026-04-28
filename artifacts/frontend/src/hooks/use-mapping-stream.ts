@@ -4,9 +4,17 @@ import type { JobResult } from "@workspace/api-client-react";
 const MAX_RETRIES = 5;
 const BASE_RETRY_MS = 1500;
 
+export interface StreamError {
+  message: string;
+  isDevEnvError: boolean;
+}
+
+type JobResultWithEnv = JobResult & { env?: string };
+
 export function useMappingStream(jobId: string) {
   const [jobState, setJobState] = useState<JobResult | null>(null);
   const [done, setDone] = useState(false);
+  const [error, setError] = useState<StreamError | null>(null);
   const esRef = useRef<EventSource | null>(null);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
@@ -24,9 +32,17 @@ export function useMappingStream(jobId: string) {
       es.addEventListener("progress", (e) => {
         if (!mountedRef.current) return;
         try {
-          const data: JobResult = JSON.parse((e as MessageEvent).data);
+          const data: JobResultWithEnv = JSON.parse((e as MessageEvent).data);
           setJobState(data);
-          if (data.status === "complete" || data.status === "error") {
+          if (data.status === "complete") {
+            setDone(true);
+            es.close();
+          } else if (data.status === "error") {
+            const isDevEnv = data.env === "dev";
+            setError({
+              message: data.error_message ?? "Mapping failed",
+              isDevEnvError: isDevEnv,
+            });
             setDone(true);
             es.close();
           }
@@ -45,6 +61,10 @@ export function useMappingStream(jobId: string) {
           retryTimerRef.current = setTimeout(() => connect(retryCount + 1), delay);
         } else {
           console.error("[SSE] Max retries exceeded, giving up on live stream");
+          setError({
+            message: "Connection to mapping service lost after multiple retries",
+            isDevEnvError: false,
+          });
           setDone(true);
         }
       };
@@ -59,5 +79,5 @@ export function useMappingStream(jobId: string) {
     };
   }, [jobId]);
 
-  return { jobState, done };
+  return { jobState, done, error };
 }

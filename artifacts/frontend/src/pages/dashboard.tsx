@@ -1,9 +1,14 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useLocation, useParams, useSearch } from "wouter";
 import { useUser, useClerk } from "@clerk/react";
 import { useMappingStream } from "@/hooks/use-mapping-stream";
 import { useGetMappingResult, getGetMappingResultQueryKey, JobResult } from "@workspace/api-client-react";
 import { SankeyChart } from "@/components/SankeyChart";
+import { EnvToggle } from "@/components/EnvToggle";
+import { EquivalentIds } from "@/components/EquivalentIds";
+import { useEnv } from "@/contexts/env-context";
+import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { MappingSummary, MappingResult } from "@/types/mapping";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -63,13 +68,32 @@ export default function DashboardPage() {
   const [flaggedNames, setFlaggedNames] = useState<Set<string>>(new Set());
   const [dismissedNames, setDismissedNames] = useState<Set<string>>(new Set());
 
-  const { jobState, done } = useMappingStream(jobId || "");
+  const { env, setEnv } = useEnv();
+  const { toast } = useToast();
+
+  const { jobState, done, error: streamError } = useMappingStream(jobId || "");
   const { data: finalResult, isLoading } = useGetMappingResult(jobId || "", {
     query: {
       enabled: done || (!jobState && !!jobId),
       queryKey: getGetMappingResultQueryKey(jobId || ""),
     }
   });
+
+  useEffect(() => {
+    if (streamError?.isDevEnvError && env === "dev") {
+      toast({
+        variant: "destructive",
+        title: "Dev API is unavailable",
+        description: streamError.message,
+        duration: Infinity,
+        action: (
+          <ToastAction altText="Switch to Production" onClick={() => setEnv("production")}>
+            Switch to Production
+          </ToastAction>
+        ),
+      });
+    }
+  }, [streamError, env, toast, setEnv]);
 
   // Prefer live SSE state while streaming; fall back to the final fetch result once done.
   // Never treat a still-loading or 202-style intermediate response as an error.
@@ -387,6 +411,7 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <EnvToggle />
           <span className="text-sm text-muted-foreground hidden sm:block">{user?.primaryEmailAddress?.emailAddress}</span>
           <Button variant="outline" size="sm" onClick={() => signOut()} data-testid="btn-sign-out">
             <LogOut className="w-4 h-4 mr-2" /> Sign Out
@@ -719,6 +744,7 @@ export default function DashboardPage() {
                                   {(!row.identifiers || Object.values(row.identifiers).every(ids => !ids || ids.length === 0)) && (
                                     <p className="text-muted-foreground text-xs">No cross-references available.</p>
                                   )}
+                                  <EquivalentIds ids={row.kg_equivalent_ids ?? []} />
                                 </div>
                               </TableCell>
                             </TableRow>

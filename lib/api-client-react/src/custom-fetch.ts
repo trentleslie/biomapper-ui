@@ -17,6 +17,7 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
+let _envHeaderGetter: (() => string) | null = null;
 
 /**
  * Set a base URL that is prepended to every relative request URL
@@ -42,6 +43,17 @@ export function setBaseUrl(url: string | null): void {
  */
 export function setAuthTokenGetter(getter: AuthTokenGetter | null): void {
   _authTokenGetter = getter;
+}
+
+/**
+ * Register a getter that supplies the current API environment name.
+ * Before every fetch the getter is invoked; when it returns a non-empty
+ * string, an `X-Biomapper-Env` header is attached to the request.
+ *
+ * Pass `null` to clear the getter.
+ */
+export function setEnvHeaderGetter(getter: (() => string) | null): void {
+  _envHeaderGetter = getter;
 }
 
 function isRequest(input: RequestInfo | URL): input is Request {
@@ -355,6 +367,14 @@ export async function customFetch<T = unknown>(
     const token = await _authTokenGetter();
     if (token) {
       headers.set("authorization", `Bearer ${token}`);
+    }
+  }
+
+  // Attach environment header when an env getter is configured.
+  if (_envHeaderGetter) {
+    const envValue = _envHeaderGetter();
+    if (envValue) {
+      headers.set("X-Biomapper-Env", envValue);
     }
   }
 

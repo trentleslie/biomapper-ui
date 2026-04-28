@@ -2,7 +2,7 @@ import logging
 import time
 from typing import Any, Awaitable, Callable
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 
 from biomapper import (
     BioMapperClient,
@@ -10,6 +10,7 @@ from biomapper import (
     BioMapperError,
 )
 
+from services.env_routing import resolve_env_base_url
 from services.mapper import MapperService
 
 logger = logging.getLogger("entity-linker.discovery")
@@ -42,6 +43,7 @@ def _set_cache(key: str, value: Any, ttl: int, error: bool = False) -> None:
 async def _fetch_with_cache(
     key: str,
     fetcher: Callable[[BioMapperClient], Awaitable[list[Any]]],
+    base_url: str | None = None,
 ) -> list[dict[str, Any]]:
     found, entry = _get_cached(key)
     if found:
@@ -49,10 +51,10 @@ async def _fetch_with_cache(
             raise HTTPException(status_code=502, detail=entry["value"])
         return entry["value"]
 
-    base_url = MapperService._get_base_url()
+    resolved_url = base_url if base_url is not None else MapperService._get_base_url()
     client_kwargs: dict[str, Any] = {}
-    if base_url:
-        client_kwargs["base_url"] = base_url
+    if resolved_url:
+        client_kwargs["base_url"] = resolved_url
 
     try:
         async with BioMapperClient(**client_kwargs) as client:
@@ -76,24 +78,30 @@ async def _fetch_with_cache(
 
 
 @router.get("/entity-types")
-async def get_entity_types() -> list[dict[str, Any]]:
+async def get_entity_types(x_biomapper_env: str | None = Header(None)) -> list[dict[str, Any]]:
+    env, base_url = resolve_env_base_url(x_biomapper_env)
     return await _fetch_with_cache(
-        "entity-types",
+        f"{env}:entity-types",
         lambda client: client.list_entity_types(),
+        base_url=base_url,
     )
 
 
 @router.get("/annotators")
-async def get_annotators() -> list[dict[str, Any]]:
+async def get_annotators(x_biomapper_env: str | None = Header(None)) -> list[dict[str, Any]]:
+    env, base_url = resolve_env_base_url(x_biomapper_env)
     return await _fetch_with_cache(
-        "annotators",
+        f"{env}:annotators",
         lambda client: client.list_annotators(),
+        base_url=base_url,
     )
 
 
 @router.get("/vocabularies")
-async def get_vocabularies() -> list[dict[str, Any]]:
+async def get_vocabularies(x_biomapper_env: str | None = Header(None)) -> list[dict[str, Any]]:
+    env, base_url = resolve_env_base_url(x_biomapper_env)
     return await _fetch_with_cache(
-        "vocabularies",
+        f"{env}:vocabularies",
         lambda client: client.list_vocabularies(),
+        base_url=base_url,
     )

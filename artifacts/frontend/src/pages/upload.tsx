@@ -23,6 +23,9 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, UploadCloud, FileType, CheckCircle2 } from "lucide-react";
 import { FieldTooltip } from "@/components/field-tooltip";
+import { EnvToggle } from "@/components/EnvToggle";
+import { useEnv } from "@/contexts/env-context";
+import { ToastAction } from "@/components/ui/toast";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Default selected vocabularies per entity type. These act as a UX preset;
@@ -83,6 +86,7 @@ export type ConfidenceFilter = "all" | "high_medium" | "high";
 export default function UploadPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { env, setEnv } = useEnv();
   const [mode, setMode] = useState<'link' | 'benchmark'>('link');
   const [file, setFile] = useState<File | null>(null);
   const [columns, setColumns] = useState<string[]>([]);
@@ -308,8 +312,26 @@ export default function UploadPage() {
           });
           setLocation(`/job/${data.job_id}?${params.toString()}`);
         },
-        onError: () => {
-          toast({ title: "Failed to start mapping", description: "Unknown error", variant: "destructive" });
+        onError: (error: unknown) => {
+          const apiError = error as { status?: number; data?: { env?: string; detail?: string } } | undefined;
+          const hasDevEnvField = apiError?.data?.env === "dev";
+          const isDevStatusCode = apiError?.status === 502 || apiError?.status === 503;
+          const isDevEnvError = isDevStatusCode && (hasDevEnvField || env === "dev");
+          if (isDevEnvError) {
+            toast({
+              variant: "destructive",
+              title: "Dev API is unavailable",
+              description: apiError?.data?.detail ?? "Could not reach the dev biomapper2 backend",
+              duration: Infinity,
+              action: (
+                <ToastAction altText="Switch to Production" onClick={() => setEnv("production")}>
+                  Switch to Production
+                </ToastAction>
+              ),
+            });
+          } else {
+            toast({ title: "Failed to start mapping", description: "Unknown error", variant: "destructive" });
+          }
         }
       }
     );
@@ -342,8 +364,9 @@ export default function UploadPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="border-b border-border bg-card px-6 py-3 flex items-center gap-4 sticky top-0 z-10">
+      <header className="border-b border-border bg-card px-6 py-3 flex items-center justify-between sticky top-0 z-10">
         <span className="font-semibold text-foreground tracking-tight">PhenomeHealth Linker</span>
+        <EnvToggle />
       </header>
 
       <div className="max-w-3xl w-full mx-auto mt-10 px-6 pb-16">
