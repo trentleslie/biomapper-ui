@@ -20,8 +20,8 @@ MAX_RETRIES = 3
 
 
 class MapperService:
-    def __init__(self) -> None:
-        self.base_url = self._get_base_url()
+    def __init__(self, base_url_override: str | None = None) -> None:
+        self.base_url = base_url_override if base_url_override is not None else self._get_base_url()
 
     @staticmethod
     def _get_base_url() -> str | None:
@@ -159,7 +159,7 @@ class MapperService:
 
     @staticmethod
     def _process_result(name: str, result: Any) -> dict[str, Any]:
-        return {
+        processed: dict[str, Any] = {
             "name": name,
             "resolved": result.resolved,
             "primaryCurie": result.primary_curie,
@@ -179,3 +179,7 @@ class MapperService:
                 "chembl": result.ids_for("ChEMBL"),
             },
         }
+        kg_equiv = getattr(result, "kg_equivalent_ids", None)
+        if kg_equiv:
+            processed["kg_equivalent_ids"] = list(kg_equiv)
+        return processed

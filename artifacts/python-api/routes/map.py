@@ -3,11 +3,12 @@ import json
 import uuid
 from typing import AsyncIterator
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import ValidationError
 
 from models.schemas import BatchRequest
+from services.env_routing import resolve_env_base_url
 from services.jobs import job_store
 from services.mapper import MapperService
 
@@ -15,10 +16,15 @@ router = APIRouter()
 
 
 @router.post("/batch")
-async def start_batch(request: BatchRequest, background_tasks: BackgroundTasks) -> dict:
+async def start_batch(
+    batch_request: BatchRequest,
+    background_tasks: BackgroundTasks,
+    x_biomapper_env: str | None = Header(None),
+) -> dict:
+    env, base_url = resolve_env_base_url(x_biomapper_env)
     job_id = str(uuid.uuid4())
-    job_store.create(job_id, total=len(request.names))
-    background_tasks.add_task(_run_mapping, job_id, request)
+    job_store.create(job_id, total=len(batch_request.names), env=env)
+    background_tasks.add_task(_run_mapping, job_id, batch_request, base_url)
     return {"job_id": job_id}
 
 
@@ -65,8 +71,8 @@ async def get_result(job_id: str) -> dict:
     return job.to_dict()
 
 
-async def _run_mapping(job_id: str, request: BatchRequest) -> None:
-    mapper = MapperService()
+async def _run_mapping(job_id: str, request: BatchRequest, base_url: str | None = None) -> None:
+    mapper = MapperService(base_url_override=base_url)
     try:
         async for result in mapper.map_batch(request.names, request.config):
             job_store.add_result(job_id, result)
@@ -75,7 +81,12 @@ async def _run_mapping(job_id: str, request: BatchRequest) -> None:
                 return
         job_store.complete(job_id)
     except Exception as e:
-        job_store.error(job_id, str(e))
+        job = job_store.get(job_id)
+        env = job.env if job else "production"
+        if env == "dev":
+            job_store.error(job_id, f"Dev API (biomapper2) is unavailable: {e}")
+        else:
+            job_store.error(job_id, str(e))
 
 
 def _sse_event(event_name: str, data: dict) -> str:
