@@ -5,7 +5,7 @@ from fastapi import HTTPException
 _VALID_ENVS = {"production", "dev"}
 
 
-def resolve_env_base_url(env_header: str | None) -> tuple[str, str]:
+def resolve_env_base_url(env_header: str | None) -> tuple[str, str | None]:
     """Resolve the biomapper2 base URL from the environment header.
 
     Returns (env, base_url) where env is the validated environment name
@@ -33,4 +33,4 @@ def resolve_env_base_url(env_header: str | None) -> tuple[str, str]:
 
     # production
     prod_url = os.environ.get("BIOMAPPER_BASE_URL", "").strip() or None
-    return env, prod_url  # type: ignore[return-value]
+    return env, prod_url

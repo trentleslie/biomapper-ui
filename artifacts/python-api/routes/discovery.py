@@ -2,7 +2,7 @@ import logging
 import time
 from typing import Any, Awaitable, Callable
 
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, Header, HTTPException
 
 from biomapper import (
     BioMapperClient,

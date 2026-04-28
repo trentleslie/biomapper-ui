@@ -314,7 +314,9 @@ export default function UploadPage() {
         },
         onError: (error: unknown) => {
           const apiError = error as { status?: number; data?: { env?: string; detail?: string } } | undefined;
-          const isDevEnvError = apiError?.status === 502 && apiError?.data?.env === "dev" && env === "dev";
+          const hasDevEnvField = apiError?.data?.env === "dev";
+          const isDevStatusCode = apiError?.status === 502 || apiError?.status === 503;
+          const isDevEnvError = isDevStatusCode && (hasDevEnvField || env === "dev");
           if (isDevEnvError) {
             toast({
               variant: "destructive",
