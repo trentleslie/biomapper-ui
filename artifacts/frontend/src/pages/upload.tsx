@@ -23,6 +23,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, UploadCloud, FileType, CheckCircle2 } from "lucide-react";
 import { FieldTooltip } from "@/components/field-tooltip";
+import { EnvToggle } from "@/components/EnvToggle";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Default selected vocabularies per entity type. These act as a UX preset;
@@ -342,8 +343,9 @@ export default function UploadPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="border-b border-border bg-card px-6 py-3 flex items-center gap-4 sticky top-0 z-10">
+      <header className="border-b border-border bg-card px-6 py-3 flex items-center justify-between sticky top-0 z-10">
         <span className="font-semibold text-foreground tracking-tight">PhenomeHealth Linker</span>
+        <EnvToggle />
       </header>
 
       <div className="max-w-3xl w-full mx-auto mt-10 px-6 pb-16">

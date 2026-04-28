@@ -4,6 +4,7 @@ import { useUser, useClerk } from "@clerk/react";
 import { useMappingStream } from "@/hooks/use-mapping-stream";
 import { useGetMappingResult, getGetMappingResultQueryKey, JobResult } from "@workspace/api-client-react";
 import { SankeyChart } from "@/components/SankeyChart";
+import { EnvToggle } from "@/components/EnvToggle";
 import { MappingSummary, MappingResult } from "@/types/mapping";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -387,6 +388,7 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <EnvToggle />
           <span className="text-sm text-muted-foreground hidden sm:block">{user?.primaryEmailAddress?.emailAddress}</span>
           <Button variant="outline" size="sm" onClick={() => signOut()} data-testid="btn-sign-out">
             <LogOut className="w-4 h-4 mr-2" /> Sign Out
