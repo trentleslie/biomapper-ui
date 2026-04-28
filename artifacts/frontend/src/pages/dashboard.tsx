@@ -5,6 +5,7 @@ import { useMappingStream } from "@/hooks/use-mapping-stream";
 import { useGetMappingResult, getGetMappingResultQueryKey, JobResult } from "@workspace/api-client-react";
 import { SankeyChart } from "@/components/SankeyChart";
 import { EnvToggle } from "@/components/EnvToggle";
+import { EquivalentIds } from "@/components/EquivalentIds";
 import { useEnv } from "@/contexts/env-context";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
@@ -743,6 +744,7 @@ export default function DashboardPage() {
                                   {(!row.identifiers || Object.values(row.identifiers).every(ids => !ids || ids.length === 0)) && (
                                     <p className="text-muted-foreground text-xs">No cross-references available.</p>
                                   )}
+                                  <EquivalentIds ids={row.kg_equivalent_ids ?? []} />
                                 </div>
                               </TableCell>
                             </TableRow>
