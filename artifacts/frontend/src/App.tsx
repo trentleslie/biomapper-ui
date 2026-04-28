@@ -9,6 +9,7 @@ import UploadPage from "@/pages/upload";
 import DashboardPage from "@/pages/dashboard";
 import AccessDeniedPage from "@/pages/access-denied";
 import NotFound from "@/pages/not-found";
+import { EnvProvider } from "@/contexts/env-context";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
@@ -169,9 +170,11 @@ function NoAuthRoutes() {
 
 function App() {
   return (
-    <WouterRouter base={basePath}>
-      {clerkEnabled ? <ClerkProviderWithRoutes /> : <NoAuthRoutes />}
-    </WouterRouter>
+    <EnvProvider>
+      <WouterRouter base={basePath}>
+        {clerkEnabled ? <ClerkProviderWithRoutes /> : <NoAuthRoutes />}
+      </WouterRouter>
+    </EnvProvider>
   );
 }
 
