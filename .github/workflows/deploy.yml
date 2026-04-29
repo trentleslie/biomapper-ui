@@ -30,7 +30,6 @@ jobs:
           host: ${{ secrets.LIGHTSAIL_HOST }}
           username: ubuntu
           key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
-          script_stop: true
           timeout: 300s
           script: |
             set -e
