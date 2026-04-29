@@ -1,0 +1,110 @@
+name: Deploy Biomapper UI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'artifacts/**'
+      - 'lib/**'
+      - 'deploy/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Deploy to Lightsail
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # v1.0.3
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ubuntu
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          script_stop: true
+          timeout: 300s
+          script: |
+            set -e
+
+            DEPLOY_DIR=/home/ubuntu/biomapper-ui
+
+            cd $DEPLOY_DIR
+
+            # Capture current commit for rollback reference
+            PREV_SHA=$(git rev-parse HEAD)
+            echo "Previous commit: $PREV_SHA"
+
+            # Pull latest code
+            git fetch origin main
+            git reset --hard origin/main
+            echo "Deployed commit: $(git rev-parse HEAD)"
+
+            # Install Node dependencies
+            corepack enable
+            pnpm install --frozen-lockfile
+
+            # Export only VITE_* vars for frontend build (avoid leaking backend secrets)
+            export $(grep '^VITE_' $DEPLOY_DIR/.env | xargs) 2>/dev/null || true
+            pnpm build
+
+            # Sync Python dependencies
+            cd $DEPLOY_DIR/artifacts/python-api
+            ~/.local/bin/uv venv $DEPLOY_DIR/.venv --python 3.11
+            ~/.local/bin/uv pip install --python $DEPLOY_DIR/.venv/bin/python -r requirements.txt
+            cd $DEPLOY_DIR
+
+            # Update systemd service files (not nginx — certbot has modified it with SSL)
+            sudo cp deploy/biomapper-ui-express.service /etc/systemd/system/
+            sudo sed -i "s|\$DEPLOY_DIR|$DEPLOY_DIR|g" /etc/systemd/system/biomapper-ui-express.service
+            sudo cp deploy/biomapper-ui-python.service /etc/systemd/system/
+            sudo sed -i "s|\$DEPLOY_DIR|$DEPLOY_DIR|g" /etc/systemd/system/biomapper-ui-python.service
+            sudo systemctl daemon-reload
+
+            # Restart services
+            sudo systemctl restart biomapper-ui-python biomapper-ui-express
+
+            # Health check with retry loop (12 attempts, 5s apart = 60s max)
+            echo "Waiting for services to start..."
+            for i in $(seq 1 12); do
+              PYTHON_OK=false
+              EXPRESS_OK=false
+
+              curl -sf http://127.0.0.1:8002/health > /dev/null 2>&1 && PYTHON_OK=true
+              curl -sf http://127.0.0.1:8080/api/healthz > /dev/null 2>&1 && EXPRESS_OK=true
+
+              if [ "$PYTHON_OK" = true ] && [ "$EXPRESS_OK" = true ]; then
+                echo "Both services healthy!"
+                break
+              fi
+
+              echo "Waiting for services... ($i/12) Python=$PYTHON_OK Express=$EXPRESS_OK"
+              sleep 5
+            done
+
+            # Final verification
+            curl -sf http://127.0.0.1:8002/health > /dev/null || {
+              echo "FAILED: Python API health check"
+              echo "ROLLBACK INFO: previous commit was $PREV_SHA"
+              exit 1
+            }
+            curl -sf http://127.0.0.1:8080/api/healthz > /dev/null || {
+              echo "FAILED: Express API health check"
+              echo "ROLLBACK INFO: previous commit was $PREV_SHA"
+              exit 1
+            }
+
+            echo "Deployment successful!"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Deployment failed! Check the SSH action logs above."

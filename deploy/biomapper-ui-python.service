@@ -12,7 +12,7 @@ WorkingDirectory=$DEPLOY_DIR/artifacts/python-api
 Environment="PATH=/usr/local/bin:/usr/bin:/bin"
 EnvironmentFile=$DEPLOY_DIR/.env
 
-ExecStart=$DEPLOY_DIR/artifacts/python-api/.venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000
+ExecStart=$DEPLOY_DIR/.venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8002
 
 # Restart policy
 Restart=always
