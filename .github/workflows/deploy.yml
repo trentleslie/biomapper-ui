@@ -53,7 +53,11 @@ jobs:
 
             # Export only VITE_* vars for frontend build (avoid leaking backend secrets)
             set -a; source <(grep '^VITE_' "$DEPLOY_DIR/.env" 2>/dev/null); set +a
-            pnpm build
+
+            # Build only production workspaces (skip mockup-sandbox which needs Replit env vars)
+            pnpm run typecheck
+            PORT=5173 BASE_PATH="/" pnpm --filter @workspace/frontend run build
+            pnpm --filter @workspace/api-server run build
 
             # Sync Python dependencies
             cd $DEPLOY_DIR/artifacts/python-api
