@@ -75,7 +75,9 @@ jobs:
             sudo systemctl restart biomapper-ui-python biomapper-ui-express
 
             # Health check with retry loop (12 attempts, 5s apart = 60s max)
+            # Disable set -e for the loop since curl returns non-zero when services aren't ready yet
             echo "Waiting for services to start..."
+            set +e
             for i in $(seq 1 12); do
               PYTHON_OK=false
               EXPRESS_OK=false
@@ -94,6 +96,7 @@ jobs:
               fi
               sleep 5
             done
+            set -e
 
             # Final verification
             curl -sf http://127.0.0.1:8002/health > /dev/null || {
