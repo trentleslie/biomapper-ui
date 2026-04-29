@@ -59,9 +59,8 @@ jobs:
             PORT=5173 BASE_PATH="/" pnpm --filter @workspace/frontend run build
             pnpm --filter @workspace/api-server run build
 
-            # Sync Python dependencies
+            # Sync Python dependencies (venv lives at repo root, not artifacts/python-api/)
             cd $DEPLOY_DIR/artifacts/python-api
-            ~/.local/bin/uv venv $DEPLOY_DIR/.venv --python 3.11
             ~/.local/bin/uv pip install --python $DEPLOY_DIR/.venv/bin/python -r requirements.txt
             cd $DEPLOY_DIR
 
