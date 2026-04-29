@@ -48,8 +48,7 @@ jobs:
             git reset --hard origin/main
             echo "Deployed commit: $(git rev-parse HEAD)"
 
-            # Install Node dependencies
-            corepack enable
+            # Install Node dependencies (pnpm already available via corepack from initial setup)
             pnpm install --frozen-lockfile
 
             # Export only VITE_* vars for frontend build (avoid leaking backend secrets)
