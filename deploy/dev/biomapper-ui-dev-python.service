@@ -1,0 +1,33 @@
+[Unit]
+Description=Biomapper UI Dev Python API Server
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=$DEPLOY_DIR/artifacts/python-api
+
+# Environment variables
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+EnvironmentFile=$DEPLOY_DIR/.env
+
+ExecStart=$DEPLOY_DIR/.venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8005
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=biomapper-ui-dev-python
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=$DEPLOY_DIR
+
+[Install]
+WantedBy=multi-user.target
