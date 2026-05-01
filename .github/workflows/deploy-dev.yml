@@ -48,13 +48,13 @@ jobs:
             BRANCH=${INPUT_BRANCH:-dev}
             echo "Deploying branch: $BRANCH"
 
-            # Validate branch exists on remote
+            cd $DEPLOY_DIR
+
+            # Validate branch exists on remote (must be inside git repo for 'origin' alias)
             if ! git ls-remote --exit-code origin "refs/heads/$BRANCH" > /dev/null 2>&1; then
               echo "ERROR: Branch '$BRANCH' does not exist on origin"
               exit 1
             fi
-
-            cd $DEPLOY_DIR
 
             # Capture current state for rollback reference
             PREV_SHA=$(git rev-parse HEAD)
