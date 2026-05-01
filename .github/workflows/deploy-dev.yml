@@ -8,7 +8,6 @@ on:
       - 'artifacts/**'
       - 'lib/**'
       - 'deploy/**'
-      - 'deploy/dev/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
