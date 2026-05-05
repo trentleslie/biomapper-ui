@@ -12,12 +12,12 @@ import NotFound from "@/pages/not-found";
 import { EnvProvider } from "@/contexts/env-context";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+if (!clerkPubKey) {
+  throw new Error("VITE_CLERK_PUBLISHABLE_KEY is required. Set it in your .env file.");
+}
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 const queryClient = new QueryClient();
-
-// Clerk is optional — if no publishable key is set, the app runs without auth
-const clerkEnabled = !!clerkPubKey && clerkPubKey !== 'placeholder_will_update_later';
 
 function stripBase(path: string): string {
   return basePath && path.startsWith(basePath)
@@ -74,17 +74,9 @@ const rawFrontendEmails = (import.meta.env.VITE_ALLOWED_EMAILS as string | undef
 const ALLOWED_UX_EMAILS = new Set(rawFrontendEmails.split(",").map((e: string) => e.trim().toLowerCase()).filter(Boolean));
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
-  // When Clerk is disabled, skip auth checks entirely
-  if (!clerkEnabled) return <Component />;
-
-  return <ClerkProtectedRoute component={Component} />;
-}
-
-function ClerkProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoaded, isSignedIn } = useUser();
 
   if (!isLoaded) return null;
-  // Redirect unauthenticated users to /login (the canonical sign-in entry per spec)
   if (!isSignedIn) return <Redirect to="/login" />;
 
   const email = (user.primaryEmailAddress?.emailAddress || "").toLowerCase();
@@ -136,7 +128,7 @@ function Router() {
   );
 }
 
-function ClerkProviderWithRoutes() {
+function AppWithClerk() {
   const [, setLocation] = useLocation();
 
   return (
@@ -157,22 +149,11 @@ function ClerkProviderWithRoutes() {
   );
 }
 
-function NoAuthRoutes() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Router />
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
-  );
-}
-
 function App() {
   return (
     <EnvProvider>
       <WouterRouter base={basePath}>
-        {clerkEnabled ? <ClerkProviderWithRoutes /> : <NoAuthRoutes />}
+        <AppWithClerk />
       </WouterRouter>
     </EnvProvider>
   );
