@@ -11,6 +11,7 @@ import AccessDeniedPage from "@/pages/access-denied";
 import NotFound from "@/pages/not-found";
 import { EnvProvider } from "@/contexts/env-context";
 
+const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string;
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 const queryClient = new QueryClient();
@@ -129,6 +130,7 @@ function AppWithClerk() {
 
   return (
     <ClerkProvider
+      publishableKey={clerkPubKey}
       proxyUrl={clerkProxyUrl}
       routerPush={(to) => setLocation(stripBase(to))}
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
