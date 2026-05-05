@@ -11,7 +11,10 @@ import AccessDeniedPage from "@/pages/access-denied";
 import NotFound from "@/pages/not-found";
 import { EnvProvider } from "@/contexts/env-context";
 
-const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string;
+const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+if (!clerkPubKey) {
+  throw new Error("VITE_CLERK_PUBLISHABLE_KEY is required. Set it in your .env file.");
+}
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 const queryClient = new QueryClient();
