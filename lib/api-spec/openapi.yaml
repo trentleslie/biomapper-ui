@@ -311,6 +311,16 @@ components:
             type: array
             items:
               type: string
+        kgEquivalentIds:
+          type: object
+          description: |
+            Map of CURIE prefix to list of equivalent local identifiers from the
+            knowledge graph node. Keys are native CURIE prefixes (e.g. "HMDB",
+            "KEGG.COMPOUND"). Empty object when no KG match.
+          additionalProperties:
+            type: array
+            items:
+              type: string
         error:
           type: string
           nullable: true

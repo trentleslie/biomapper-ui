@@ -224,7 +224,22 @@ export default function DashboardPage() {
       .map(v => v.toLowerCase())
       .filter(v => visibleOntologies.size === 0 || visibleOntologies.has(v))
       .sort();
-    const headers = ["Original Name", "Resolved", "Primary Curie", "Confidence Tier", "Confidence Score", "Needs Review", ...vocabCols];
+
+    // Collect equivalent ID prefixes (uppercase CURIE prefixes from kgEquivalentIds).
+    // Filter by visibleOntologies using case-insensitive CURIE prefix comparison.
+    const allEquivPrefixes = new Set<string>();
+    results.forEach(r => {
+      if (r.kgEquivalentIds) Object.keys(r.kgEquivalentIds).forEach(k => allEquivPrefixes.add(k));
+    });
+    const equivCols = Array.from(allEquivPrefixes)
+      .filter(p => visibleOntologies.size === 0 || visibleOntologies.has(p.toLowerCase()))
+      .sort();
+
+    const headers = [
+      "Original Name", "Resolved", "Primary Curie", "Confidence Tier", "Confidence Score", "Needs Review",
+      ...vocabCols,
+      ...equivCols.map(p => `equiv_${p}`),
+    ];
     const rows = results.map(r => {
       const row = [
         r.name,
@@ -243,6 +258,10 @@ export default function DashboardPage() {
       }
       vocabCols.forEach(v => {
         row.push(idMap[v]?.join("|") || "");
+      });
+      // Equivalent ID columns
+      equivCols.forEach(p => {
+        row.push(r.kgEquivalentIds?.[p]?.join("|") || "");
       });
       return row.join("\t");
     });
@@ -744,7 +763,7 @@ export default function DashboardPage() {
                                   {(!row.identifiers || Object.values(row.identifiers).every(ids => !ids || ids.length === 0)) && (
                                     <p className="text-muted-foreground text-xs">No cross-references available.</p>
                                   )}
-                                  <EquivalentIds ids={row.kg_equivalent_ids ?? []} />
+                                  <EquivalentIds ids={row.kgEquivalentIds ?? {}} />
                                 </div>
                               </TableCell>
                             </TableRow>

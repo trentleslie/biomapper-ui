@@ -49,7 +49,7 @@ class MapperService:
         async def process_one(name: str) -> None:
             async with semaphore:
                 if stop_event.is_set():
-                    await queue.put({"name": name, "skipped": True, "resolved": False})
+                    await queue.put({"name": name, "skipped": True, "resolved": False, "kgEquivalentIds": {}})
                     return
                 try:
                     result = await self._map_with_retry(name, config, stop_event)
@@ -59,6 +59,7 @@ class MapperService:
                         "resolved": False,
                         "error": str(e),
                         "error_type": "mapping_error",
+                        "kgEquivalentIds": {},
                     }
                 await queue.put(result)
 
@@ -98,6 +99,7 @@ class MapperService:
                 "resolved": False,
                 "error": f"API key not configured — {e}",
                 "error_type": "config_error",
+                "kgEquivalentIds": {},
             }
 
         async with client_ctx as client:
@@ -108,6 +110,7 @@ class MapperService:
                         "resolved": False,
                         "error": "Job aborted due to prior auth failure.",
                         "error_type": "aborted",
+                        "kgEquivalentIds": {},
                     }
                 try:
                     logger.debug(
@@ -134,6 +137,7 @@ class MapperService:
                         "resolved": False,
                         "error": "API authentication failed — check BIOMAPPER_API_KEY configuration.",
                         "error_type": "auth_failure",
+                        "kgEquivalentIds": {},
                     }
 
                 except BioMapperRateLimitError:
@@ -155,6 +159,7 @@ class MapperService:
             "resolved": False,
             "error": last_error,
             "error_type": "mapping_error",
+            "kgEquivalentIds": {},
         }
 
     @staticmethod
@@ -180,6 +185,5 @@ class MapperService:
             },
         }
         kg_equiv = getattr(result, "kg_equivalent_ids", None)
-        if kg_equiv:
-            processed["kg_equivalent_ids"] = list(kg_equiv)
+        processed["kgEquivalentIds"] = dict(kg_equiv) if kg_equiv is not None else {}
         return processed
