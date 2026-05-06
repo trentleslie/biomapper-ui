@@ -15,6 +15,4 @@ export interface MappingSummary {
   vocabularyCoverage: Record<string, number>;
 }
 
-export interface MappingResult extends MappingResultItem {
-  kg_equivalent_ids?: string[];
-}
+export type MappingResult = MappingResultItem;

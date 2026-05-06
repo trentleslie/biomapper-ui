@@ -7,6 +7,7 @@
  */
 import type { MappingResultItemConfidenceTier } from "./mappingResultItemConfidenceTier";
 import type { MappingResultItemIdentifiers } from "./mappingResultItemIdentifiers";
+import type { MappingResultItemKgEquivalentIds } from "./mappingResultItemKgEquivalentIds";
 
 export interface MappingResultItem {
   name: string;
@@ -22,6 +23,11 @@ BioMapper run produces, including ones not in the small-molecule
 preset.
  */
   identifiers?: MappingResultItemIdentifiers;
+  /** Map of CURIE prefix to list of equivalent local identifiers from the
+knowledge graph node. Keys are native CURIE prefixes (e.g. "HMDB",
+"KEGG.COMPOUND"). Empty object when no KG match.
+ */
+  kgEquivalentIds?: MappingResultItemKgEquivalentIds;
   error?: string | null;
   error_type?: string | null;
 }
