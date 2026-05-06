@@ -132,6 +132,12 @@ export const GetMappingResultResponse = zod.object({
         .describe(
           'Map of vocabulary key → list of CURIEs\/identifiers found for this entity.\nKeys are vocabulary identifiers (e.g. \"hmdb\", \"chebi\", \"uniprot\").\nOpen record — backend may emit any vocabulary key the underlying\nBioMapper run produces, including ones not in the small-molecule\npreset.\n',
         ),
+      kgEquivalentIds: zod
+        .record(zod.string(), zod.array(zod.string()))
+        .optional()
+        .describe(
+          'Map of CURIE prefix to list of equivalent local identifiers from the\nknowledge graph node. Keys are native CURIE prefixes (e.g. \"HMDB\",\n\"KEGG.COMPOUND\"). Empty object when no KG match.\n',
+        ),
       error: zod.string().nullish(),
       error_type: zod.string().nullish(),
     }),

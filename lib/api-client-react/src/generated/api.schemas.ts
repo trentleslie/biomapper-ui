@@ -82,6 +82,14 @@ preset.
  */
 export type MappingResultItemIdentifiers = { [key: string]: string[] };
 
+/**
+ * Map of CURIE prefix to list of equivalent local identifiers from the
+knowledge graph node. Keys are native CURIE prefixes (e.g. "HMDB",
+"KEGG.COMPOUND"). Empty object when no KG match.
+
+ */
+export type MappingResultItemKgEquivalentIds = { [key: string]: string[] };
+
 export interface MappingResultItem {
   name: string;
   resolved: boolean;
@@ -96,6 +104,11 @@ BioMapper run produces, including ones not in the small-molecule
 preset.
  */
   identifiers?: MappingResultItemIdentifiers;
+  /** Map of CURIE prefix to list of equivalent local identifiers from the
+knowledge graph node. Keys are native CURIE prefixes (e.g. "HMDB",
+"KEGG.COMPOUND"). Empty object when no KG match.
+ */
+  kgEquivalentIds?: MappingResultItemKgEquivalentIds;
   error?: string | null;
   error_type?: string | null;
 }

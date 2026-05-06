@@ -20,4 +20,5 @@ export * from "./mappingConfigHints";
 export * from "./mappingResultItem";
 export * from "./mappingResultItemConfidenceTier";
 export * from "./mappingResultItemIdentifiers";
+export * from "./mappingResultItemKgEquivalentIds";
 export * from "./vocabulary";

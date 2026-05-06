@@ -3,25 +3,10 @@ import { Badge } from "@/components/ui/badge";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 interface EquivalentIdsProps {
-  ids: string[];
+  ids: Record<string, string[]>;
 }
 
-function groupByPrefix(ids: string[]): Map<string, string[]> {
-  const groups = new Map<string, string[]>();
-  for (const curie of ids) {
-    const colonIdx = curie.indexOf(":");
-    const prefix = colonIdx > 0 ? curie.slice(0, colonIdx) : "OTHER";
-    const existing = groups.get(prefix);
-    if (existing) {
-      existing.push(curie);
-    } else {
-      groups.set(prefix, [curie]);
-    }
-  }
-  return groups;
-}
-
-function PrefixGroup({ prefix, curies }: { prefix: string; curies: string[] }) {
+function PrefixGroup({ prefix, ids }: { prefix: string; ids: string[] }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -39,14 +24,14 @@ function PrefixGroup({ prefix, curies }: { prefix: string; curies: string[] }) {
         )}
         <span className="font-medium">{prefix}</span>
         <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-          {curies.length}
+          {ids.length}
         </Badge>
       </button>
       {open && (
         <div className="ml-5 mt-1 space-y-0.5">
-          {curies.map((curie) => (
-            <div key={curie} className="font-mono text-xs text-muted-foreground">
-              {curie}
+          {ids.map((id) => (
+            <div key={id} className="font-mono text-xs text-muted-foreground">
+              {id}
             </div>
           ))}
         </div>
@@ -56,22 +41,22 @@ function PrefixGroup({ prefix, curies }: { prefix: string; curies: string[] }) {
 }
 
 export function EquivalentIds({ ids }: EquivalentIdsProps) {
-  if (!ids || ids.length === 0) return null;
+  if (!ids || Object.keys(ids).length === 0) return null;
 
-  const groups = groupByPrefix(ids);
-  const sortedPrefixes = [...groups.keys()].sort();
+  const sortedPrefixes = Object.keys(ids).sort();
+  const totalCount = sortedPrefixes.reduce((sum, p) => sum + ids[p].length, 0);
 
   return (
     <div className="mt-3">
       <p className="font-medium text-sm mb-1.5">
         Knowledge Graph Equivalent IDs
         <Badge variant="secondary" className="ml-2 text-[10px] px-1.5 py-0">
-          {ids.length}
+          {totalCount}
         </Badge>
       </p>
       <div className="space-y-1">
         {sortedPrefixes.map((prefix) => (
-          <PrefixGroup key={prefix} prefix={prefix} curies={groups.get(prefix)!} />
+          <PrefixGroup key={prefix} prefix={prefix} ids={ids[prefix]} />
         ))}
       </div>
     </div>
