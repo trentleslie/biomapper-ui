@@ -48,8 +48,11 @@ class TestProcessResult:
 
     def test_absent_attribute_returns_empty_dict(self):
         """Missing attribute (older SDK) defaults to empty dict via getattr."""
+        from unittest.mock import PropertyMock
+
         result = _make_mock_result()
-        del result.kg_equivalent_ids  # simulate absent attribute
+        # MagicMock never raises AttributeError on its own, so we must force it.
+        type(result).kg_equivalent_ids = PropertyMock(side_effect=AttributeError)
 
         processed = MapperService._process_result("unknown-entity", result)
 
