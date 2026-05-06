@@ -44,7 +44,7 @@ export function EquivalentIds({ ids }: EquivalentIdsProps) {
   if (!ids || Object.keys(ids).length === 0) return null;
 
   const sortedPrefixes = Object.keys(ids).sort();
-  const totalCount = sortedPrefixes.reduce((sum, p) => sum + ids[p].length, 0);
+  const totalCount = sortedPrefixes.reduce((sum, p) => sum + (ids[p] ?? []).length, 0);
 
   return (
     <div className="mt-3">
@@ -56,7 +56,7 @@ export function EquivalentIds({ ids }: EquivalentIdsProps) {
       </p>
       <div className="space-y-1">
         {sortedPrefixes.map((prefix) => (
-          <PrefixGroup key={prefix} prefix={prefix} ids={ids[prefix]} />
+          <PrefixGroup key={prefix} prefix={prefix} ids={ids[prefix] ?? []} />
         ))}
       </div>
     </div>
