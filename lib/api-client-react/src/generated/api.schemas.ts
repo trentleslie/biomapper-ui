@@ -22,6 +22,11 @@ export type MappingConfigHints = {
   [key: string]: { [key: string]: string | string[] };
 };
 
+/**
+ * Maps inferred CURIE prefix to original column name from uploaded file
+ */
+export type MappingConfigHintColumns = { [key: string]: string };
+
 export interface MappingConfig {
   annotationMode?: MappingConfigAnnotationMode;
   /** Biolink entity type (e.g. biolink:SmallMolecule, biolink:Drug, biolink:Protein). */
@@ -29,6 +34,8 @@ export interface MappingConfig {
   /** Optional list of annotator slugs to restrict mapping to. Null/omitted means use all available annotators. */
   annotators?: string[] | null;
   hints?: MappingConfigHints;
+  /** Maps inferred CURIE prefix to original column name from uploaded file */
+  hintColumns?: MappingConfigHintColumns;
 }
 
 export interface EntityType {
@@ -90,6 +97,11 @@ knowledge graph node. Keys are native CURIE prefixes (e.g. "HMDB",
  */
 export type MappingResultItemKgEquivalentIds = { [key: string]: string[] };
 
+/**
+ * Original provided ID values from user's uploaded file, keyed by original column name
+ */
+export type MappingResultItemProvidedIds = { [key: string]: string | string[] };
+
 export interface MappingResultItem {
   name: string;
   resolved: boolean;
@@ -109,6 +121,8 @@ knowledge graph node. Keys are native CURIE prefixes (e.g. "HMDB",
 "KEGG.COMPOUND"). Empty object when no KG match.
  */
   kgEquivalentIds?: MappingResultItemKgEquivalentIds;
+  /** Original provided ID values from user's uploaded file, keyed by original column name */
+  providedIds?: MappingResultItemProvidedIds;
   error?: string | null;
   error_type?: string | null;
 }

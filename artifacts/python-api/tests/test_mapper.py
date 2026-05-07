@@ -1,6 +1,8 @@
-from unittest.mock import MagicMock
+import asyncio
+from unittest.mock import MagicMock, AsyncMock, patch
 
 from services.mapper import MapperService
+from models.schemas import MappingConfig
 
 
 def _make_mock_result(**overrides):
@@ -100,3 +102,93 @@ class TestProcessResult:
         assert processed["confidenceTier"] == "high"
         assert processed["needsReview"] is False
         assert "identifiers" in processed
+
+
+class TestProvidedIds:
+    """Tests for providedIds injection in _map_with_retry."""
+
+    def _run(self, coro):
+        return asyncio.get_event_loop().run_until_complete(coro)
+
+    def test_hint_columns_maps_prefix_to_original_column(self):
+        """hint_columns={'HMDB': 'provided_ids'} causes providedIds to use 'provided_ids' as key."""
+        mock_result = _make_mock_result()
+        config = MappingConfig(
+            hints={"creatine": {"HMDB": "HMDB0000294"}},
+            hint_columns={"HMDB": "provided_ids"},
+        )
+        service = MapperService(base_url_override="http://fake")
+        stop_event = asyncio.Event()
+
+        with patch("services.mapper.BioMapperClient") as MockClient:
+            mock_client = AsyncMock()
+            mock_client.map_entity = AsyncMock(return_value=mock_result)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            MockClient.return_value = mock_client
+
+            result = self._run(service._map_with_retry("creatine", config, stop_event))
+
+        assert "providedIds" in result
+        assert result["providedIds"] == {"provided_ids": "HMDB0000294"}
+
+    def test_no_hints_returns_empty_provided_ids(self):
+        """Entity with no hints produces providedIds: {}."""
+        mock_result = _make_mock_result()
+        config = MappingConfig(hints={}, hint_columns={})
+        service = MapperService(base_url_override="http://fake")
+        stop_event = asyncio.Event()
+
+        with patch("services.mapper.BioMapperClient") as MockClient:
+            mock_client = AsyncMock()
+            mock_client.map_entity = AsyncMock(return_value=mock_result)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            MockClient.return_value = mock_client
+
+            result = self._run(service._map_with_retry("unknown", config, stop_event))
+
+        assert "providedIds" in result
+        assert result["providedIds"] == {}
+
+    def test_multiple_hint_columns(self):
+        """Multiple hint columns each appear keyed by their original column name."""
+        mock_result = _make_mock_result()
+        config = MappingConfig(
+            hints={"taurine": {"HMDB": "HMDB0000251", "CHEBI": "15891"}},
+            hint_columns={"HMDB": "hmdb_col", "CHEBI": "chebi_col"},
+        )
+        service = MapperService(base_url_override="http://fake")
+        stop_event = asyncio.Event()
+
+        with patch("services.mapper.BioMapperClient") as MockClient:
+            mock_client = AsyncMock()
+            mock_client.map_entity = AsyncMock(return_value=mock_result)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            MockClient.return_value = mock_client
+
+            result = self._run(service._map_with_retry("taurine", config, stop_event))
+
+        assert result["providedIds"] == {"hmdb_col": "HMDB0000251", "chebi_col": "15891"}
+
+    def test_hint_columns_missing_prefix_falls_back_to_prefix_key(self):
+        """When hint_columns doesn't map a prefix, the prefix itself is the key."""
+        mock_result = _make_mock_result()
+        config = MappingConfig(
+            hints={"alanine": {"HMDB": "HMDB0000161"}},
+            hint_columns={},  # no mapping
+        )
+        service = MapperService(base_url_override="http://fake")
+        stop_event = asyncio.Event()
+
+        with patch("services.mapper.BioMapperClient") as MockClient:
+            mock_client = AsyncMock()
+            mock_client.map_entity = AsyncMock(return_value=mock_result)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            MockClient.return_value = mock_client
+
+            result = self._run(service._map_with_retry("alanine", config, stop_event))
+
+        assert result["providedIds"] == {"HMDB": "HMDB0000161"}

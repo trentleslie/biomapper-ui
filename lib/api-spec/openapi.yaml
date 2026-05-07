@@ -219,6 +219,12 @@ components:
                 - type: array
                   items:
                     type: string
+        hintColumns:
+          type: object
+          description: Maps inferred CURIE prefix to original column name from uploaded file
+          additionalProperties:
+            type: string
+          default: {}
       required: []
 
     EntityType:
@@ -321,6 +327,16 @@ components:
             type: array
             items:
               type: string
+        providedIds:
+          type: object
+          description: Original provided ID values from user's uploaded file, keyed by original column name
+          additionalProperties:
+            oneOf:
+              - type: string
+              - type: array
+                items:
+                  type: string
+          default: {}
         error:
           type: string
           nullable: true

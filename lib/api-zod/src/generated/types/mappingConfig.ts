@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { MappingConfigAnnotationMode } from "./mappingConfigAnnotationMode";
+import type { MappingConfigHintColumns } from "./mappingConfigHintColumns";
 import type { MappingConfigHints } from "./mappingConfigHints";
 
 export interface MappingConfig {
@@ -15,4 +16,6 @@ export interface MappingConfig {
   /** Optional list of annotator slugs to restrict mapping to. Null/omitted means use all available annotators. */
   annotators?: string[] | null;
   hints?: MappingConfigHints;
+  /** Maps inferred CURIE prefix to original column name from uploaded file */
+  hintColumns?: MappingConfigHintColumns;
 }
