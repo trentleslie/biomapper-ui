@@ -644,6 +644,92 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {/* Report Summary */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Report Summary</CardTitle>
+                <CardDescription>Overview of mapping results — also available as a downloadable Markdown report</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Summary Stats */}
+                  <div>
+                    <h4 className="text-sm font-semibold mb-2">Summary</h4>
+                    <table className="w-full text-sm">
+                      <tbody>
+                        <tr className="border-b"><td className="py-1 text-muted-foreground">Total Rows</td><td className="py-1 text-right font-mono">{summary.totalRows.toLocaleString()}</td></tr>
+                        <tr className="border-b"><td className="py-1 text-muted-foreground">Unique Names</td><td className="py-1 text-right font-mono">{summary.uniqueNames.toLocaleString()}</td></tr>
+                        <tr className="border-b"><td className="py-1 text-muted-foreground">Resolved</td><td className="py-1 text-right font-mono">{summary.resolved.toLocaleString()} ({(summary.resolvedRate * 100).toFixed(1)}%)</td></tr>
+                        <tr className="border-b"><td className="py-1 text-muted-foreground">Unresolved</td><td className="py-1 text-right font-mono">{(summary.uniqueNames - summary.resolved).toLocaleString()}</td></tr>
+                        <tr><td className="py-1 text-muted-foreground">High Quality</td><td className="py-1 text-right font-mono">{(summary.highQualityRate * 100).toFixed(1)}%</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Confidence Tier Distribution */}
+                  <div>
+                    <h4 className="text-sm font-semibold mb-2">Confidence Tiers</h4>
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-muted-foreground"><th className="py-1 text-left font-normal">Tier</th><th className="py-1 text-right font-normal">Count</th><th className="py-1 text-right font-normal">%</th></tr>
+                      </thead>
+                      <tbody>
+                        {([["High", summary.confidenceTierDistribution.high, TIER_COLORS.high],
+                           ["Medium", summary.confidenceTierDistribution.medium, TIER_COLORS.medium],
+                           ["Low", summary.confidenceTierDistribution.low, TIER_COLORS.low],
+                           ["Unknown", summary.confidenceTierDistribution.unknown, TIER_COLORS.unknown]] as [string, number, string][]).map(([tier, count, color]) => (
+                          <tr key={tier} className="border-b last:border-0">
+                            <td className="py-1 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full inline-block" style={{ background: color }} />
+                              {tier}
+                            </td>
+                            <td className="py-1 text-right font-mono">{count}</td>
+                            <td className="py-1 text-right font-mono">{summary.uniqueNames > 0 ? (count / summary.uniqueNames * 100).toFixed(1) : "0.0"}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Vocabulary Coverage */}
+                  <div>
+                    <h4 className="text-sm font-semibold mb-2">Vocabulary Coverage</h4>
+                    <div className="max-h-[200px] overflow-y-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b text-muted-foreground"><th className="py-1 text-left font-normal">Vocabulary</th><th className="py-1 text-right font-normal">Hits</th></tr>
+                        </thead>
+                        <tbody>
+                          {Object.entries(summary.vocabularyCoverage)
+                            .sort(([, a], [, b]) => b - a)
+                            .map(([vocab, count]) => (
+                              <tr key={vocab} className="border-b last:border-0">
+                                <td className="py-1 font-mono text-xs">{vocab.toUpperCase()}</td>
+                                <td className="py-1 text-right font-mono">{count}</td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Unresolved Names */}
+                {summary.uniqueNames - summary.resolved > 0 && (
+                  <div className="mt-4 pt-4 border-t">
+                    <h4 className="text-sm font-semibold mb-2">Unresolved Names ({(summary.uniqueNames - summary.resolved).toLocaleString()})</h4>
+                    <div className="flex flex-wrap gap-1.5">
+                      {results.filter(r => !r.resolved).map(r => (
+                        <Badge key={r.name} variant="outline" className="text-xs font-mono">
+                          {r.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Needs Review */}
             {needsReview.length > 0 && (
               <Card>
