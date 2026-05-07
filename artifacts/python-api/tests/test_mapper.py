@@ -108,7 +108,7 @@ class TestProvidedIds:
     """Tests for providedIds injection in _map_with_retry."""
 
     def _run(self, coro):
-        return asyncio.get_event_loop().run_until_complete(coro)
+        return asyncio.run(coro)
 
     def test_hint_columns_maps_prefix_to_original_column(self):
         """hint_columns={'HMDB': 'provided_ids'} causes providedIds to use 'provided_ids' as key."""
