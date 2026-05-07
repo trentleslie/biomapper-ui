@@ -570,7 +570,9 @@ export default function UploadPage() {
                     <div className="grid grid-cols-2 gap-2" data-testid="hint-column-checkboxes">
                       {availableHintColumns.map(col => {
                         const isSelected = hintColumns.has(col);
-                        const resolvedPrefix = hintColumnPrefixMap[col] || inferPrefix(col);
+                        // For unchecked columns, sample values to show value-based prefix preview.
+                        const sampleVals = parsedRows.slice(0, 20).map(r => r[col]).filter(v => v != null && String(v).trim() !== "").map(v => String(v).trim());
+                        const resolvedPrefix = hintColumnPrefixMap[col] || inferPrefix(col, sampleVals);
                         return (
                           <div key={col} className="flex items-center gap-2">
                             <Checkbox

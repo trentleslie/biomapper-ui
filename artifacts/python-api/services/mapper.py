@@ -46,10 +46,20 @@ class MapperService:
         semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
         stop_event = asyncio.Event()
 
+        def _build_provided_ids(name: str) -> dict[str, str]:
+            hints = config.hints.get(name, {})
+            if not hints:
+                return {}
+            ids: dict[str, str] = {}
+            for prefix, value in hints.items():
+                val = value[0] if isinstance(value, list) else value
+                ids[config.hint_columns.get(prefix, prefix)] = val
+            return ids
+
         async def process_one(name: str) -> None:
             async with semaphore:
                 if stop_event.is_set():
-                    await queue.put({"name": name, "skipped": True, "resolved": False, "kgEquivalentIds": {}, "providedIds": {}})
+                    await queue.put({"name": name, "skipped": True, "resolved": False, "kgEquivalentIds": {}, "providedIds": _build_provided_ids(name)})
                     return
                 try:
                     result = await self._map_with_retry(name, config, stop_event)
@@ -60,7 +70,7 @@ class MapperService:
                         "error": str(e),
                         "error_type": "mapping_error",
                         "kgEquivalentIds": {},
-                        "providedIds": {},
+                        "providedIds": _build_provided_ids(name),
                     }
                 await queue.put(result)
 
