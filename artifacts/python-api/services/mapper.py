@@ -46,10 +46,20 @@ class MapperService:
         semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
         stop_event = asyncio.Event()
 
+        def _build_provided_ids(name: str) -> dict[str, str]:
+            hints = config.hints.get(name, {})
+            if not hints:
+                return {}
+            ids: dict[str, str] = {}
+            for prefix, value in hints.items():
+                val = value[0] if isinstance(value, list) else value
+                ids[config.hint_columns.get(prefix, prefix)] = val
+            return ids
+
         async def process_one(name: str) -> None:
             async with semaphore:
                 if stop_event.is_set():
-                    await queue.put({"name": name, "skipped": True, "resolved": False, "kgEquivalentIds": {}})
+                    await queue.put({"name": name, "skipped": True, "resolved": False, "kgEquivalentIds": {}, "providedIds": _build_provided_ids(name)})
                     return
                 try:
                     result = await self._map_with_retry(name, config, stop_event)
@@ -60,6 +70,7 @@ class MapperService:
                         "error": str(e),
                         "error_type": "mapping_error",
                         "kgEquivalentIds": {},
+                        "providedIds": _build_provided_ids(name),
                     }
                 await queue.put(result)
 
@@ -80,8 +91,12 @@ class MapperService:
     ) -> dict[str, Any]:
         hints = config.hints.get(name, {})
         identifiers: dict[str, str] | None = None
+        provided_ids: dict[str, str] = {}
         if hints:
             identifiers = {k: (v[0] if isinstance(v, list) else v) for k, v in hints.items()}
+            for prefix, value in identifiers.items():
+                original_col = config.hint_columns.get(prefix, prefix)
+                provided_ids[original_col] = value
 
         # Treat both None and [] as "use all annotators" — forward None to
         # the client. Passing an empty list could be interpreted as "use zero
@@ -100,6 +115,7 @@ class MapperService:
                 "error": f"API key not configured — {e}",
                 "error_type": "config_error",
                 "kgEquivalentIds": {},
+                "providedIds": {},
             }
 
         async with client_ctx as client:
@@ -111,6 +127,7 @@ class MapperService:
                         "error": "Job aborted due to prior auth failure.",
                         "error_type": "aborted",
                         "kgEquivalentIds": {},
+                        "providedIds": provided_ids,
                     }
                 try:
                     logger.debug(
@@ -128,7 +145,9 @@ class MapperService:
                         annotation_mode=config.annotation_mode,
                         annotators=annotators_arg,
                     )
-                    return self._process_result(name, result)
+                    result_dict = self._process_result(name, result)
+                    result_dict["providedIds"] = provided_ids
+                    return result_dict
 
                 except BioMapperAuthError:
                     stop_event.set()
@@ -138,6 +157,7 @@ class MapperService:
                         "error": "API authentication failed — check BIOMAPPER_API_KEY configuration.",
                         "error_type": "auth_failure",
                         "kgEquivalentIds": {},
+                        "providedIds": provided_ids,
                     }
 
                 except BioMapperRateLimitError:
@@ -160,6 +180,7 @@ class MapperService:
             "error": last_error,
             "error_type": "mapping_error",
             "kgEquivalentIds": {},
+            "providedIds": provided_ids,
         }
 
     @staticmethod

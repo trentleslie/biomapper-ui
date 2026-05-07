@@ -235,10 +235,19 @@ export default function DashboardPage() {
       .filter(p => visibleOntologies.size === 0 || visibleOntologies.has(p.toLowerCase()))
       .sort();
 
+    // Collect all unique provided ID column names across results.
+    const providedIdCols = new Set<string>();
+    results.forEach(r => {
+      if (r.providedIds) Object.keys(r.providedIds).forEach(k => providedIdCols.add(k));
+    });
+    const sortedProvidedIdCols = Array.from(providedIdCols).sort();
+    const hasProvidedIds = sortedProvidedIdCols.length > 0;
+
     const headers = [
       "Original Name", "Resolved", "Primary Curie", "Confidence Tier", "Confidence Score", "Needs Review",
-      ...vocabCols,
-      ...equivCols.map(p => `equiv_${p}`),
+      ...sortedProvidedIdCols,
+      ...vocabCols.map(v => hasProvidedIds ? `${v}_biomapper` : v),
+      ...equivCols.map(p => hasProvidedIds ? `equiv_${p}_biomapper` : `equiv_${p}`),
     ];
     const rows = results.map(r => {
       const row = [
@@ -249,6 +258,11 @@ export default function DashboardPage() {
         r.confidenceScore?.toString() || "",
         r.needsReview ? "true" : "false",
       ];
+      // Provided ID columns (original user-submitted values)
+      sortedProvidedIdCols.forEach(col => {
+        const val = r.providedIds?.[col];
+        row.push(Array.isArray(val) ? val.join("|") : (val || ""));
+      });
       // Identifier keys come from the backend in their native case; resolve case-insensitively.
       const idMap: Record<string, string[] | undefined> = {};
       if (r.identifiers) {
@@ -275,6 +289,83 @@ export default function DashboardPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handleDownloadCSV = () => {
+    if (!results || results.length === 0) return;
+
+    const csvEscape = (val: string) => {
+      if (val.includes(",") || val.includes('"') || val.includes("\n")) {
+        return `"${val.replace(/"/g, '""')}"`;
+      }
+      return val;
+    };
+
+    const allVocabs = new Set<string>();
+    results.forEach(r => {
+      if (r.identifiers) Object.keys(r.identifiers).forEach(k => allVocabs.add(k));
+    });
+    const vocabCols = Array.from(allVocabs)
+      .map(v => v.toLowerCase())
+      .filter(v => visibleOntologies.size === 0 || visibleOntologies.has(v))
+      .sort();
+
+    const allEquivPrefixes = new Set<string>();
+    results.forEach(r => {
+      if (r.kgEquivalentIds) Object.keys(r.kgEquivalentIds).forEach(k => allEquivPrefixes.add(k));
+    });
+    const equivCols = Array.from(allEquivPrefixes)
+      .filter(p => visibleOntologies.size === 0 || visibleOntologies.has(p.toLowerCase()))
+      .sort();
+
+    const providedIdCols = new Set<string>();
+    results.forEach(r => {
+      if (r.providedIds) Object.keys(r.providedIds).forEach(k => providedIdCols.add(k));
+    });
+    const sortedProvidedIdCols = Array.from(providedIdCols).sort();
+    const hasProvidedIds = sortedProvidedIdCols.length > 0;
+
+    const headers = [
+      "Original Name", "Resolved", "Primary Curie", "Confidence Tier", "Confidence Score", "Needs Review",
+      ...sortedProvidedIdCols,
+      ...vocabCols.map(v => hasProvidedIds ? `${v}_biomapper` : v),
+      ...equivCols.map(p => hasProvidedIds ? `equiv_${p}_biomapper` : `equiv_${p}`),
+    ];
+    const rows = results.map(r => {
+      const row = [
+        r.name,
+        r.resolved ? "true" : "false",
+        r.primaryCurie || "",
+        r.confidenceTier || "",
+        r.confidenceScore?.toString() || "",
+        r.needsReview ? "true" : "false",
+      ];
+      sortedProvidedIdCols.forEach(col => {
+        const val = r.providedIds?.[col];
+        row.push(Array.isArray(val) ? val.join("|") : (val || ""));
+      });
+      const idMap: Record<string, string[] | undefined> = {};
+      if (r.identifiers) {
+        for (const [k, val] of Object.entries(r.identifiers)) {
+          idMap[k.toLowerCase()] = val as string[] | undefined;
+        }
+      }
+      vocabCols.forEach(v => {
+        row.push(idMap[v]?.join("|") || "");
+      });
+      equivCols.forEach(p => {
+        row.push(r.kgEquivalentIds?.[p]?.join("|") || "");
+      });
+      return row.map(csvEscape).join(",");
+    });
+    const content = [headers.map(csvEscape).join(","), ...rows].join("\n");
+    const blob = new Blob([content], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `mapping-results-${jobId}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // Display columns are derived from whatever vocabularies actually appear in
   // the results (lowercased). If the upload page passed an `ontologies` filter,
   // restrict to the intersection; otherwise show every vocabulary present.
@@ -295,6 +386,17 @@ export default function DashboardPage() {
       : Array.from(presentVocabKeys);
     return allowed.sort();
   }, [presentVocabKeys, visibleOntologies]);
+
+  // Collect unique provided ID column names for the results table.
+  const providedIdColsForTable = useMemo(() => {
+    const cols = new Set<string>();
+    for (const r of results) {
+      if (r.providedIds) {
+        Object.keys(r.providedIds).forEach(k => cols.add(k));
+      }
+    }
+    return Array.from(cols).sort();
+  }, [results]);
 
   const handleDownloadMarkdown = () => {
     if (!summary) return;
@@ -643,6 +745,9 @@ export default function DashboardPage() {
                     <Button variant="outline" size="sm" onClick={handleDownloadMarkdown} data-testid="btn-download-md">
                       <Download className="w-4 h-4 mr-2" /> Markdown
                     </Button>
+                    <Button variant="outline" size="sm" onClick={handleDownloadCSV} data-testid="btn-download-csv">
+                      <Download className="w-4 h-4 mr-2" /> CSV
+                    </Button>
                     <Button variant="outline" size="sm" onClick={handleDownloadTSV} data-testid="btn-download-tsv">
                       <Download className="w-4 h-4 mr-2" /> TSV
                     </Button>
@@ -704,6 +809,9 @@ export default function DashboardPage() {
                         >
                           Score <SortIcon field="confidenceScore" />
                         </TableHead>
+                        {providedIdColsForTable.map(col => (
+                          <TableHead key={`provided-${col}`} className="text-xs">{col}</TableHead>
+                        ))}
                         {visibleVocabCols.map(v => (
                           <TableHead key={v} className="text-xs">{v.toUpperCase()}</TableHead>
                         ))}
@@ -743,6 +851,15 @@ export default function DashboardPage() {
                             <TableCell className="font-mono text-sm">
                               {row.confidenceScore != null ? row.confidenceScore.toFixed(3) : "-"}
                             </TableCell>
+                            {providedIdColsForTable.map(col => {
+                              const val = row.providedIds?.[col];
+                              const display = Array.isArray(val) ? val.join("|") : (val || "-");
+                              return (
+                                <TableCell key={`provided-${col}`} className="font-mono text-xs text-muted-foreground max-w-[100px] truncate" title={typeof display === "string" ? display : ""}>
+                                  {display}
+                                </TableCell>
+                              );
+                            })}
                             {visibleVocabCols.map(v => (
                               <TableCell key={v} className="font-mono text-xs text-muted-foreground max-w-[100px] truncate">
                                 {lookupIds(row, v)?.join(", ") || "-"}
@@ -751,7 +868,7 @@ export default function DashboardPage() {
                           </TableRow>,
                           isExpanded && (
                             <TableRow key={`expand-${i}`} className="bg-muted/20">
-                              <TableCell colSpan={5 + visibleVocabCols.length} className="py-3 px-6">
+                              <TableCell colSpan={5 + providedIdColsForTable.length + visibleVocabCols.length} className="py-3 px-6">
                                 <div className="text-sm space-y-1">
                                   <p className="font-medium mb-2">Full Cross-References for: <span className="font-mono">{row.name}</span></p>
                                   {row.identifiers && Object.entries(row.identifiers).filter(([, ids]) => ids && ids.length > 0).map(([vocab, ids]) => (
@@ -772,7 +889,7 @@ export default function DashboardPage() {
                       })}
                       {pagedResults.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={5 + visibleVocabCols.length} className="text-center py-12 text-muted-foreground">
+                          <TableCell colSpan={5 + providedIdColsForTable.length + visibleVocabCols.length} className="text-center py-12 text-muted-foreground">
                             No results match the current filters.
                           </TableCell>
                         </TableRow>
