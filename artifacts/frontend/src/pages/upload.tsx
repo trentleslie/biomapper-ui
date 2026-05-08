@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useDropzone } from "react-dropzone";
 import * as XLSX from "xlsx";
 import Papa from "papaparse";
+import { saveOriginalData } from "@/lib/original-data-store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -382,7 +383,16 @@ export default function UploadPage() {
         }
       },
       {
-        onSuccess: (data) => {
+        onSuccess: async (data) => {
+          // Persist original rows to IndexedDB before navigating so downloads
+          // can join results back to the full uploaded dataset. If IndexedDB is
+          // unavailable, proceed with navigation — downloads will fall back to
+          // the results-only format.
+          try {
+            await saveOriginalData(data.job_id, { parsedRows, selectedColumn, columns });
+          } catch (err) {
+            console.warn("Failed to save original data to IndexedDB:", err);
+          }
           const params = new URLSearchParams({
             ontologies: ontologiesParam,
             confidence: confidenceFilter,
