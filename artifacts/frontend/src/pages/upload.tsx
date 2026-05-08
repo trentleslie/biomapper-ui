@@ -461,7 +461,7 @@ export default function UploadPage() {
         <p className="mt-1 text-sm text-neutral-500 max-w-2xl">Upload a dataset to link entity names to biological vocabularies.</p>
       </div>
 
-      <div className="max-w-3xl w-full">
+      <div className="max-w-3xl w-full mx-auto">
 
         <div className="flex items-center gap-2 mb-6">
           <Tabs value={mode} onValueChange={(v) => setMode(v as 'link' | 'benchmark')}>

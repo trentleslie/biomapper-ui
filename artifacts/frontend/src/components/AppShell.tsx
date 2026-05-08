@@ -71,7 +71,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => signOut()}
+            onClick={() => void signOut()}
             className="text-sm text-neutral-500"
           >
             Sign out

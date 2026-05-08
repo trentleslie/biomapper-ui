@@ -14,7 +14,7 @@ export default function AccessDeniedPage() {
       <p className="text-neutral-500 max-w-md mb-8">
         This application is restricted to PhenomeHealth researchers. Your email domain is not authorized.
       </p>
-      <Button variant="default" onClick={() => signOut()}>
+      <Button variant="default" onClick={() => void signOut()}>
         Sign Out and Return Home
       </Button>
     </div>
