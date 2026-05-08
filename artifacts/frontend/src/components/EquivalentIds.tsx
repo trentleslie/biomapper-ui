@@ -15,7 +15,7 @@ function PrefixGroup({ prefix, ids }: { prefix: string; ids: string[] }) {
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        className="flex items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-900 transition-colors"
       >
         {open ? (
           <ChevronDown className="w-3.5 h-3.5" />
@@ -30,7 +30,7 @@ function PrefixGroup({ prefix, ids }: { prefix: string; ids: string[] }) {
       {open && (
         <div className="ml-5 mt-1 space-y-0.5">
           {ids.map((id) => (
-            <div key={id} className="font-mono text-xs text-muted-foreground">
+            <div key={id} className="font-mono text-xs text-neutral-500">
               {id}
             </div>
           ))}
