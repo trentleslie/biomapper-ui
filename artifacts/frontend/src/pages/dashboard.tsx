@@ -91,9 +91,11 @@ export default function DashboardPage() {
     }
   }, [streamError, env, toast, setEnv]);
 
-  // Prefer live SSE state while streaming; fall back to the final fetch result once done.
-  // Never treat a still-loading or 202-style intermediate response as an error.
-  const job = jobState ?? (done && finalResult && "status" in finalResult ? finalResult : null);
+  // Prefer live SSE state while streaming; fall back to the REST result when SSE
+  // hasn't fired yet (e.g., page reload of a completed job). The jobState ?? prefix
+  // ensures live stream data takes precedence; the fallback is only reached when
+  // jobState is null.
+  const job = jobState ?? (finalResult && "status" in finalResult ? finalResult : null);
   // Surface an error if: (a) API returned an error response with "detail", OR
   // (b) loading finished but we have no job data at all (network failure, 404, etc.)
   const isError = !isLoading && !jobState && (!job || "detail" in job);
