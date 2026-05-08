@@ -8,6 +8,7 @@
 import type { MappingResultItemConfidenceTier } from "./mappingResultItemConfidenceTier";
 import type { MappingResultItemIdentifiers } from "./mappingResultItemIdentifiers";
 import type { MappingResultItemKgEquivalentIds } from "./mappingResultItemKgEquivalentIds";
+import type { MappingResultItemProvidedIds } from "./mappingResultItemProvidedIds";
 
 export interface MappingResultItem {
   name: string;
@@ -28,6 +29,8 @@ knowledge graph node. Keys are native CURIE prefixes (e.g. "HMDB",
 "KEGG.COMPOUND"). Empty object when no KG match.
  */
   kgEquivalentIds?: MappingResultItemKgEquivalentIds;
+  /** Original provided ID values from user's uploaded file, keyed by original column name */
+  providedIds?: MappingResultItemProvidedIds;
   error?: string | null;
   error_type?: string | null;
 }

@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useDropzone } from "react-dropzone";
 import * as XLSX from "xlsx";
 import Papa from "papaparse";
+import { saveOriginalData } from "@/lib/original-data-store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -66,6 +67,17 @@ const COLUMN_PREFIX_HINTS: Array<[RegExp, string]> = [
   [/hgnc/i,                     "HGNC"],
 ];
 
+// Value-based prefix detection — used when column-name heuristic fails.
+// Order matters: more specific patterns first, generic (pure numeric) last.
+const VALUE_PREFIX_PATTERNS: Array<[RegExp, string]> = [
+  [/^HMDB\d+$/i,           "HMDB"],
+  [/^CHEBI[:\s]?\d+$/i,    "CHEBI"],
+  [/^C\d{5}$/,             "KEGG.COMPOUND"],
+  [/^LM[A-Z]{2}\d+$/i,    "LIPIDMAPS"],
+  [/^RM[:\s]?\d+$/i,       "refmet_id"],
+  [/^\d+$/,                "PUBCHEM.COMPOUND"],
+];
+
 const ANNOTATOR_DESCRIPTION_FALLBACKS: Record<string, string> = {
   "kestrel-hybrid-search": "Combines text and semantic vector search for comprehensive matching",
   "kestrel-text-search": "Exact and fuzzy text matching against entity name databases",
@@ -73,11 +85,40 @@ const ANNOTATOR_DESCRIPTION_FALLBACKS: Record<string, string> = {
   "metabolomics-workbench": "Lookup against the Metabolomics Workbench reference database",
 };
 
-function inferPrefix(columnName: string): string {
+function inferPrefix(columnName: string, sampleValues?: string[]): string {
+  // 1. Try value-based detection first when sample values are provided.
+  if (sampleValues && sampleValues.length > 0) {
+    const counts = new Map<string, number>();
+    for (const val of sampleValues) {
+      for (const [re, prefix] of VALUE_PREFIX_PATTERNS) {
+        if (re.test(val)) {
+          counts.set(prefix, (counts.get(prefix) || 0) + 1);
+          break; // first matching pattern wins per value
+        }
+      }
+    }
+    if (counts.size > 0) {
+      // Pick the prefix with the most matches.
+      let bestPrefix = "";
+      let bestCount = 0;
+      for (const [prefix, count] of counts) {
+        if (count > bestCount) {
+          bestPrefix = prefix;
+          bestCount = count;
+        }
+      }
+      // Must exceed 50% of non-empty samples to be confident.
+      if (bestCount > sampleValues.length / 2) {
+        return bestPrefix;
+      }
+    }
+  }
+
+  // 2. Fall back to column-name regex heuristic.
   for (const [re, prefix] of COLUMN_PREFIX_HINTS) {
     if (re.test(columnName)) return prefix;
   }
-  // Fallback: use the column name itself (uppercased, normalized).
+  // 3. Fallback: use the column name itself (uppercased, normalized).
   return columnName.trim().toUpperCase().replace(/\s+/g, "_");
 }
 
@@ -101,6 +142,7 @@ export default function UploadPage() {
   const [showAllVocabs, setShowAllVocabs] = useState(false);
   const [vocabSearch, setVocabSearch] = useState("");
   const [hintColumns, setHintColumns] = useState<Set<string>>(new Set());
+  const [prefixOverrides, setPrefixOverrides] = useState<Record<string, string>>({});
   const [confidenceFilter, setConfidenceFilter] = useState<ConfidenceFilter>("all");
 
   // Discovery — long staleTime since these are slow-moving reference data.
@@ -160,10 +202,24 @@ export default function UploadPage() {
     for (const col of hintColumns) {
       // Defensive: never derive hints from the active name column.
       if (col === selectedColumn) continue;
-      m[col] = inferPrefix(col);
+      // User override takes priority.
+      if (prefixOverrides[col]) {
+        m[col] = prefixOverrides[col];
+        continue;
+      }
+      // Sample up to 20 non-empty values from parsedRows for value-based detection.
+      const sampleValues: string[] = [];
+      for (const row of parsedRows) {
+        if (sampleValues.length >= 20) break;
+        const val = row[col];
+        if (val !== null && val !== undefined && String(val).trim() !== "") {
+          sampleValues.push(String(val).trim());
+        }
+      }
+      m[col] = inferPrefix(col, sampleValues);
     }
     return m;
-  }, [hintColumns, selectedColumn]);
+  }, [hintColumns, selectedColumn, prefixOverrides, parsedRows]);
 
   // Build hints payload: { name -> { PREFIX -> id } } for rows where at least
   // one selected ID column has a value.
@@ -181,7 +237,24 @@ export default function UploadPage() {
         perRow[prefix] = String(val).trim();
       }
       if (Object.keys(perRow).length > 0) {
-        result[trimmedName] = { ...(result[trimmedName] || {}), ...perRow };
+        if (!result[trimmedName]) {
+          result[trimmedName] = perRow;
+        } else {
+          // Accumulate: if a key already exists, make it an array.
+          const existing = result[trimmedName] as Record<string, string | string[]>;
+          for (const [key, val] of Object.entries(perRow)) {
+            if (key in existing) {
+              const prev = existing[key];
+              if (Array.isArray(prev)) {
+                if (!prev.includes(val as string)) prev.push(val as string);
+              } else if (prev !== val) {
+                existing[key] = [prev as string, val as string];
+              }
+            } else {
+              existing[key] = val;
+            }
+          }
+        }
       }
     }
     return Object.keys(result).length > 0 ? result : undefined;
@@ -199,6 +272,7 @@ export default function UploadPage() {
     ) || cols[0];
     setSelectedColumn(likelyNameCol);
     setHintColumns(new Set());
+    setPrefixOverrides({});
   }, []);
 
   const parseFile = useCallback((uploadedFile: File) => {
@@ -290,6 +364,15 @@ export default function UploadPage() {
     const ontologiesParam = Array.from(selectedVocabPrefixes).map(p => p.toLowerCase()).join(",");
     const annotatorsList = Array.from(selectedAnnotators);
 
+    const hintColumnsPayload: Record<string, string> = {};
+    for (const [col, prefix] of Object.entries(hintColumnPrefixMap)) {
+      // When two columns share a prefix (collision), keep the first one.
+      // The UI already warns about this; the user chose to proceed.
+      if (!(prefix in hintColumnsPayload)) {
+        hintColumnsPayload[prefix] = col;
+      }
+    }
+
     startMapping.mutate(
       {
         data: {
@@ -299,11 +382,21 @@ export default function UploadPage() {
             entityType,
             annotators: annotatorsList.length > 0 ? annotatorsList : null,
             ...(hintsPayload ? { hints: hintsPayload } : {}),
+            ...(Object.keys(hintColumnsPayload).length > 0 ? { hintColumns: hintColumnsPayload } : {}),
           },
         }
       },
       {
-        onSuccess: (data) => {
+        onSuccess: async (data) => {
+          // Persist original rows to IndexedDB before navigating so downloads
+          // can join results back to the full uploaded dataset. If IndexedDB is
+          // unavailable, proceed with navigation — downloads will fall back to
+          // the results-only format.
+          try {
+            await saveOriginalData(data.job_id, { parsedRows, selectedColumn, columns });
+          } catch (err) {
+            console.warn("Failed to save original data to IndexedDB:", err);
+          }
           const params = new URLSearchParams({
             ontologies: ontologiesParam,
             confidence: confidenceFilter,
@@ -434,6 +527,7 @@ export default function UploadPage() {
                       setParsedRows([]);
                       setSelectedColumn("");
                       setHintColumns(new Set());
+                      setPrefixOverrides({});
                     }} className="mt-2" data-testid="btn-remove-file">
                       Remove File
                     </Button>
@@ -489,8 +583,10 @@ export default function UploadPage() {
                     </Label>
                     <div className="grid grid-cols-2 gap-2" data-testid="hint-column-checkboxes">
                       {availableHintColumns.map(col => {
-                        const inferred = inferPrefix(col);
                         const isSelected = hintColumns.has(col);
+                        // For unchecked columns, sample values to show value-based prefix preview.
+                        const sampleVals = parsedRows.slice(0, 20).map(r => r[col]).filter(v => v != null && String(v).trim() !== "").map(v => String(v).trim());
+                        const resolvedPrefix = hintColumnPrefixMap[col] || inferPrefix(col, sampleVals);
                         return (
                           <div key={col} className="flex items-center gap-2">
                             <Checkbox
@@ -499,18 +595,67 @@ export default function UploadPage() {
                               onCheckedChange={() => toggleHintColumn(col)}
                               data-testid={`checkbox-hint-${col}`}
                             />
-                            <Label
-                              htmlFor={`hint-col-${col}`}
-                              className="font-normal cursor-pointer text-sm"
-                              title={`Will be sent as ${inferred} hints`}
-                            >
-                              {col}
-                              <span className="ml-1.5 text-xs text-muted-foreground">→ {inferred}</span>
-                            </Label>
+                            {isSelected ? (
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <Label
+                                  htmlFor={`hint-col-${col}`}
+                                  className="font-normal cursor-pointer text-sm shrink-0"
+                                >
+                                  {col} →
+                                </Label>
+                                <Input
+                                  className="h-6 text-xs px-1.5 py-0 w-36 font-mono"
+                                  value={prefixOverrides[col] ?? resolvedPrefix}
+                                  onChange={(e) => {
+                                    setPrefixOverrides(prev => ({
+                                      ...prev,
+                                      [col]: e.target.value,
+                                    }));
+                                  }}
+                                  onBlur={(e) => {
+                                    if (e.target.value.trim() === "") {
+                                      setPrefixOverrides(prev => {
+                                        const next = { ...prev };
+                                        delete next[col];
+                                        return next;
+                                      });
+                                    }
+                                  }}
+                                  data-testid={`input-prefix-${col}`}
+                                />
+                              </div>
+                            ) : (
+                              <Label
+                                htmlFor={`hint-col-${col}`}
+                                className="font-normal cursor-pointer text-sm"
+                                title={`Will be sent as ${resolvedPrefix} hints`}
+                              >
+                                {col}
+                                <span className="ml-1.5 text-xs text-muted-foreground">→ {resolvedPrefix}</span>
+                              </Label>
+                            )}
                           </div>
                         );
                       })}
                     </div>
+                    {(() => {
+                      // Check for prefix collisions among checked hint columns.
+                      const prefixCounts = new Map<string, string[]>();
+                      for (const [col, prefix] of Object.entries(hintColumnPrefixMap)) {
+                        const cols = prefixCounts.get(prefix) || [];
+                        cols.push(col);
+                        prefixCounts.set(prefix, cols);
+                      }
+                      const collisions = [...prefixCounts.entries()].filter(([, cols]) => cols.length > 1);
+                      if (collisions.length > 0) {
+                        return (
+                          <p className="text-xs text-amber-600">
+                            Warning: columns {collisions.map(([prefix, cols]) => `[${cols.join(", ")}] both resolve to "${prefix}"`).join("; ")}. Consider overriding one prefix to avoid conflicts.
+                          </p>
+                        );
+                      }
+                      return null;
+                    })()}
                     {hintColumns.size > 0 && (
                       <p className="text-xs text-muted-foreground">
                         {hintRowCount > 0

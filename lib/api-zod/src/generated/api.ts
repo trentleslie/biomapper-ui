@@ -25,6 +25,7 @@ export const startMappingBatchBodyNamesMax = 10000;
 
 export const startMappingBatchBodyConfigAnnotationModeDefault = `missing`;
 export const startMappingBatchBodyConfigEntityTypeDefault = `biolink:SmallMolecule`;
+export const startMappingBatchBodyConfigHintColumnsDefault = {};
 
 export const StartMappingBatchBody = zod.object({
   names: zod
@@ -57,6 +58,12 @@ export const StartMappingBatchBody = zod.object({
           ),
         )
         .optional(),
+      hintColumns: zod
+        .record(zod.string(), zod.string())
+        .default(startMappingBatchBodyConfigHintColumnsDefault)
+        .describe(
+          "Maps inferred CURIE prefix to original column name from uploaded file",
+        ),
     })
     .optional(),
 });
@@ -111,6 +118,8 @@ export const GetMappingResultParams = zod.object({
   jobId: zod.coerce.string(),
 });
 
+export const getMappingResultResponseResultsItemProvidedIdsDefault = {};
+
 export const GetMappingResultResponse = zod.object({
   job_id: zod.string(),
   status: zod.enum(["pending", "processing", "complete", "error"]),
@@ -137,6 +146,15 @@ export const GetMappingResultResponse = zod.object({
         .optional()
         .describe(
           'Map of CURIE prefix to list of equivalent local identifiers from the\nknowledge graph node. Keys are native CURIE prefixes (e.g. \"HMDB\",\n\"KEGG.COMPOUND\"). Empty object when no KG match.\n',
+        ),
+      providedIds: zod
+        .record(
+          zod.string(),
+          zod.union([zod.string(), zod.array(zod.string())]),
+        )
+        .default(getMappingResultResponseResultsItemProvidedIdsDefault)
+        .describe(
+          "Original provided ID values from user's uploaded file, keyed by original column name",
         ),
       error: zod.string().nullish(),
       error_type: zod.string().nullish(),

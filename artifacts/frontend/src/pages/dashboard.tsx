@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { useLocation, useParams, useSearch } from "wouter";
 import { useUser, useClerk } from "@clerk/react";
 import { useMappingStream } from "@/hooks/use-mapping-stream";
+import { loadOriginalData, type OriginalData } from "@/lib/original-data-store";
 import { useGetMappingResult, getGetMappingResultQueryKey, JobResult } from "@workspace/api-client-react";
 import { SankeyChart } from "@/components/SankeyChart";
 import { EnvToggle } from "@/components/EnvToggle";
@@ -202,20 +203,29 @@ export default function DashboardPage() {
     return sortDir === "asc" ? <ChevronUp className="w-3 h-3 ml-1 inline" /> : <ChevronDown className="w-3 h-3 ml-1 inline" />;
   };
 
-  const handleDownloadJSON = () => {
+  const handleDownloadJSON = async () => {
     if (!jobData || !summary) return;
-    const data = JSON.stringify({ summary, results }, null, 2);
-    const blob = new Blob([data], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `mapping-results-${jobId}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const originalData = jobId ? await loadOriginalData(jobId) : undefined;
+      const payload: Record<string, unknown> = { summary, results };
+      if (originalData) {
+        payload.originalRows = originalData.parsedRows;
+      }
+      const data = JSON.stringify(payload, null, 2);
+      const blob = new Blob([data], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `mapping-results-${jobId}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("JSON download failed:", err);
+    }
   };
 
-  const handleDownloadTSV = () => {
-    if (!results || results.length === 0) return;
+  // Shared helper: build biomapper column names and per-result row values.
+  const buildBiomapperColumns = () => {
     const allVocabs = new Set<string>();
     results.forEach(r => {
       if (r.identifiers) Object.keys(r.identifiers).forEach(k => allVocabs.add(k));
@@ -225,8 +235,6 @@ export default function DashboardPage() {
       .filter(v => visibleOntologies.size === 0 || visibleOntologies.has(v))
       .sort();
 
-    // Collect equivalent ID prefixes (uppercase CURIE prefixes from kgEquivalentIds).
-    // Filter by visibleOntologies using case-insensitive CURIE prefix comparison.
     const allEquivPrefixes = new Set<string>();
     results.forEach(r => {
       if (r.kgEquivalentIds) Object.keys(r.kgEquivalentIds).forEach(k => allEquivPrefixes.add(k));
@@ -235,10 +243,113 @@ export default function DashboardPage() {
       .filter(p => visibleOntologies.size === 0 || visibleOntologies.has(p.toLowerCase()))
       .sort();
 
+    return { vocabCols, equivCols };
+  };
+
+  const biomapperRowValues = (r: MappingResult, vocabCols: string[], equivCols: string[]) => {
+    const row: string[] = [
+      r.resolved ? "true" : "false",
+      r.primaryCurie || "",
+      r.confidenceTier || "",
+      r.confidenceScore?.toString() || "",
+      r.needsReview ? "true" : "false",
+    ];
+    const idMap: Record<string, string[] | undefined> = {};
+    if (r.identifiers) {
+      for (const [k, val] of Object.entries(r.identifiers)) {
+        idMap[k.toLowerCase()] = val as string[] | undefined;
+      }
+    }
+    vocabCols.forEach(v => {
+      row.push(idMap[v]?.join("|") || "");
+    });
+    equivCols.forEach(p => {
+      row.push(r.kgEquivalentIds?.[p]?.join("|") || "");
+    });
+    return row;
+  };
+
+  // Deduplicate biomapper column names against original columns.
+  const deduplicateColName = (name: string, existingNames: Set<string>): string => {
+    if (!existingNames.has(name)) return name;
+    let candidate = `${name}_2`;
+    let i = 3;
+    while (existingNames.has(candidate)) {
+      candidate = `${name}_${i++}`;
+    }
+    return candidate;
+  };
+
+  const buildEnrichedDownload = async (
+    delimiter: "\t" | ",",
+    escape?: (val: string) => string,
+  ): Promise<{ content: string; hasOriginalData: boolean }> => {
+    const esc = escape ?? ((v: string) => v);
+    const { vocabCols, equivCols } = buildBiomapperColumns();
+
+    // Try loading original data from IndexedDB.
+    const originalData = jobId ? await loadOriginalData(jobId) : undefined;
+
+    if (originalData) {
+      // --- Enriched path: original columns + _biomapper columns ---
+      const { parsedRows, selectedColumn, columns } = originalData;
+      const originalColSet = new Set(columns);
+
+      // Build biomapper column headers with _biomapper suffix.
+      const coreHeaders = ["resolved_biomapper", "primary_curie_biomapper", "confidence_tier_biomapper", "confidence_score_biomapper", "needs_review_biomapper"];
+      const vocabHeaders = vocabCols.map(v => `${v}_biomapper`);
+      const equivHeaders = equivCols.map(p => `equiv_${p}_biomapper`);
+      const allBiomapperHeaders = [...coreHeaders, ...vocabHeaders, ...equivHeaders];
+
+      // Deduplicate biomapper headers against original column names.
+      // Track generated names so two biomapper headers that collide with the same
+      // original column get distinct suffixes (e.g., _2 and _3).
+      const usedNames = new Set(originalColSet);
+      const dedupedBiomapperHeaders = allBiomapperHeaders.map(h => {
+        const name = deduplicateColName(h, usedNames);
+        usedNames.add(name);
+        return name;
+      });
+
+      const headers = [...columns, ...dedupedBiomapperHeaders];
+
+      // Build result lookup by trimmed name.
+      const resultMap = new Map<string, MappingResult>();
+      for (const r of results) {
+        if (r.name) resultMap.set(r.name.trim(), r);
+      }
+
+      // One row per original row, joined by name.
+      const rows = parsedRows.map(row => {
+        const name = row[selectedColumn];
+        const trimmedName = name != null ? String(name).trim() : "";
+        const result = resultMap.get(trimmedName);
+
+        const originalValues = columns.map(col => esc(row[col] ?? ""));
+        const bmValues = result
+          ? biomapperRowValues(result, vocabCols, equivCols).map(esc)
+          : allBiomapperHeaders.map(() => "");
+
+        return [...originalValues, ...bmValues].join(delimiter);
+      });
+
+      const content = [headers.map(esc).join(delimiter), ...rows].join("\n");
+      return { content, hasOriginalData: true };
+    }
+
+    // --- Fallback: current results-only format (backward-compatible) ---
+    const providedIdCols = new Set<string>();
+    results.forEach(r => {
+      if (r.providedIds) Object.keys(r.providedIds).forEach(k => providedIdCols.add(k));
+    });
+    const sortedProvidedIdCols = Array.from(providedIdCols).sort();
+    const hasProvidedIds = sortedProvidedIdCols.length > 0;
+
     const headers = [
       "Original Name", "Resolved", "Primary Curie", "Confidence Tier", "Confidence Score", "Needs Review",
-      ...vocabCols,
-      ...equivCols.map(p => `equiv_${p}`),
+      ...sortedProvidedIdCols,
+      ...vocabCols.map(v => hasProvidedIds ? `${v}_biomapper` : v),
+      ...equivCols.map(p => hasProvidedIds ? `equiv_${p}_biomapper` : `equiv_${p}`),
     ];
     const rows = results.map(r => {
       const row = [
@@ -249,7 +360,10 @@ export default function DashboardPage() {
         r.confidenceScore?.toString() || "",
         r.needsReview ? "true" : "false",
       ];
-      // Identifier keys come from the backend in their native case; resolve case-insensitively.
+      sortedProvidedIdCols.forEach(col => {
+        const val = r.providedIds?.[col];
+        row.push(Array.isArray(val) ? val.join("|") : (val || ""));
+      });
       const idMap: Record<string, string[] | undefined> = {};
       if (r.identifiers) {
         for (const [k, val] of Object.entries(r.identifiers)) {
@@ -259,20 +373,53 @@ export default function DashboardPage() {
       vocabCols.forEach(v => {
         row.push(idMap[v]?.join("|") || "");
       });
-      // Equivalent ID columns
       equivCols.forEach(p => {
         row.push(r.kgEquivalentIds?.[p]?.join("|") || "");
       });
-      return row.join("\t");
+      return row.map(esc).join(delimiter);
     });
-    const content = [headers.join("\t"), ...rows].join("\n");
-    const blob = new Blob([content], { type: "text/tab-separated-values" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `mapping-results-${jobId}.tsv`;
-    a.click();
-    URL.revokeObjectURL(url);
+
+    const content = [headers.map(esc).join(delimiter), ...rows].join("\n");
+    return { content, hasOriginalData: false };
+  };
+
+  const handleDownloadTSV = async () => {
+    if (!results || results.length === 0) return;
+    const tsvEscape = (val: string) => val.replace(/[\t\n\r]/g, " ");
+    try {
+      const { content } = await buildEnrichedDownload("\t", tsvEscape);
+      const blob = new Blob([content], { type: "text/tab-separated-values" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `mapping-results-${jobId}.tsv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("TSV download failed:", err);
+    }
+  };
+
+  const handleDownloadCSV = async () => {
+    if (!results || results.length === 0) return;
+    const csvEscape = (val: string) => {
+      if (val.includes(",") || val.includes('"') || val.includes("\n")) {
+        return `"${val.replace(/"/g, '""')}"`;
+      }
+      return val;
+    };
+    try {
+      const { content } = await buildEnrichedDownload(",", csvEscape);
+      const blob = new Blob([content], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `mapping-results-${jobId}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("CSV download failed:", err);
+    }
   };
 
   // Display columns are derived from whatever vocabularies actually appear in
@@ -295,6 +442,17 @@ export default function DashboardPage() {
       : Array.from(presentVocabKeys);
     return allowed.sort();
   }, [presentVocabKeys, visibleOntologies]);
+
+  // Collect unique provided ID column names for the results table.
+  const providedIdColsForTable = useMemo(() => {
+    const cols = new Set<string>();
+    for (const r of results) {
+      if (r.providedIds) {
+        Object.keys(r.providedIds).forEach(k => cols.add(k));
+      }
+    }
+    return Array.from(cols).sort();
+  }, [results]);
 
   const handleDownloadMarkdown = () => {
     if (!summary) return;
@@ -542,6 +700,92 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {/* Report Summary */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Report Summary</CardTitle>
+                <CardDescription>Overview of mapping results — also available as a downloadable Markdown report</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Summary Stats */}
+                  <div>
+                    <h4 className="text-sm font-semibold mb-2">Summary</h4>
+                    <table className="w-full text-sm">
+                      <tbody>
+                        <tr className="border-b"><td className="py-1 text-muted-foreground">Total Rows</td><td className="py-1 text-right font-mono">{summary.totalRows.toLocaleString()}</td></tr>
+                        <tr className="border-b"><td className="py-1 text-muted-foreground">Unique Names</td><td className="py-1 text-right font-mono">{summary.uniqueNames.toLocaleString()}</td></tr>
+                        <tr className="border-b"><td className="py-1 text-muted-foreground">Resolved</td><td className="py-1 text-right font-mono">{summary.resolved.toLocaleString()} ({(summary.resolvedRate * 100).toFixed(1)}%)</td></tr>
+                        <tr className="border-b"><td className="py-1 text-muted-foreground">Unresolved</td><td className="py-1 text-right font-mono">{(summary.uniqueNames - summary.resolved).toLocaleString()}</td></tr>
+                        <tr><td className="py-1 text-muted-foreground">High Quality</td><td className="py-1 text-right font-mono">{(summary.highQualityRate * 100).toFixed(1)}%</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Confidence Tier Distribution */}
+                  <div>
+                    <h4 className="text-sm font-semibold mb-2">Confidence Tiers</h4>
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-muted-foreground"><th className="py-1 text-left font-normal">Tier</th><th className="py-1 text-right font-normal">Count</th><th className="py-1 text-right font-normal">%</th></tr>
+                      </thead>
+                      <tbody>
+                        {([["High", summary.confidenceTierDistribution.high, TIER_COLORS.high],
+                           ["Medium", summary.confidenceTierDistribution.medium, TIER_COLORS.medium],
+                           ["Low", summary.confidenceTierDistribution.low, TIER_COLORS.low],
+                           ["Unknown", summary.confidenceTierDistribution.unknown, TIER_COLORS.unknown]] as [string, number, string][]).map(([tier, count, color]) => (
+                          <tr key={tier} className="border-b last:border-0">
+                            <td className="py-1 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full inline-block" style={{ background: color }} />
+                              {tier}
+                            </td>
+                            <td className="py-1 text-right font-mono">{count}</td>
+                            <td className="py-1 text-right font-mono">{summary.uniqueNames > 0 ? (count / summary.uniqueNames * 100).toFixed(1) : "0.0"}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Vocabulary Coverage */}
+                  <div>
+                    <h4 className="text-sm font-semibold mb-2">Vocabulary Coverage</h4>
+                    <div className="max-h-[200px] overflow-y-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b text-muted-foreground"><th className="py-1 text-left font-normal">Vocabulary</th><th className="py-1 text-right font-normal">Hits</th></tr>
+                        </thead>
+                        <tbody>
+                          {Object.entries(summary.vocabularyCoverage)
+                            .sort(([, a], [, b]) => b - a)
+                            .map(([vocab, count]) => (
+                              <tr key={vocab} className="border-b last:border-0">
+                                <td className="py-1 font-mono text-xs">{vocab.toUpperCase()}</td>
+                                <td className="py-1 text-right font-mono">{count}</td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Unresolved Names */}
+                {summary.uniqueNames - summary.resolved > 0 && (
+                  <div className="mt-4 pt-4 border-t">
+                    <h4 className="text-sm font-semibold mb-2">Unresolved Names ({(summary.uniqueNames - summary.resolved).toLocaleString()})</h4>
+                    <div className="flex flex-wrap gap-1.5">
+                      {results.filter(r => !r.resolved).map(r => (
+                        <Badge key={r.name} variant="outline" className="text-xs font-mono">
+                          {r.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Needs Review */}
             {needsReview.length > 0 && (
               <Card>
@@ -643,6 +887,9 @@ export default function DashboardPage() {
                     <Button variant="outline" size="sm" onClick={handleDownloadMarkdown} data-testid="btn-download-md">
                       <Download className="w-4 h-4 mr-2" /> Markdown
                     </Button>
+                    <Button variant="outline" size="sm" onClick={handleDownloadCSV} data-testid="btn-download-csv">
+                      <Download className="w-4 h-4 mr-2" /> CSV
+                    </Button>
                     <Button variant="outline" size="sm" onClick={handleDownloadTSV} data-testid="btn-download-tsv">
                       <Download className="w-4 h-4 mr-2" /> TSV
                     </Button>
@@ -704,6 +951,9 @@ export default function DashboardPage() {
                         >
                           Score <SortIcon field="confidenceScore" />
                         </TableHead>
+                        {providedIdColsForTable.map(col => (
+                          <TableHead key={`provided-${col}`} className="text-xs">{col}</TableHead>
+                        ))}
                         {visibleVocabCols.map(v => (
                           <TableHead key={v} className="text-xs">{v.toUpperCase()}</TableHead>
                         ))}
@@ -743,6 +993,15 @@ export default function DashboardPage() {
                             <TableCell className="font-mono text-sm">
                               {row.confidenceScore != null ? row.confidenceScore.toFixed(3) : "-"}
                             </TableCell>
+                            {providedIdColsForTable.map(col => {
+                              const val = row.providedIds?.[col];
+                              const display = Array.isArray(val) ? val.join("|") : (val || "-");
+                              return (
+                                <TableCell key={`provided-${col}`} className="font-mono text-xs text-muted-foreground max-w-[100px] truncate" title={typeof display === "string" ? display : ""}>
+                                  {display}
+                                </TableCell>
+                              );
+                            })}
                             {visibleVocabCols.map(v => (
                               <TableCell key={v} className="font-mono text-xs text-muted-foreground max-w-[100px] truncate">
                                 {lookupIds(row, v)?.join(", ") || "-"}
@@ -751,7 +1010,7 @@ export default function DashboardPage() {
                           </TableRow>,
                           isExpanded && (
                             <TableRow key={`expand-${i}`} className="bg-muted/20">
-                              <TableCell colSpan={5 + visibleVocabCols.length} className="py-3 px-6">
+                              <TableCell colSpan={5 + providedIdColsForTable.length + visibleVocabCols.length} className="py-3 px-6">
                                 <div className="text-sm space-y-1">
                                   <p className="font-medium mb-2">Full Cross-References for: <span className="font-mono">{row.name}</span></p>
                                   {row.identifiers && Object.entries(row.identifiers).filter(([, ids]) => ids && ids.length > 0).map(([vocab, ids]) => (
@@ -772,7 +1031,7 @@ export default function DashboardPage() {
                       })}
                       {pagedResults.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={5 + visibleVocabCols.length} className="text-center py-12 text-muted-foreground">
+                          <TableCell colSpan={5 + providedIdColsForTable.length + visibleVocabCols.length} className="text-center py-12 text-muted-foreground">
                             No results match the current filters.
                           </TableCell>
                         </TableRow>

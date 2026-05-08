@@ -10,6 +10,7 @@ class MappingConfig(BaseModel):
     annotation_mode: Literal["missing", "all", "none"] = "missing"
     annotators: list[str] | None = None
     hints: dict[str, dict[str, str | list[str]]] = {}
+    hint_columns: dict[str, str] = {}
 
 
 class BatchRequest(BaseModel):
