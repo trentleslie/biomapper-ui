@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { useLocation, useParams, useSearch } from "wouter";
 import { useUser, useClerk } from "@clerk/react";
 import { useMappingStream } from "@/hooks/use-mapping-stream";
+import { loadOriginalData, type OriginalData } from "@/lib/original-data-store";
 import { useGetMappingResult, getGetMappingResultQueryKey, JobResult } from "@workspace/api-client-react";
 import { SankeyChart } from "@/components/SankeyChart";
 import { EnvToggle } from "@/components/EnvToggle";
@@ -202,9 +203,14 @@ export default function DashboardPage() {
     return sortDir === "asc" ? <ChevronUp className="w-3 h-3 ml-1 inline" /> : <ChevronDown className="w-3 h-3 ml-1 inline" />;
   };
 
-  const handleDownloadJSON = () => {
+  const handleDownloadJSON = async () => {
     if (!jobData || !summary) return;
-    const data = JSON.stringify({ summary, results }, null, 2);
+    const originalData = jobId ? await loadOriginalData(jobId) : undefined;
+    const payload: Record<string, unknown> = { summary, results };
+    if (originalData) {
+      payload.originalRows = originalData.parsedRows;
+    }
+    const data = JSON.stringify(payload, null, 2);
     const blob = new Blob([data], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -214,8 +220,8 @@ export default function DashboardPage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleDownloadTSV = () => {
-    if (!results || results.length === 0) return;
+  // Shared helper: build biomapper column names and per-result row values.
+  const buildBiomapperColumns = () => {
     const allVocabs = new Set<string>();
     results.forEach(r => {
       if (r.identifiers) Object.keys(r.identifiers).forEach(k => allVocabs.add(k));
@@ -225,8 +231,6 @@ export default function DashboardPage() {
       .filter(v => visibleOntologies.size === 0 || visibleOntologies.has(v))
       .sort();
 
-    // Collect equivalent ID prefixes (uppercase CURIE prefixes from kgEquivalentIds).
-    // Filter by visibleOntologies using case-insensitive CURIE prefix comparison.
     const allEquivPrefixes = new Set<string>();
     results.forEach(r => {
       if (r.kgEquivalentIds) Object.keys(r.kgEquivalentIds).forEach(k => allEquivPrefixes.add(k));
@@ -235,7 +239,94 @@ export default function DashboardPage() {
       .filter(p => visibleOntologies.size === 0 || visibleOntologies.has(p.toLowerCase()))
       .sort();
 
-    // Collect all unique provided ID column names across results.
+    return { vocabCols, equivCols };
+  };
+
+  const biomapperRowValues = (r: MappingResult, vocabCols: string[], equivCols: string[]) => {
+    const row: string[] = [
+      r.resolved ? "true" : "false",
+      r.primaryCurie || "",
+      r.confidenceTier || "",
+      r.confidenceScore?.toString() || "",
+      r.needsReview ? "true" : "false",
+    ];
+    const idMap: Record<string, string[] | undefined> = {};
+    if (r.identifiers) {
+      for (const [k, val] of Object.entries(r.identifiers)) {
+        idMap[k.toLowerCase()] = val as string[] | undefined;
+      }
+    }
+    vocabCols.forEach(v => {
+      row.push(idMap[v]?.join("|") || "");
+    });
+    equivCols.forEach(p => {
+      row.push(r.kgEquivalentIds?.[p]?.join("|") || "");
+    });
+    return row;
+  };
+
+  // Deduplicate biomapper column names against original columns.
+  const deduplicateColName = (name: string, existingNames: Set<string>): string => {
+    if (!existingNames.has(name)) return name;
+    let candidate = `${name}_2`;
+    let i = 3;
+    while (existingNames.has(candidate)) {
+      candidate = `${name}_${i++}`;
+    }
+    return candidate;
+  };
+
+  const buildEnrichedDownload = async (
+    delimiter: "\t" | ",",
+    escape?: (val: string) => string,
+  ): Promise<{ content: string; hasOriginalData: boolean }> => {
+    const esc = escape ?? ((v: string) => v);
+    const { vocabCols, equivCols } = buildBiomapperColumns();
+
+    // Try loading original data from IndexedDB.
+    const originalData = jobId ? await loadOriginalData(jobId) : undefined;
+
+    if (originalData) {
+      // --- Enriched path: original columns + _biomapper columns ---
+      const { parsedRows, selectedColumn, columns } = originalData;
+      const originalColSet = new Set(columns);
+
+      // Build biomapper column headers with _biomapper suffix.
+      const coreHeaders = ["resolved_biomapper", "primary_curie_biomapper", "confidence_tier_biomapper", "confidence_score_biomapper", "needs_review_biomapper"];
+      const vocabHeaders = vocabCols.map(v => `${v}_biomapper`);
+      const equivHeaders = equivCols.map(p => `equiv_${p}_biomapper`);
+      const allBiomapperHeaders = [...coreHeaders, ...vocabHeaders, ...equivHeaders];
+
+      // Deduplicate biomapper headers against original column names.
+      const dedupedBiomapperHeaders = allBiomapperHeaders.map(h => deduplicateColName(h, originalColSet));
+
+      const headers = [...columns, ...dedupedBiomapperHeaders];
+
+      // Build result lookup by trimmed name.
+      const resultMap = new Map<string, MappingResult>();
+      for (const r of results) {
+        if (r.name) resultMap.set(r.name.trim(), r);
+      }
+
+      // One row per original row, joined by name.
+      const rows = parsedRows.map(row => {
+        const name = row[selectedColumn];
+        const trimmedName = name != null ? String(name).trim() : "";
+        const result = resultMap.get(trimmedName);
+
+        const originalValues = columns.map(col => esc(row[col] ?? ""));
+        const bmValues = result
+          ? biomapperRowValues(result, vocabCols, equivCols).map(esc)
+          : allBiomapperHeaders.map(() => "");
+
+        return [...originalValues, ...bmValues].join(delimiter);
+      });
+
+      const content = [headers.map(esc).join(delimiter), ...rows].join("\n");
+      return { content, hasOriginalData: true };
+    }
+
+    // --- Fallback: current results-only format (backward-compatible) ---
     const providedIdCols = new Set<string>();
     results.forEach(r => {
       if (r.providedIds) Object.keys(r.providedIds).forEach(k => providedIdCols.add(k));
@@ -258,12 +349,13 @@ export default function DashboardPage() {
         r.confidenceScore?.toString() || "",
         r.needsReview ? "true" : "false",
       ];
-      // Provided ID columns (original user-submitted values)
       sortedProvidedIdCols.forEach(col => {
         const val = r.providedIds?.[col];
         row.push(Array.isArray(val) ? val.join("|") : (val || ""));
       });
-      // Identifier keys come from the backend in their native case; resolve case-insensitively.
+      const bmRow = biomapperRowValues(r, vocabCols, equivCols);
+      // bmRow already has resolved..needsReview + vocab + equiv, but fallback row
+      // already has those core values, so just append vocab + equiv from offset 5.
       const idMap: Record<string, string[] | undefined> = {};
       if (r.identifiers) {
         for (const [k, val] of Object.entries(r.identifiers)) {
@@ -273,13 +365,19 @@ export default function DashboardPage() {
       vocabCols.forEach(v => {
         row.push(idMap[v]?.join("|") || "");
       });
-      // Equivalent ID columns
       equivCols.forEach(p => {
         row.push(r.kgEquivalentIds?.[p]?.join("|") || "");
       });
-      return row.join("\t");
+      return row.map(esc).join(delimiter);
     });
-    const content = [headers.join("\t"), ...rows].join("\n");
+
+    const content = [headers.map(esc).join(delimiter), ...rows].join("\n");
+    return { content, hasOriginalData: false };
+  };
+
+  const handleDownloadTSV = async () => {
+    if (!results || results.length === 0) return;
+    const { content } = await buildEnrichedDownload("\t");
     const blob = new Blob([content], { type: "text/tab-separated-values" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -289,74 +387,15 @@ export default function DashboardPage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleDownloadCSV = () => {
+  const handleDownloadCSV = async () => {
     if (!results || results.length === 0) return;
-
     const csvEscape = (val: string) => {
       if (val.includes(",") || val.includes('"') || val.includes("\n")) {
         return `"${val.replace(/"/g, '""')}"`;
       }
       return val;
     };
-
-    const allVocabs = new Set<string>();
-    results.forEach(r => {
-      if (r.identifiers) Object.keys(r.identifiers).forEach(k => allVocabs.add(k));
-    });
-    const vocabCols = Array.from(allVocabs)
-      .map(v => v.toLowerCase())
-      .filter(v => visibleOntologies.size === 0 || visibleOntologies.has(v))
-      .sort();
-
-    const allEquivPrefixes = new Set<string>();
-    results.forEach(r => {
-      if (r.kgEquivalentIds) Object.keys(r.kgEquivalentIds).forEach(k => allEquivPrefixes.add(k));
-    });
-    const equivCols = Array.from(allEquivPrefixes)
-      .filter(p => visibleOntologies.size === 0 || visibleOntologies.has(p.toLowerCase()))
-      .sort();
-
-    const providedIdCols = new Set<string>();
-    results.forEach(r => {
-      if (r.providedIds) Object.keys(r.providedIds).forEach(k => providedIdCols.add(k));
-    });
-    const sortedProvidedIdCols = Array.from(providedIdCols).sort();
-    const hasProvidedIds = sortedProvidedIdCols.length > 0;
-
-    const headers = [
-      "Original Name", "Resolved", "Primary Curie", "Confidence Tier", "Confidence Score", "Needs Review",
-      ...sortedProvidedIdCols,
-      ...vocabCols.map(v => hasProvidedIds ? `${v}_biomapper` : v),
-      ...equivCols.map(p => hasProvidedIds ? `equiv_${p}_biomapper` : `equiv_${p}`),
-    ];
-    const rows = results.map(r => {
-      const row = [
-        r.name,
-        r.resolved ? "true" : "false",
-        r.primaryCurie || "",
-        r.confidenceTier || "",
-        r.confidenceScore?.toString() || "",
-        r.needsReview ? "true" : "false",
-      ];
-      sortedProvidedIdCols.forEach(col => {
-        const val = r.providedIds?.[col];
-        row.push(Array.isArray(val) ? val.join("|") : (val || ""));
-      });
-      const idMap: Record<string, string[] | undefined> = {};
-      if (r.identifiers) {
-        for (const [k, val] of Object.entries(r.identifiers)) {
-          idMap[k.toLowerCase()] = val as string[] | undefined;
-        }
-      }
-      vocabCols.forEach(v => {
-        row.push(idMap[v]?.join("|") || "");
-      });
-      equivCols.forEach(p => {
-        row.push(r.kgEquivalentIds?.[p]?.join("|") || "");
-      });
-      return row.map(csvEscape).join(",");
-    });
-    const content = [headers.map(csvEscape).join(","), ...rows].join("\n");
+    const { content } = await buildEnrichedDownload(",", csvEscape);
     const blob = new Blob([content], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

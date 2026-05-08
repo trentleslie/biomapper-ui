@@ -79,6 +79,7 @@
     "@clerk/react": "^6.2.0",
     "@nivo/core": "^0.99.0",
     "@nivo/sankey": "^0.99.0",
+    "idb-keyval": "^6.2.2",
     "papaparse": "^5.5.3",
     "react-dropzone": "^15.0.0",
     "xlsx": "^0.18.5"
