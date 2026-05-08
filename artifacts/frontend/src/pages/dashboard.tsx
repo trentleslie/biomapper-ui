@@ -385,8 +385,9 @@ export default function DashboardPage() {
 
   const handleDownloadTSV = async () => {
     if (!results || results.length === 0) return;
+    const tsvEscape = (val: string) => val.replace(/[\t\n\r]/g, " ");
     try {
-      const { content } = await buildEnrichedDownload("\t");
+      const { content } = await buildEnrichedDownload("\t", tsvEscape);
       const blob = new Blob([content], { type: "text/tab-separated-values" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");

@@ -366,7 +366,11 @@ export default function UploadPage() {
 
     const hintColumnsPayload: Record<string, string> = {};
     for (const [col, prefix] of Object.entries(hintColumnPrefixMap)) {
-      hintColumnsPayload[prefix] = col;
+      // When two columns share a prefix (collision), keep the first one.
+      // The UI already warns about this; the user chose to proceed.
+      if (!(prefix in hintColumnsPayload)) {
+        hintColumnsPayload[prefix] = col;
+      }
     }
 
     startMapping.mutate(
