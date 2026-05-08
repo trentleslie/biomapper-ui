@@ -10,6 +10,7 @@ import DashboardPage from "@/pages/dashboard";
 import AccessDeniedPage from "@/pages/access-denied";
 import NotFound from "@/pages/not-found";
 import { EnvProvider } from "@/contexts/env-context";
+import { AppShell } from "@/components/AppShell";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 if (!clerkPubKey) {
@@ -87,7 +88,7 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
     return <AccessDeniedPage />;
   }
 
-  return <Component />;
+  return <AppShell><Component /></AppShell>;
 }
 
 function Router() {

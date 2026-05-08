@@ -1,11 +1,9 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useLocation, useParams, useSearch } from "wouter";
-import { useUser, useClerk } from "@clerk/react";
 import { useMappingStream } from "@/hooks/use-mapping-stream";
 import { loadOriginalData, type OriginalData } from "@/lib/original-data-store";
 import { useGetMappingResult, getGetMappingResultQueryKey, JobResult } from "@workspace/api-client-react";
 import { SankeyChart } from "@/components/SankeyChart";
-import { EnvToggle } from "@/components/EnvToggle";
 import { EquivalentIds } from "@/components/EquivalentIds";
 import { useEnv } from "@/contexts/env-context";
 import { useToast } from "@/hooks/use-toast";
@@ -25,15 +23,15 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Download, AlertCircle, Loader2, ArrowLeft, LogOut,
+  Download, AlertCircle, Loader2,
   ChevronDown, ChevronRight, ChevronUp, Search, Flag, X,
 } from "lucide-react";
 
 const TIER_COLORS: Record<string, string> = {
-  high: '#22c55e',
-  medium: '#f59e0b',
-  low: '#f97316',
-  unknown: '#9ca3af',
+  high: '#005B33',
+  medium: '#B45309',
+  low: '#B91C1C',
+  unknown: '#8892A3',
 };
 
 type SortField = "name" | "confidenceTier" | "confidenceScore";
@@ -47,9 +45,6 @@ export default function DashboardPage() {
   const searchString = useSearch();
   const params = new URLSearchParams(searchString);
   const [, setLocation] = useLocation();
-  const { signOut } = useClerk();
-  const { user } = useUser();
-
   // Vocabularies the user picked on the upload page (lowercased CURIE prefixes).
   // Empty set => fall back to "show every vocabulary actually present in results".
   const initialOntologies = params.get("ontologies")
@@ -96,11 +91,14 @@ export default function DashboardPage() {
     }
   }, [streamError, env, toast, setEnv]);
 
-  // Prefer live SSE state while streaming; fall back to the final fetch result once done.
-  // Never treat a still-loading or 202-style intermediate response as an error.
-  const job = jobState ?? (done && finalResult && "status" in finalResult ? finalResult : null);
-  // Only surface an error if the SSE stream is done (or never started) AND we still have no valid job data.
-  const isError = !isLoading && !jobState && job && "detail" in job;
+  // Prefer live SSE state while streaming; fall back to the REST result when SSE
+  // hasn't fired yet (e.g., page reload of a completed job). The jobState ?? prefix
+  // ensures live stream data takes precedence; the fallback is only reached when
+  // jobState is null.
+  const job = jobState ?? (finalResult && "status" in finalResult ? finalResult : null);
+  // Surface an error if: (a) API returned an error response with "detail", OR
+  // (b) loading finished but we have no job data at all (network failure, 404, etc.)
+  const isError = !isLoading && !jobState && (!job || "detail" in job);
   const jobData = job && !("detail" in job) ? job as JobResult : null;
   const results = (jobData?.results || []) as MappingResult[];
 
@@ -517,15 +515,15 @@ export default function DashboardPage() {
 
   if (isError) {
     return (
-      <div className="min-h-screen p-8 bg-background flex items-center justify-center">
+      <div className="py-12 flex justify-center">
         <Card className="max-w-md w-full">
           <CardHeader>
-            <CardTitle className="text-destructive flex items-center gap-2">
+            <CardTitle className="text-danger flex items-center gap-2">
               <AlertCircle className="w-5 h-5" /> Error Loading Job
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">The job could not be loaded or an error occurred.</p>
+            <p className="text-neutral-500">The job could not be loaded or an error occurred.</p>
             <Button className="mt-4" onClick={() => setLocation("/upload")}>Return to Upload</Button>
           </CardContent>
         </Card>
@@ -535,9 +533,9 @@ export default function DashboardPage() {
 
   if (!jobData && isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4 text-muted-foreground">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="py-12 flex justify-center">
+        <div className="flex flex-col items-center gap-4 text-neutral-500">
+          <Loader2 className="w-8 h-8 animate-spin text-ph-navy" />
           <p>Loading job details...</p>
         </div>
       </div>
@@ -572,31 +570,22 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card px-6 py-3 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => setLocation("/upload")} data-testid="btn-back-upload">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div>
-            <h1 className="font-semibold tracking-tight text-foreground flex items-center gap-2">
-              Job: <span className="font-mono text-sm font-normal text-muted-foreground">{jobId}</span>
-              {isProcessing && <Badge variant="secondary" className="ml-2 animate-pulse">Processing</Badge>}
-              {jobData.status === "complete" && <Badge className="bg-green-600 ml-2">Complete</Badge>}
+    <>
+      <div className="mb-8">
+        <nav className="text-xs text-neutral-500 mb-2">Jobs / {jobId}</nav>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight flex items-center gap-2">
+              Mapping Results
+              {isProcessing && <Badge variant="secondary" className="ml-2">Processing</Badge>}
+              {jobData.status === "complete" && <Badge variant="success" className="ml-2">Complete</Badge>}
               {jobData.status === "error" && <Badge variant="destructive" className="ml-2">Failed</Badge>}
             </h1>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <EnvToggle />
-          <span className="text-sm text-muted-foreground hidden sm:block">{user?.primaryEmailAddress?.emailAddress}</span>
-          <Button variant="outline" size="sm" onClick={() => signOut()} data-testid="btn-sign-out">
-            <LogOut className="w-4 h-4 mr-2" /> Sign Out
-          </Button>
-        </div>
-      </header>
+      </div>
 
-      <main className="p-6 max-w-7xl mx-auto space-y-6">
+      <div className="space-y-6">
 
         {isProcessing && (
           <Card>
@@ -616,26 +605,26 @@ export default function DashboardPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Card>
                 <CardContent className="pt-6">
-                  <div className="text-2xl font-bold font-mono" data-testid="stat-total-rows">{summary.totalRows.toLocaleString()}</div>
-                  <p className="text-xs text-muted-foreground mt-1">Total Rows</p>
+                  <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Total Rows</p>
+                  <div className="text-2xl font-semibold text-neutral-900 tabular-nums" data-testid="stat-total-rows">{summary.totalRows.toLocaleString()}</div>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="pt-6">
-                  <div className="text-2xl font-bold font-mono" data-testid="stat-unique-names">{summary.uniqueNames.toLocaleString()}</div>
-                  <p className="text-xs text-muted-foreground mt-1">Unique Names</p>
+                  <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Unique Names</p>
+                  <div className="text-2xl font-semibold text-neutral-900 tabular-nums" data-testid="stat-unique-names">{summary.uniqueNames.toLocaleString()}</div>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="pt-6">
-                  <div className="text-2xl font-bold font-mono" data-testid="stat-resolved">{(summary.resolvedRate * 100).toFixed(1)}%</div>
-                  <p className="text-xs text-muted-foreground mt-1">Resolved</p>
+                  <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Resolved</p>
+                  <div className="text-2xl font-semibold text-neutral-900 tabular-nums" data-testid="stat-resolved">{(summary.resolvedRate * 100).toFixed(1)}%</div>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="pt-6">
-                  <div className="text-2xl font-bold font-mono" data-testid="stat-hq-rate">{(summary.highQualityRate * 100).toFixed(1)}%</div>
-                  <p className="text-xs text-muted-foreground mt-1">High Quality</p>
+                  <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider">High Quality</p>
+                  <div className="text-2xl font-semibold text-neutral-900 tabular-nums" data-testid="stat-hq-rate">{(summary.highQualityRate * 100).toFixed(1)}%</div>
                 </CardContent>
               </Card>
             </div>
@@ -670,7 +659,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex flex-wrap gap-2 mt-2">
                       {pieData.map(d => (
-                        <span key={d.name} className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <span key={d.name} className="flex items-center gap-1 text-xs text-neutral-500">
                           <span className="w-2 h-2 rounded-full inline-block" style={{ background: d.fill }} />
                           {d.name}: {d.value}
                         </span>
@@ -691,7 +680,7 @@ export default function DashboardPage() {
                           <XAxis type="number" fontSize={10} />
                           <YAxis dataKey="name" type="category" width={70} fontSize={10} />
                           <RechartsTooltip />
-                          <Bar dataKey="value" fill="#3b82f6" radius={[0, 3, 3, 0]} />
+                          <Bar dataKey="value" fill="#113682" radius={[0, 3, 3, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -713,11 +702,11 @@ export default function DashboardPage() {
                     <h4 className="text-sm font-semibold mb-2">Summary</h4>
                     <table className="w-full text-sm">
                       <tbody>
-                        <tr className="border-b"><td className="py-1 text-muted-foreground">Total Rows</td><td className="py-1 text-right font-mono">{summary.totalRows.toLocaleString()}</td></tr>
-                        <tr className="border-b"><td className="py-1 text-muted-foreground">Unique Names</td><td className="py-1 text-right font-mono">{summary.uniqueNames.toLocaleString()}</td></tr>
-                        <tr className="border-b"><td className="py-1 text-muted-foreground">Resolved</td><td className="py-1 text-right font-mono">{summary.resolved.toLocaleString()} ({(summary.resolvedRate * 100).toFixed(1)}%)</td></tr>
-                        <tr className="border-b"><td className="py-1 text-muted-foreground">Unresolved</td><td className="py-1 text-right font-mono">{(summary.uniqueNames - summary.resolved).toLocaleString()}</td></tr>
-                        <tr><td className="py-1 text-muted-foreground">High Quality</td><td className="py-1 text-right font-mono">{(summary.highQualityRate * 100).toFixed(1)}%</td></tr>
+                        <tr className="border-b"><td className="py-1 text-neutral-500">Total Rows</td><td className="py-1 text-right font-mono">{summary.totalRows.toLocaleString()}</td></tr>
+                        <tr className="border-b"><td className="py-1 text-neutral-500">Unique Names</td><td className="py-1 text-right font-mono">{summary.uniqueNames.toLocaleString()}</td></tr>
+                        <tr className="border-b"><td className="py-1 text-neutral-500">Resolved</td><td className="py-1 text-right font-mono">{summary.resolved.toLocaleString()} ({(summary.resolvedRate * 100).toFixed(1)}%)</td></tr>
+                        <tr className="border-b"><td className="py-1 text-neutral-500">Unresolved</td><td className="py-1 text-right font-mono">{(summary.uniqueNames - summary.resolved).toLocaleString()}</td></tr>
+                        <tr><td className="py-1 text-neutral-500">High Quality</td><td className="py-1 text-right font-mono">{(summary.highQualityRate * 100).toFixed(1)}%</td></tr>
                       </tbody>
                     </table>
                   </div>
@@ -727,7 +716,7 @@ export default function DashboardPage() {
                     <h4 className="text-sm font-semibold mb-2">Confidence Tiers</h4>
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="border-b text-muted-foreground"><th className="py-1 text-left font-normal">Tier</th><th className="py-1 text-right font-normal">Count</th><th className="py-1 text-right font-normal">%</th></tr>
+                        <tr className="border-b text-neutral-500"><th className="py-1 text-left font-normal">Tier</th><th className="py-1 text-right font-normal">Count</th><th className="py-1 text-right font-normal">%</th></tr>
                       </thead>
                       <tbody>
                         {([["High", summary.confidenceTierDistribution.high, TIER_COLORS.high],
@@ -753,7 +742,7 @@ export default function DashboardPage() {
                     <div className="max-h-[200px] overflow-y-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b text-muted-foreground"><th className="py-1 text-left font-normal">Vocabulary</th><th className="py-1 text-right font-normal">Hits</th></tr>
+                          <tr className="border-b text-neutral-500"><th className="py-1 text-left font-normal">Vocabulary</th><th className="py-1 text-right font-normal">Hits</th></tr>
                         </thead>
                         <tbody>
                           {Object.entries(summary.vocabularyCoverage)
@@ -820,19 +809,19 @@ export default function DashboardPage() {
                           <TableRow
                             key={i}
                             data-testid={`row-review-${i}`}
-                            className={isFlagged ? "bg-amber-50 dark:bg-amber-950/20" : undefined}
+                            className={isFlagged ? "bg-warning-bg" : undefined}
                           >
                             <TableCell className="font-mono text-sm max-w-[200px] truncate" title={row.name}>
-                              {isFlagged && <Flag className="w-3 h-3 text-amber-500 inline mr-1" />}
+                              {isFlagged && <Flag className="w-3 h-3 text-warning inline mr-1" />}
                               {row.name}
                             </TableCell>
-                            <TableCell className="font-mono text-xs text-muted-foreground">{row.primaryCurie || "-"}</TableCell>
+                            <TableCell className="font-mono text-xs text-neutral-500">{row.primaryCurie || "-"}</TableCell>
                             <TableCell>
-                              <Badge variant="outline" style={{ color: TIER_COLORS[row.confidenceTier || "unknown"], borderColor: "currentColor" }}>
+                              <Badge variant={row.confidenceTier === "high" ? "success" : row.confidenceTier === "medium" ? "warning" : row.confidenceTier === "low" ? "danger" : "neutral"}>
                                 {row.confidenceTier || "unresolved"}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
+                            <TableCell className="text-xs text-neutral-500">
                               {!row.resolved ? "No match found" : row.needsReview ? "Flagged by system" : "Low confidence"}
                             </TableCell>
                             <TableCell className="text-right">
@@ -851,7 +840,7 @@ export default function DashboardPage() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-7 px-2 text-xs text-muted-foreground"
+                                  className="h-7 px-2 text-xs text-neutral-500"
                                   onClick={() => dismissReviewItem(row.name)}
                                   title="Dismiss from review list"
                                   data-testid={`btn-dismiss-review-${i}`}
@@ -867,7 +856,7 @@ export default function DashboardPage() {
                     </TableBody>
                   </Table>
                   {needsReview.length > 25 && (
-                    <p className="text-xs text-center text-muted-foreground py-3">
+                    <p className="text-xs text-center text-neutral-500 py-3">
                       Showing 25 of {needsReview.length} items. Download TSV for full list.
                     </p>
                   )}
@@ -902,7 +891,7 @@ export default function DashboardPage() {
                 {/* Filter controls */}
                 <div className="flex gap-3 mt-3 flex-wrap">
                   <div className="relative flex-1 min-w-[200px]">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-neutral-500" />
                     <Input
                       placeholder="Search by name..."
                       value={search}
@@ -930,7 +919,7 @@ export default function DashboardPage() {
                       <TableRow>
                         <TableHead className="w-8" />
                         <TableHead
-                          className="cursor-pointer select-none hover:text-foreground"
+                          className="cursor-pointer select-none hover:text-neutral-900"
                           onClick={() => toggleSort("name")}
                           data-testid="th-sort-name"
                         >
@@ -938,14 +927,14 @@ export default function DashboardPage() {
                         </TableHead>
                         <TableHead>Primary Curie</TableHead>
                         <TableHead
-                          className="cursor-pointer select-none hover:text-foreground"
+                          className="cursor-pointer select-none hover:text-neutral-900"
                           onClick={() => toggleSort("confidenceTier")}
                           data-testid="th-sort-tier"
                         >
                           Tier <SortIcon field="confidenceTier" />
                         </TableHead>
                         <TableHead
-                          className="cursor-pointer select-none hover:text-foreground"
+                          className="cursor-pointer select-none hover:text-neutral-900"
                           onClick={() => toggleSort("confidenceScore")}
                           data-testid="th-sort-score"
                         >
@@ -965,11 +954,11 @@ export default function DashboardPage() {
                         return [
                           <TableRow
                             key={`row-${i}`}
-                            className="cursor-pointer hover:bg-muted/40"
+                            className="cursor-pointer hover:bg-neutral-50"
                             onClick={() => setExpandedRow(isExpanded ? null : row.name)}
                             data-testid={`row-result-${i}`}
                           >
-                            <TableCell className="text-muted-foreground">
+                            <TableCell className="text-neutral-500">
                               {isExpanded
                                 ? <ChevronDown className="w-4 h-4" />
                                 : <ChevronRight className="w-4 h-4" />
@@ -978,16 +967,16 @@ export default function DashboardPage() {
                             <TableCell className="font-mono text-sm max-w-[200px] truncate" title={row.name}>
                               {row.name}
                             </TableCell>
-                            <TableCell className="font-mono text-xs text-muted-foreground max-w-[160px] truncate" title={row.primaryCurie || ""}>
+                            <TableCell className="font-mono text-xs text-neutral-500 max-w-[160px] truncate" title={row.primaryCurie || ""}>
                               {row.primaryCurie || "-"}
                             </TableCell>
                             <TableCell>
                               {row.resolved ? (
-                                <Badge variant="outline" style={{ color: TIER_COLORS[row.confidenceTier || "unknown"], borderColor: "currentColor" }}>
+                                <Badge variant={row.confidenceTier === "high" ? "success" : row.confidenceTier === "medium" ? "warning" : row.confidenceTier === "low" ? "danger" : "neutral"}>
                                   {row.confidenceTier || "unknown"}
                                 </Badge>
                               ) : (
-                                <Badge variant="outline" className="text-muted-foreground">unresolved</Badge>
+                                <Badge variant="neutral">unresolved</Badge>
                               )}
                             </TableCell>
                             <TableCell className="font-mono text-sm">
@@ -997,30 +986,30 @@ export default function DashboardPage() {
                               const val = row.providedIds?.[col];
                               const display = Array.isArray(val) ? val.join("|") : (val || "-");
                               return (
-                                <TableCell key={`provided-${col}`} className="font-mono text-xs text-muted-foreground max-w-[100px] truncate" title={typeof display === "string" ? display : ""}>
+                                <TableCell key={`provided-${col}`} className="font-mono text-xs text-neutral-500 max-w-[100px] truncate" title={typeof display === "string" ? display : ""}>
                                   {display}
                                 </TableCell>
                               );
                             })}
                             {visibleVocabCols.map(v => (
-                              <TableCell key={v} className="font-mono text-xs text-muted-foreground max-w-[100px] truncate">
+                              <TableCell key={v} className="font-mono text-xs text-neutral-500 max-w-[100px] truncate">
                                 {lookupIds(row, v)?.join(", ") || "-"}
                               </TableCell>
                             ))}
                           </TableRow>,
                           isExpanded && (
-                            <TableRow key={`expand-${i}`} className="bg-muted/20">
+                            <TableRow key={`expand-${i}`} className="bg-neutral-50">
                               <TableCell colSpan={5 + providedIdColsForTable.length + visibleVocabCols.length} className="py-3 px-6">
                                 <div className="text-sm space-y-1">
                                   <p className="font-medium mb-2">Full Cross-References for: <span className="font-mono">{row.name}</span></p>
                                   {row.identifiers && Object.entries(row.identifiers).filter(([, ids]) => ids && ids.length > 0).map(([vocab, ids]) => (
                                     <div key={vocab} className="flex gap-2">
-                                      <span className="text-muted-foreground w-20 shrink-0">{vocab.toUpperCase()}:</span>
+                                      <span className="text-neutral-500 w-20 shrink-0">{vocab.toUpperCase()}:</span>
                                       <span className="font-mono text-xs">{ids?.join(", ")}</span>
                                     </div>
                                   ))}
                                   {(!row.identifiers || Object.values(row.identifiers).every(ids => !ids || ids.length === 0)) && (
-                                    <p className="text-muted-foreground text-xs">No cross-references available.</p>
+                                    <p className="text-neutral-500 text-xs">No cross-references available.</p>
                                   )}
                                   <EquivalentIds ids={row.kgEquivalentIds ?? {}} />
                                 </div>
@@ -1031,7 +1020,7 @@ export default function DashboardPage() {
                       })}
                       {pagedResults.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={5 + providedIdColsForTable.length + visibleVocabCols.length} className="text-center py-12 text-muted-foreground">
+                          <TableCell colSpan={5 + providedIdColsForTable.length + visibleVocabCols.length} className="text-center py-12 text-neutral-500">
                             No results match the current filters.
                           </TableCell>
                         </TableRow>
@@ -1043,7 +1032,7 @@ export default function DashboardPage() {
                 {/* Pagination */}
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between px-4 py-3 border-t">
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-neutral-500">
                       Page {page} of {totalPages} ({filteredResults.length.toLocaleString()} results)
                     </p>
                     <div className="flex gap-2">
@@ -1072,7 +1061,7 @@ export default function DashboardPage() {
             </Card>
           </>
         )}
-      </main>
-    </div>
+      </div>
+    </>
   );
 }

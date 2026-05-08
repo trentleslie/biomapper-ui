@@ -18,16 +18,16 @@ export interface SankeyData {
 }
 
 const TIER_COLORS = {
-  high:    '#22c55e',
-  medium:  '#f59e0b',
-  low:     '#f97316',
-  unknown: '#9ca3af',
+  high:    '#005B33',
+  medium:  '#B45309',
+  low:     '#B91C1C',
+  unknown: '#8892A3',
 };
 
 const ALL_NODES: SankeyNode[] = [
-  { id: 'input',        color: '#6b7280' },
-  { id: 'resolved',     color: '#14b8a6' },
-  { id: 'unresolved',   color: '#ef4444' },
+  { id: 'input',        color: '#8892A3' },
+  { id: 'resolved',     color: '#3AC2CB' },
+  { id: 'unresolved',   color: '#E21C52' },
   { id: 'high',         color: TIER_COLORS.high },
   { id: 'medium',       color: TIER_COLORS.medium },
   { id: 'low',          color: TIER_COLORS.low },
@@ -93,7 +93,7 @@ export function buildSankeyData(
     }
 
     for (const vocab of Array.from(allVocabs).sort()) {
-      nodes.push({ id: `vocab_${vocab}`, label: vocab.toUpperCase(), color: '#3b82f6' });
+      nodes.push({ id: `vocab_${vocab}`, label: vocab.toUpperCase(), color: '#113682' });
     }
     for (const [tier, counts] of Object.entries(vocabByTier)) {
       const tierId = tier === 'unknown' ? 'unknown_tier' : tier;

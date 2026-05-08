@@ -23,7 +23,7 @@ export function EnvToggle() {
             <ToggleGroupItem
               value="production"
               aria-label="Production"
-              className="px-2.5 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+              className="px-2.5 text-xs data-[state=on]:bg-ph-navy data-[state=on]:text-white"
             >
               <span className="hidden sm:inline">Prod</span>
               <span className="sm:hidden">P</span>
@@ -31,7 +31,7 @@ export function EnvToggle() {
             <ToggleGroupItem
               value="dev"
               aria-label="Development"
-              className="px-2.5 text-xs data-[state=on]:bg-amber-600 data-[state=on]:text-white"
+              className="px-2.5 text-xs data-[state=on]:bg-warning-bg data-[state=on]:text-warning"
             >
               <span className="hidden sm:inline">Dev</span>
               <span className="sm:hidden">D</span>
@@ -46,7 +46,7 @@ export function EnvToggle() {
       {env === "dev" && (
         <Badge
           variant="outline"
-          className="bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700 text-xs"
+          className="bg-warning-bg text-warning border-warning-border text-xs"
           role="status"
           aria-live="polite"
         >
