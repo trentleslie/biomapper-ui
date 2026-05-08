@@ -58,7 +58,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* TopBar */}
       <header className="h-14 sticky top-0 z-40 bg-white border-b border-neutral-200 flex items-center justify-between px-4 shrink-0">
         <div className="flex items-center gap-2">
-          <img src="/assets/favicon.png" alt="" className="w-6 h-6" />
+          <img src="/favicon.svg" alt="" className="w-6 h-6" />
           <span className="text-sm font-semibold text-neutral-900">Phenome Health</span>
           <span className="text-sm text-neutral-500">/ Biomapper</span>
         </div>
