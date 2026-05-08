@@ -60,7 +60,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="flex items-center gap-2">
           <img src="/favicon.svg" alt="" className="w-6 h-6" />
           <span className="text-sm font-semibold text-neutral-900">Phenome Health</span>
-          <span className="text-sm text-neutral-500">/ Biomapper</span>
+          <span className="text-sm text-neutral-500">/ BioMapper</span>
         </div>
         <div className="flex items-center gap-3">
           {email && (
