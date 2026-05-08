@@ -484,7 +484,7 @@ export default function UploadPage() {
               <CardDescription className="text-lg">Coming Soon</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-center text-muted-foreground">
+              <p className="text-center text-neutral-500">
                 {"Evaluate BioMapper's accuracy by comparing results against your known-correct identifiers. Upload a dataset with answer columns to measure precision, recall, and confidence calibration."}
               </p>
             </CardContent>
@@ -500,7 +500,7 @@ export default function UploadPage() {
               <div
                 {...getRootProps()}
                 className={`border-2 border-dashed rounded-lg p-10 text-center cursor-pointer transition-colors ${
-                  isDragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+                  isDragActive ? "border-ph-navy bg-ph-navy/5" : "border-neutral-200 hover:border-ph-navy/50"
                 }`}
                 data-testid="dropzone-upload"
               >
@@ -508,12 +508,12 @@ export default function UploadPage() {
 
                 {file ? (
                   <div className="flex flex-col items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-full bg-ph-navy/10 text-ph-navy flex items-center justify-center">
                       <FileType className="w-6 h-6" />
                     </div>
                     <div>
-                      <p className="font-medium text-foreground">{file.name}</p>
-                      <p className="text-sm text-muted-foreground">{(file.size / 1024).toFixed(1)} KB</p>
+                      <p className="font-medium text-neutral-900">{file.name}</p>
+                      <p className="text-sm text-neutral-500">{(file.size / 1024).toFixed(1)} KB</p>
                     </div>
                     <Button variant="outline" size="sm" onClick={(e) => {
                       e.stopPropagation();
@@ -529,11 +529,11 @@ export default function UploadPage() {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-muted text-muted-foreground flex items-center justify-center mb-2">
+                    <div className="w-12 h-12 rounded-full bg-neutral-100 text-neutral-500 flex items-center justify-center mb-2">
                       <UploadCloud className="w-6 h-6" />
                     </div>
-                    <p className="text-foreground font-medium">Click or drag file to this area to upload</p>
-                    <p className="text-sm text-muted-foreground">Supported formats: .csv, .tsv, .xlsx</p>
+                    <p className="text-neutral-900 font-medium">Click or drag file to this area to upload</p>
+                    <p className="text-sm text-neutral-500">Supported formats: .csv, .tsv, .xlsx</p>
                   </div>
                 )}
               </div>
@@ -541,7 +541,7 @@ export default function UploadPage() {
           </Card>
 
           {file && columns.length > 0 && (
-            <Card className="animate-in fade-in slide-in-from-bottom-4">
+            <Card>
               <CardHeader>
                 <CardTitle>2. Configure Mapping</CardTitle>
                 <CardDescription>Select the name column, mapping settings, and display preferences.</CardDescription>
@@ -560,8 +560,8 @@ export default function UploadPage() {
                     </SelectContent>
                   </Select>
                   {extractedNames.length > 0 && (
-                    <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-2">
-                      <CheckCircle2 className="w-4 h-4 text-primary" />
+                    <p className="text-sm text-neutral-500 flex items-center gap-1.5 mt-2">
+                      <CheckCircle2 className="w-4 h-4 text-ph-navy" />
                       {rawTotalRows.toLocaleString()} rows → {extractedNames.length.toLocaleString()} unique names (after dedup)
                     </p>
                   )}
@@ -572,7 +572,7 @@ export default function UploadPage() {
                     <Label>
                       Provided ID Columns
                       <FieldTooltip label="Help: Provided ID Columns">Columns with known identifiers (e.g., HMDB IDs, CHEBI IDs) that help BioMapper confirm or improve matches. These act as hints, not constraints.</FieldTooltip>
-                      <span className="text-muted-foreground font-normal text-xs ml-1">
+                      <span className="text-neutral-500 font-normal text-xs ml-1">
                         (optional — pre-fill known cross-references as hints to BioMapper)
                       </span>
                     </Label>
@@ -626,7 +626,7 @@ export default function UploadPage() {
                                 title={`Will be sent as ${resolvedPrefix} hints`}
                               >
                                 {col}
-                                <span className="ml-1.5 text-xs text-muted-foreground">→ {resolvedPrefix}</span>
+                                <span className="ml-1.5 text-xs text-neutral-500">→ {resolvedPrefix}</span>
                               </Label>
                             )}
                           </div>
@@ -652,7 +652,7 @@ export default function UploadPage() {
                       return null;
                     })()}
                     {hintColumns.size > 0 && (
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-neutral-500">
                         {hintRowCount > 0
                           ? `Hints will be sent for ${hintRowCount.toLocaleString()} unique name${hintRowCount === 1 ? "" : "s"}.`
                           : "No usable hint values found in selected columns."}
@@ -665,7 +665,7 @@ export default function UploadPage() {
                   <Label htmlFor="entity-type">
                     Entity Type
                     <FieldTooltip label="Help: Entity Type">The Biolink ontology class for your entities. This determines which vocabularies and identification strategies are used. SmallMolecule is correct for most metabolomics data.</FieldTooltip>
-                    <span className="text-muted-foreground font-normal text-xs ml-1">
+                    <span className="text-neutral-500 font-normal text-xs ml-1">
                       (Biolink class — drives default vocabulary preset)
                     </span>
                   </Label>
@@ -681,7 +681,7 @@ export default function UploadPage() {
                         <SelectItem key={et.type} value={et.type}>
                           {et.type}
                           {et.aliases && et.aliases.length > 0 && (
-                            <span className="text-xs text-muted-foreground ml-2">({et.aliases.join(", ")})</span>
+                            <span className="text-xs text-neutral-500 ml-2">({et.aliases.join(", ")})</span>
                           )}
                         </SelectItem>
                       ))}
@@ -712,12 +712,12 @@ export default function UploadPage() {
                   <Label>
                     Annotators
                     <FieldTooltip label="Help: Annotators">Select specific annotators to use, or leave all unchecked to use the full default set. Each annotator uses a different strategy (text search, vector similarity, etc.) to find matches.</FieldTooltip>
-                    <span className="text-muted-foreground font-normal text-xs ml-1">
+                    <span className="text-neutral-500 font-normal text-xs ml-1">
                       (leave all unchecked to use the BioMapper default set)
                     </span>
                   </Label>
                   {annotatorsQuery.isLoading ? (
-                    <p className="text-xs text-muted-foreground">Loading annotators…</p>
+                    <p className="text-xs text-neutral-500">Loading annotators…</p>
                   ) : annotatorsQuery.isError ? (
                     <p className="text-xs text-amber-600">Couldn't load annotators — leaving unspecified (server defaults).</p>
                   ) : (
@@ -735,8 +735,8 @@ export default function UploadPage() {
                             />
                             <Label htmlFor={`annotator-${a.slug}`} className="font-normal cursor-pointer text-sm">
                               <span className="font-mono text-xs">{a.slug}</span>
-                              <span className="text-muted-foreground ml-2">{a.name}</span>
-                              <span className="block text-xs text-muted-foreground mt-0.5">{desc}</span>
+                              <span className="text-neutral-500 ml-2">{a.name}</span>
+                              <span className="block text-xs text-neutral-500 mt-0.5">{desc}</span>
                             </Label>
                           </div>
                         );
@@ -750,7 +750,7 @@ export default function UploadPage() {
                     <Label>
                       Display Vocabularies
                       <FieldTooltip label="Help: Display Vocabularies">Choose which identifier vocabularies appear as columns in the results table. Presets are based on entity type; switch to 'Show all' to search across 300+ vocabularies.</FieldTooltip>
-                      <span className="text-muted-foreground font-normal text-xs ml-1">
+                      <span className="text-neutral-500 font-normal text-xs ml-1">
                         (controls which identifier columns appear in results)
                       </span>
                     </Label>
@@ -776,13 +776,13 @@ export default function UploadPage() {
                   )}
 
                   {vocabulariesQuery.isLoading ? (
-                    <p className="text-xs text-muted-foreground">Loading vocabularies…</p>
+                    <p className="text-xs text-neutral-500">Loading vocabularies…</p>
                   ) : vocabulariesQuery.isError ? (
                     <p className="text-xs text-amber-600">
                       Couldn't load vocabularies — display columns will be derived from results.
                     </p>
                   ) : visibleVocabs.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-neutral-500">
                       {showAllVocabs ? "No vocabularies match your search." : "No preset for this entity type — use \"Show all\" to pick vocabularies."}
                     </p>
                   ) : (
@@ -808,7 +808,7 @@ export default function UploadPage() {
                 </div>
 
                 <div className="space-y-3">
-                  <Label htmlFor="confidence-filter">Confidence Filter <FieldTooltip label="Help: Confidence Filter">Filter which results appear in the dashboard. 'High + Medium' hides uncertain matches. 'High Only' shows only the most confident identifications.</FieldTooltip> <span className="text-muted-foreground font-normal text-xs ml-1">(filters which results appear in the dashboard table)</span></Label>
+                  <Label htmlFor="confidence-filter">Confidence Filter <FieldTooltip label="Help: Confidence Filter">Filter which results appear in the dashboard. 'High + Medium' hides uncertain matches. 'High Only' shows only the most confident identifications.</FieldTooltip> <span className="text-neutral-500 font-normal text-xs ml-1">(filters which results appear in the dashboard table)</span></Label>
                   <Select value={confidenceFilter} onValueChange={(v) => setConfidenceFilter(v as ConfidenceFilter)}>
                     <SelectTrigger id="confidence-filter" data-testid="select-confidence-filter">
                       <SelectValue />
@@ -821,7 +821,7 @@ export default function UploadPage() {
                   </Select>
                 </div>
               </CardContent>
-              <CardFooter className="bg-muted/50 border-t flex justify-end py-4">
+              <CardFooter className="bg-neutral-50 border-t flex justify-end py-4">
                 <Button
                   size="lg"
                   onClick={handleSubmit}
