@@ -575,7 +575,7 @@ export default function DashboardPage() {
             <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight flex items-center gap-2">
               Mapping Results
               {isProcessing && <Badge variant="secondary" className="ml-2">Processing</Badge>}
-              {jobData.status === "complete" && <Badge className="bg-success ml-2">Complete</Badge>}
+              {jobData.status === "complete" && <Badge variant="success" className="ml-2">Complete</Badge>}
               {jobData.status === "error" && <Badge variant="destructive" className="ml-2">Failed</Badge>}
             </h1>
           </div>
