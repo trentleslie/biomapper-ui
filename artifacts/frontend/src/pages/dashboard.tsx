@@ -205,19 +205,23 @@ export default function DashboardPage() {
 
   const handleDownloadJSON = async () => {
     if (!jobData || !summary) return;
-    const originalData = jobId ? await loadOriginalData(jobId) : undefined;
-    const payload: Record<string, unknown> = { summary, results };
-    if (originalData) {
-      payload.originalRows = originalData.parsedRows;
+    try {
+      const originalData = jobId ? await loadOriginalData(jobId) : undefined;
+      const payload: Record<string, unknown> = { summary, results };
+      if (originalData) {
+        payload.originalRows = originalData.parsedRows;
+      }
+      const data = JSON.stringify(payload, null, 2);
+      const blob = new Blob([data], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `mapping-results-${jobId}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("JSON download failed:", err);
     }
-    const data = JSON.stringify(payload, null, 2);
-    const blob = new Blob([data], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `mapping-results-${jobId}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
   };
 
   // Shared helper: build biomapper column names and per-result row values.
@@ -298,7 +302,14 @@ export default function DashboardPage() {
       const allBiomapperHeaders = [...coreHeaders, ...vocabHeaders, ...equivHeaders];
 
       // Deduplicate biomapper headers against original column names.
-      const dedupedBiomapperHeaders = allBiomapperHeaders.map(h => deduplicateColName(h, originalColSet));
+      // Track generated names so two biomapper headers that collide with the same
+      // original column get distinct suffixes (e.g., _2 and _3).
+      const usedNames = new Set(originalColSet);
+      const dedupedBiomapperHeaders = allBiomapperHeaders.map(h => {
+        const name = deduplicateColName(h, usedNames);
+        usedNames.add(name);
+        return name;
+      });
 
       const headers = [...columns, ...dedupedBiomapperHeaders];
 
@@ -353,9 +364,6 @@ export default function DashboardPage() {
         const val = r.providedIds?.[col];
         row.push(Array.isArray(val) ? val.join("|") : (val || ""));
       });
-      const bmRow = biomapperRowValues(r, vocabCols, equivCols);
-      // bmRow already has resolved..needsReview + vocab + equiv, but fallback row
-      // already has those core values, so just append vocab + equiv from offset 5.
       const idMap: Record<string, string[] | undefined> = {};
       if (r.identifiers) {
         for (const [k, val] of Object.entries(r.identifiers)) {
@@ -377,14 +385,18 @@ export default function DashboardPage() {
 
   const handleDownloadTSV = async () => {
     if (!results || results.length === 0) return;
-    const { content } = await buildEnrichedDownload("\t");
-    const blob = new Blob([content], { type: "text/tab-separated-values" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `mapping-results-${jobId}.tsv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const { content } = await buildEnrichedDownload("\t");
+      const blob = new Blob([content], { type: "text/tab-separated-values" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `mapping-results-${jobId}.tsv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("TSV download failed:", err);
+    }
   };
 
   const handleDownloadCSV = async () => {
@@ -395,14 +407,18 @@ export default function DashboardPage() {
       }
       return val;
     };
-    const { content } = await buildEnrichedDownload(",", csvEscape);
-    const blob = new Blob([content], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `mapping-results-${jobId}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const { content } = await buildEnrichedDownload(",", csvEscape);
+      const blob = new Blob([content], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `mapping-results-${jobId}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("CSV download failed:", err);
+    }
   };
 
   // Display columns are derived from whatever vocabularies actually appear in
