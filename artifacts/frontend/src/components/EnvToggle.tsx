@@ -31,7 +31,7 @@ export function EnvToggle() {
             <ToggleGroupItem
               value="dev"
               aria-label="Development"
-              className="px-2.5 text-xs data-[state=on]:bg-warning-border data-[state=on]:text-warning-bg"
+              className="px-2.5 text-xs data-[state=on]:bg-warning-bg data-[state=on]:text-warning"
             >
               <span className="hidden sm:inline">Dev</span>
               <span className="sm:hidden">D</span>
