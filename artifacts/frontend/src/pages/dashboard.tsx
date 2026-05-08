@@ -94,8 +94,9 @@ export default function DashboardPage() {
   // Prefer live SSE state while streaming; fall back to the final fetch result once done.
   // Never treat a still-loading or 202-style intermediate response as an error.
   const job = jobState ?? (done && finalResult && "status" in finalResult ? finalResult : null);
-  // Only surface an error if the SSE stream is done (or never started) AND we still have no valid job data.
-  const isError = !isLoading && !jobState && job && "detail" in job;
+  // Surface an error if: (a) API returned an error response with "detail", OR
+  // (b) loading finished but we have no job data at all (network failure, 404, etc.)
+  const isError = !isLoading && !jobState && (!job || "detail" in job);
   const jobData = job && !("detail" in job) ? job as JobResult : null;
   const results = (jobData?.results || []) as MappingResult[];
 
