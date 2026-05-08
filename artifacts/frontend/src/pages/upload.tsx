@@ -24,7 +24,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, UploadCloud, FileType, CheckCircle2 } from "lucide-react";
 import { FieldTooltip } from "@/components/field-tooltip";
-import { EnvToggle } from "@/components/EnvToggle";
 import { useEnv } from "@/contexts/env-context";
 import { ToastAction } from "@/components/ui/toast";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -456,17 +455,13 @@ export default function UploadPage() {
   const hintRowCount = hintsPayload ? Object.keys(hintsPayload).length : 0;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <header className="border-b border-border bg-card px-6 py-3 flex items-center justify-between sticky top-0 z-10">
-        <span className="font-semibold text-foreground tracking-tight">PhenomeHealth Linker</span>
-        <EnvToggle />
-      </header>
+    <>
+      <div className="mb-8">
+        <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">New mapping job</h1>
+        <p className="mt-1 text-sm text-neutral-500 max-w-2xl">Upload a dataset to link entity names to biological vocabularies.</p>
+      </div>
 
-      <div className="max-w-3xl w-full mx-auto mt-10 px-6 pb-16">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground tracking-tight mb-2">New Mapping Job</h1>
-          <p className="text-muted-foreground">Upload a dataset to link entity names to biological vocabularies.</p>
-        </div>
+      <div className="max-w-3xl w-full">
 
         <div className="flex items-center gap-2 mb-6">
           <Tabs value={mode} onValueChange={(v) => setMode(v as 'link' | 'benchmark')}>
@@ -848,6 +843,6 @@ export default function UploadPage() {
         </div>
         )}
       </div>
-    </div>
+    </>
   );
 }

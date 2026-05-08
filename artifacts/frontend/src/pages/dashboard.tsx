@@ -1,11 +1,9 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useLocation, useParams, useSearch } from "wouter";
-import { useUser, useClerk } from "@clerk/react";
 import { useMappingStream } from "@/hooks/use-mapping-stream";
 import { loadOriginalData, type OriginalData } from "@/lib/original-data-store";
 import { useGetMappingResult, getGetMappingResultQueryKey, JobResult } from "@workspace/api-client-react";
 import { SankeyChart } from "@/components/SankeyChart";
-import { EnvToggle } from "@/components/EnvToggle";
 import { EquivalentIds } from "@/components/EquivalentIds";
 import { useEnv } from "@/contexts/env-context";
 import { useToast } from "@/hooks/use-toast";
@@ -25,7 +23,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Download, AlertCircle, Loader2, ArrowLeft, LogOut,
+  Download, AlertCircle, Loader2,
   ChevronDown, ChevronRight, ChevronUp, Search, Flag, X,
 } from "lucide-react";
 
@@ -47,9 +45,6 @@ export default function DashboardPage() {
   const searchString = useSearch();
   const params = new URLSearchParams(searchString);
   const [, setLocation] = useLocation();
-  const { signOut } = useClerk();
-  const { user } = useUser();
-
   // Vocabularies the user picked on the upload page (lowercased CURIE prefixes).
   // Empty set => fall back to "show every vocabulary actually present in results".
   const initialOntologies = params.get("ontologies")
@@ -517,7 +512,7 @@ export default function DashboardPage() {
 
   if (isError) {
     return (
-      <div className="min-h-screen p-8 bg-background flex items-center justify-center">
+      <div className="py-12 flex justify-center">
         <Card className="max-w-md w-full">
           <CardHeader>
             <CardTitle className="text-destructive flex items-center gap-2">
@@ -535,7 +530,7 @@ export default function DashboardPage() {
 
   if (!jobData && isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="py-12 flex justify-center">
         <div className="flex flex-col items-center gap-4 text-muted-foreground">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
           <p>Loading job details...</p>
@@ -572,31 +567,22 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card px-6 py-3 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => setLocation("/upload")} data-testid="btn-back-upload">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div>
-            <h1 className="font-semibold tracking-tight text-foreground flex items-center gap-2">
-              Job: <span className="font-mono text-sm font-normal text-muted-foreground">{jobId}</span>
-              {isProcessing && <Badge variant="secondary" className="ml-2 animate-pulse">Processing</Badge>}
+    <>
+      <div className="mb-8">
+        <nav className="text-xs text-neutral-500 mb-2">Jobs / {jobId}</nav>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight flex items-center gap-2">
+              Mapping Results
+              {isProcessing && <Badge variant="secondary" className="ml-2">Processing</Badge>}
               {jobData.status === "complete" && <Badge className="bg-green-600 ml-2">Complete</Badge>}
               {jobData.status === "error" && <Badge variant="destructive" className="ml-2">Failed</Badge>}
             </h1>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <EnvToggle />
-          <span className="text-sm text-muted-foreground hidden sm:block">{user?.primaryEmailAddress?.emailAddress}</span>
-          <Button variant="outline" size="sm" onClick={() => signOut()} data-testid="btn-sign-out">
-            <LogOut className="w-4 h-4 mr-2" /> Sign Out
-          </Button>
-        </div>
-      </header>
+      </div>
 
-      <main className="p-6 max-w-7xl mx-auto space-y-6">
+      <div className="space-y-6">
 
         {isProcessing && (
           <Card>
@@ -1072,7 +1058,7 @@ export default function DashboardPage() {
             </Card>
           </>
         )}
-      </main>
-    </div>
+      </div>
+    </>
   );
 }
