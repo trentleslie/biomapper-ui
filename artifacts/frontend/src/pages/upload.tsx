@@ -385,8 +385,14 @@ export default function UploadPage() {
       {
         onSuccess: async (data) => {
           // Persist original rows to IndexedDB before navigating so downloads
-          // can join results back to the full uploaded dataset.
-          await saveOriginalData(data.job_id, { parsedRows, selectedColumn, columns });
+          // can join results back to the full uploaded dataset. If IndexedDB is
+          // unavailable, proceed with navigation — downloads will fall back to
+          // the results-only format.
+          try {
+            await saveOriginalData(data.job_id, { parsedRows, selectedColumn, columns });
+          } catch (err) {
+            console.warn("Failed to save original data to IndexedDB:", err);
+          }
           const params = new URLSearchParams({
             ontologies: ontologiesParam,
             confidence: confidenceFilter,
