@@ -118,7 +118,10 @@ export default function DashboardPage() {
   const job = jobState ?? (persistedJob && "status" in persistedJob ? persistedJob : null) ?? (finalResult && "status" in finalResult ? finalResult : null);
   // Surface an error if: (a) API returned an error response with "detail", OR
   // (b) loading finished but we have no job data at all (network failure, 404, etc.)
-  const isError = !isLoading && !persistedJobLoading && !jobState && (!job || "detail" in job);
+  // Don't flag an error while SSE is still active — the result endpoint returns
+  // 202 before the job completes, which looks like a failure to TanStack Query.
+  const sseStillActive = sseEnabled && !done && !streamError;
+  const isError = !sseStillActive && !isLoading && !persistedJobLoading && !jobState && (!job || "detail" in job);
   const jobData = job && !("detail" in job) ? job as JobResult : null;
   const results = (jobData?.results || []) as MappingResult[];
 
