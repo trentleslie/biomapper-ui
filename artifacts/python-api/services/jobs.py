@@ -7,7 +7,7 @@ _PURGE_INTERVAL = 300  # run purge at most every 5 minutes
 
 
 class Job:
-    def __init__(self, job_id: str, total: int, env: str = "production"):
+    def __init__(self, job_id: str, total: int, env: str = "production", ttl_seconds: int = _TTL_SECONDS):
         self.job_id = job_id
         self.status = "pending"
         self.completed = 0
@@ -17,6 +17,7 @@ class Job:
         self.results: list[dict[str, Any]] = []
         self.created_at = time.time()
         self.env = env
+        self.ttl_seconds = ttl_seconds
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -43,9 +44,9 @@ class JobStore:
             self._last_purge = now
             self.purge_expired()
 
-    def create(self, job_id: str, total: int, env: str = "production") -> Job:
+    def create(self, job_id: str, total: int, env: str = "production", ttl_seconds: int = _TTL_SECONDS) -> Job:
         self._maybe_purge()
-        job = Job(job_id, total, env=env)
+        job = Job(job_id, total, env=env, ttl_seconds=ttl_seconds)
         self._jobs[job_id] = job
         return job
 
@@ -77,7 +78,7 @@ class JobStore:
 
     def purge_expired(self) -> int:
         now = time.time()
-        expired = [jid for jid, j in self._jobs.items() if now - j.created_at > _TTL_SECONDS]
+        expired = [jid for jid, j in self._jobs.items() if now - j.created_at > j.ttl_seconds]
         for jid in expired:
             del self._jobs[jid]
         return len(expired)

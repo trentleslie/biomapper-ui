@@ -577,7 +577,7 @@ export default function DashboardPage() {
     <>
       {isDemo && isProcessing && (
         <div className="mb-4 text-sm text-neutral-600 bg-neutral-50 border border-neutral-200 rounded-lg px-4 py-3">
-          Mapping 100 sample metabolite names across biological databases...
+          Mapping {jobData.total} sample metabolite names across biological databases...
         </div>
       )}
 

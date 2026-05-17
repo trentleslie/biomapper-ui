@@ -1,9 +1,9 @@
+import asyncio
 import csv
-import threading
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse
 
 from models.schemas import BatchRequest, MappingConfig
@@ -44,36 +44,32 @@ except FileNotFoundError:
 if not _demo_names:
     raise RuntimeError("Demo dataset contains no valid names.")
 
-# --- Concurrency cap ---
+# --- Concurrency cap via asyncio.Semaphore ---
 
 MAX_ACTIVE_DEMO_JOBS = 3
-_active_demo_jobs = 0
-_active_lock = threading.Lock()
+_demo_semaphore = asyncio.Semaphore(MAX_ACTIVE_DEMO_JOBS)
 
 
 @router.post("/demo")
-async def start_demo(background_tasks: BackgroundTasks) -> dict:
-    global _active_demo_jobs
+async def start_demo(background_tasks: BackgroundTasks) -> dict | JSONResponse:
+    if _demo_semaphore.locked():
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Demo is busy. Please try again in a moment."},
+            headers={"Retry-After": "30"},
+        )
 
-    with _active_lock:
-        if _active_demo_jobs >= MAX_ACTIVE_DEMO_JOBS:
-            return JSONResponse(
-                status_code=429,
-                content={"detail": "Demo is busy. Please try again in a moment."},
-                headers={"Retry-After": "30"},
-            )
-        _active_demo_jobs += 1
+    await _demo_semaphore.acquire()
 
     job_id = str(uuid.uuid4())
-    job_store.create(job_id, total=len(_demo_names), env="production")
+    job_store.create(job_id, total=len(_demo_names), env="production", ttl_seconds=DEMO_TTL_SECONDS)
 
     background_tasks.add_task(_run_demo_mapping, job_id)
     return {"job_id": job_id}
 
 
 async def _run_demo_mapping(job_id: str) -> None:
-    """Run the demo mapping job, ensuring the concurrency counter is always decremented."""
-    global _active_demo_jobs
+    """Run the demo mapping job, releasing the semaphore on completion."""
     try:
         _, base_url = resolve_env_base_url(None)  # production default
         request = BatchRequest(names=_demo_names, config=MappingConfig())
@@ -87,5 +83,4 @@ async def _run_demo_mapping(job_id: str) -> None:
     except Exception as e:
         job_store.error(job_id, str(e))
     finally:
-        with _active_lock:
-            _active_demo_jobs -= 1
+        _demo_semaphore.release()
