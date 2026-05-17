@@ -85,7 +85,7 @@ async def start_demo(background_tasks: BackgroundTasks):
     await sem.acquire()
 
     job_id = str(uuid.uuid4())
-    job_store.create(job_id, total=len(_demo_names), env="production", ttl_seconds=DEMO_TTL_SECONDS)
+    await job_store.create(job_id, total=len(_demo_names), env="production", ttl_seconds=DEMO_TTL_SECONDS)
 
     background_tasks.add_task(_run_demo_mapping, job_id)
     return {"job_id": job_id}
@@ -100,10 +100,10 @@ async def _run_demo_mapping(job_id: str) -> None:
         async for result in mapper.map_batch(request.names, request.config):
             job_store.add_result(job_id, result)
             if result.get("error_type") in ("auth_failure", "config_error"):
-                job_store.error(job_id, result.get("error", "Fatal mapping error"))
+                await job_store.error(job_id, result.get("error", "Fatal mapping error"))
                 return
-        job_store.complete(job_id)
+        await job_store.complete(job_id)
     except Exception as e:
-        job_store.error(job_id, str(e))
+        await job_store.error(job_id, str(e))
     finally:
         _get_semaphore().release()
