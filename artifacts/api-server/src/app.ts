@@ -89,7 +89,7 @@ function onProxyReqInjectUser(
 // - POST /api/map/demo (start demo job, unauthenticated)
 // - GET /api/map/stream/* (SSE streaming, needed for demo job progress)
 // - GET /api/map/result/* (fetch completed results, needed for demo fallback)
-const requireMapAuthUnlessDemoPath = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+const requireMapAuthUnlessDemoPath = (req: Request, res: Response, next: NextFunction): void => {
   // Skip auth for demo endpoint and stream/result endpoints
   // (stream/result are safe because job IDs are UUIDv4 and results are non-sensitive)
   const path = req.path; // path relative to mount point "/api/map"
@@ -101,7 +101,7 @@ const requireMapAuthUnlessDemoPath = async (req: Request, res: Response, next: N
     next();
     return;
   }
-  await requireMapAuth(req, res, next);
+  requireMapAuth(req, res, next);
 };
 
 app.use(
