@@ -27,7 +27,6 @@ import {
   Download, AlertCircle, Loader2,
   ChevronDown, ChevronRight, ChevronUp, Search, Flag, X, LogIn,
 } from "lucide-react";
-import { Link } from "wouter";
 
 const TIER_COLORS: Record<string, string> = {
   high: '#005B33',

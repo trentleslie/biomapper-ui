@@ -41,7 +41,7 @@ export function useMappingStream(jobId: string, enabled: boolean = true) {
           } else if (data.status === "error") {
             const isDevEnv = data.env === "dev";
             setError({
-              message: data.error_message ?? "Mapping failed",
+              message: (data as any).errorMessage ?? data.error_message ?? "Mapping failed",
               isDevEnvError: isDevEnv,
             });
             setDone(true);

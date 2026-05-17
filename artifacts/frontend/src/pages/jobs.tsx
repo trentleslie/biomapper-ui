@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { useListJobs, useUpdateJob, useDeleteJob, getListJobsQueryKey } from "@workspace/api-client-react";
+import { useListJobs, useUpdateJob, useDeleteJob, getListJobsQueryKey, getGetJobQueryKey } from "@workspace/api-client-react";
 import { deleteOriginalData } from "@/lib/original-data-store";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -100,6 +100,7 @@ export default function JobsPage() {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListJobsQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getGetJobQueryKey(jobId) });
           cancelEditing();
         },
         onError: () => {
