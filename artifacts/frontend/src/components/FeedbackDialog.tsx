@@ -96,7 +96,7 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
     };
 
     try {
-      await customFetch("/feedback", {
+      await customFetch("/api/feedback", {
         method: "POST",
         body: JSON.stringify(payload),
         headers: { "Content-Type": "application/json" },

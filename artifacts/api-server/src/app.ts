@@ -167,6 +167,26 @@ app.use(
   }),
 );
 
+// Feedback endpoints — same auth gate as /api/map.
+app.use(
+  "/api/feedback",
+  ...(clerkEnabled ? [requireMapAuth] : []),
+  createProxyMiddleware({
+    target: PYTHON_API_BASE,
+    changeOrigin: true,
+    pathRewrite: (path: string) => "/feedback" + path,
+    on: {
+      error: (_err, _req, res) => {
+        if (!("headersSent" in res && res.headersSent)) {
+          (res as express.Response)
+            .status(502)
+            .json({ detail: "Feedback service unavailable. Please try again later." });
+        }
+      },
+    },
+  }),
+);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
