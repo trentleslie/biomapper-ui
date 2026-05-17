@@ -150,14 +150,17 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
                   onClick={() => handleCategoryChange(cat.value)}
                   onKeyDown={(e) => {
                     const idx = CATEGORIES.findIndex((c) => c.value === cat.value);
+                    let targetIdx: number | null = null;
                     if (e.key === "ArrowRight" || e.key === "ArrowDown") {
                       e.preventDefault();
-                      const next = CATEGORIES[(idx + 1) % CATEGORIES.length];
-                      handleCategoryChange(next.value);
+                      targetIdx = (idx + 1) % CATEGORIES.length;
                     } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
                       e.preventDefault();
-                      const prev = CATEGORIES[(idx - 1 + CATEGORIES.length) % CATEGORIES.length];
-                      handleCategoryChange(prev.value);
+                      targetIdx = (idx - 1 + CATEGORIES.length) % CATEGORIES.length;
+                    }
+                    if (targetIdx !== null) {
+                      handleCategoryChange(CATEGORIES[targetIdx].value);
+                      (e.currentTarget.parentElement?.children[targetIdx] as HTMLElement | undefined)?.focus();
                     }
                   }}
                   tabIndex={category === cat.value ? 0 : -1}
