@@ -11,7 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from routes import health, map as map_router, discovery as discovery_router
+from routes import health, map as map_router, demo as demo_router, discovery as discovery_router
 from services.mapper import MapperService
 
 logger = logging.getLogger("entity-linker")
@@ -39,6 +39,7 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(map_router.router, prefix="/map")
+app.include_router(demo_router.router, prefix="/map")
 app.include_router(discovery_router.router, prefix="/discovery")
 
 
