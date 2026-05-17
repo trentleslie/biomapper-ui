@@ -153,7 +153,7 @@ app.use(
   createProxyMiddleware({
     target: PYTHON_API_BASE,
     changeOrigin: true,
-    pathRewrite: (path: string) => "/jobs" + path,
+    pathRewrite: (path: string) => "/jobs" + (path === "/" ? "" : path),
     on: {
       proxyReq: onProxyReqInjectUser,
       error: (_err, _req, res) => {
