@@ -65,6 +65,23 @@ const requireMapAuth = (req: Request, res: Response, next: NextFunction): void =
   next();
 };
 
+/**
+ * Shared onProxyReq handler — injects the authenticated Clerk user ID as a
+ * trusted header for downstream Python services.  Any client-supplied value
+ * is stripped first so the header is always server-authoritative.
+ */
+function onProxyReqInjectUser(
+  proxyReq: import("http").ClientRequest,
+  req: import("http").IncomingMessage,
+  _res: import("http").ServerResponse,
+) {
+  proxyReq.removeHeader("X-Clerk-User-Id");
+  const auth = getAuth(req as any);
+  if (auth?.userId) {
+    proxyReq.setHeader("X-Clerk-User-Id", auth.userId);
+  }
+}
+
 // Mount the map proxy BEFORE body parsers so the raw body stream is still intact.
 // The SSE stream endpoint (/api/map/stream/*) requires unbuffered pass-through.
 app.use(
@@ -77,6 +94,7 @@ app.use(
     // so we restore it for the Python FastAPI routes.
     pathRewrite: (path: string) => "/map" + path,
     on: {
+      proxyReq: onProxyReqInjectUser,
       error: (_err, _req, res) => {
         if (!("headersSent" in res && res.headersSent)) {
           (res as express.Response)
@@ -102,6 +120,27 @@ app.use(
           (res as express.Response)
             .status(502)
             .json({ detail: "Discovery service unavailable. Please try again later." });
+        }
+      },
+    },
+  }),
+);
+
+// Jobs endpoints — user-scoped, same auth gate as /api/map.
+app.use(
+  "/api/jobs",
+  ...(clerkEnabled ? [requireMapAuth] : []),
+  createProxyMiddleware({
+    target: PYTHON_API_BASE,
+    changeOrigin: true,
+    pathRewrite: (path: string) => "/jobs" + path,
+    on: {
+      proxyReq: onProxyReqInjectUser,
+      error: (_err, _req, res) => {
+        if (!("headersSent" in res && res.headersSent)) {
+          (res as express.Response)
+            .status(502)
+            .json({ detail: "Jobs service unavailable. Please try again later." });
         }
       },
     },
