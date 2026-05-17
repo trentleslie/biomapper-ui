@@ -72,7 +72,7 @@ export default function DashboardPage() {
   const { data: persistedJob, error: persistedJobError, isLoading: persistedJobLoading } = useGetJob(jobId || "", {
     query: {
       queryKey: getGetJobQueryKey(jobId || ""),
-      enabled: !!jobId,
+      enabled: !!jobId && !isDemo,
       retry: (failureCount, error) => {
         // Don't retry 404s — the job simply isn't persisted yet
         if (error instanceof ApiError && error.status === 404) return false;
