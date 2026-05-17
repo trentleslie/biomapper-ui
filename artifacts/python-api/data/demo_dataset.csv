@@ -1,0 +1,103 @@
+feature_id,compound_name,match_level,issue_category,provided_ids
+50322,AKOS033484333,MS2,Vendor catalog codes,
+51533,AKOS014708986,MS2,Vendor catalog codes,
+10001,Glucose,MS1,Common name,HMDB0000122
+10002,L-Alanine,MS2,Common name,HMDB0000161
+10003,Cholesterol,MS1,Common name,HMDB0000067
+10004,Taurine,MS2,Common name,HMDB0000251
+10005,Creatinine,MS1,Common name,HMDB0000562
+10006,Urea,MS2,Common name,HMDB0000294
+10007,Citric acid,MS1,Common name,HMDB0000094
+10008,Lactic acid,MS2,Common name,HMDB0000190
+10009,Pyruvic acid,MS1,Common name,HMDB0000243
+10010,Succinic acid,MS2,Common name,HMDB0000254
+10011,Fumaric acid,MS1,Common name,HMDB0000134
+10012,Malic acid,MS2,Common name,HMDB0000156
+10013,Oxaloacetic acid,MS1,Common name,
+10014,Alpha-ketoglutaric acid,MS2,Common name,
+10015,Glycine,MS1,Common name,HMDB0000123
+10016,L-Serine,MS2,Common name,HMDB0000187
+10017,L-Threonine,MS1,Common name,HMDB0000167
+10018,L-Valine,MS2,Common name,HMDB0000883
+10019,L-Leucine,MS1,Common name,HMDB0000687
+10020,L-Isoleucine,MS2,Common name,HMDB0000172
+10021,L-Proline,MS1,Common name,HMDB0000162
+10022,L-Phenylalanine,MS2,Common name,HMDB0000159
+10023,L-Tryptophan,MS1,Common name,HMDB0000929
+10024,L-Tyrosine,MS2,Common name,HMDB0000158
+10025,L-Histidine,MS1,Common name,HMDB0000177
+10026,L-Lysine,MS2,Common name,HMDB0000182
+10027,L-Arginine,MS1,Common name,HMDB0000517
+10028,L-Methionine,MS2,Common name,HMDB0000696
+10029,L-Cysteine,MS1,Common name,HMDB0000574
+10030,L-Glutamic acid,MS2,Common name,HMDB0000148
+10031,L-Aspartic acid,MS1,Common name,HMDB0000191
+10032,L-Asparagine,MS2,Common name,HMDB0000168
+10033,L-Glutamine,MS1,Common name,HMDB0000641
+10034,Palmitic acid,MS2,Lipid,HMDB0000220
+10035,Stearic acid,MS1,Lipid,HMDB0000827
+10036,Oleic acid,MS2,Lipid,HMDB0000207
+10037,Linoleic acid,MS1,Lipid,HMDB0000673
+10038,Arachidonic acid,MS2,Lipid,HMDB0001043
+10039,Docosahexaenoic acid,MS1,Lipid,HMDB0002183
+10040,Eicosapentaenoic acid,MS2,Lipid,HMDB0001999
+10041,Sphingomyelin,MS1,Lipid,
+10042,Phosphatidylcholine,MS2,Lipid,
+10043,Carnitine,MS1,Common name,HMDB0000062
+10044,Acetylcarnitine,MS2,Common name,HMDB0000201
+10045,Propionylcarnitine,MS1,Common name,HMDB0000824
+10046,Butyrylcarnitine,MS2,Common name,HMDB0002013
+10047,Hippuric acid,MS1,Common name,HMDB0000714
+10048,Indoxyl sulfate,MS2,Uremic toxin,HMDB0000682
+10049,p-Cresol sulfate,MS1,Uremic toxin,HMDB0011635
+10050,Trimethylamine N-oxide,MS2,Gut metabolite,HMDB0000925
+10051,Betaine,MS1,Common name,HMDB0000043
+10052,Choline,MS2,Common name,HMDB0000097
+10053,Acetylcholine,MS1,Neurotransmitter,HMDB0000895
+10054,Serotonin,MS2,Neurotransmitter,HMDB0000259
+10055,Dopamine,MS1,Neurotransmitter,HMDB0000073
+10056,Norepinephrine,MS2,Neurotransmitter,HMDB0000216
+10057,GABA,MS1,Neurotransmitter,HMDB0000112
+10058,Glutathione,MS2,Antioxidant,HMDB0000125
+10059,Uric acid,MS1,Common name,HMDB0000289
+10060,Hypoxanthine,MS2,Purine,HMDB0000157
+10061,Xanthine,MS1,Purine,HMDB0000292
+10062,Adenosine,MS2,Nucleoside,HMDB0000050
+10063,Guanosine,MS1,Nucleoside,HMDB0000133
+10064,Inosine,MS2,Nucleoside,HMDB0000195
+10065,Nicotinamide,MS1,Vitamin,HMDB0001406
+10066,Riboflavin,MS2,Vitamin,HMDB0000244
+10067,Pantothenic acid,MS1,Vitamin,HMDB0000210
+10068,Biotin,MS2,Vitamin,HMDB0000030
+10069,Folic acid,MS1,Vitamin,HMDB0000121
+10070,Ascorbic acid,MS2,Vitamin,HMDB0000044
+10071,Alpha-tocopherol,MS1,Vitamin,HMDB0001893
+10072,Retinol,MS2,Vitamin,HMDB0000305
+10073,Cortisol,MS1,Steroid,HMDB0000063
+10074,Testosterone,MS2,Steroid,HMDB0000234
+10075,Estradiol,MS1,Steroid,HMDB0000151
+10076,Progesterone,MS2,Steroid,HMDB0001830
+10077,Bile acid,MS1,Bile acid,
+10078,Glycocholic acid,MS2,Bile acid,HMDB0000138
+10079,Taurocholic acid,MS1,Bile acid,HMDB0000036
+10080,Chenodeoxycholic acid,MS2,Bile acid,HMDB0000518
+10081,Deoxycholic acid,MS1,Bile acid,HMDB0000626
+10082,Bilirubin,MS2,Heme,HMDB0000054
+10083,Creatine,MS1,Common name,HMDB0000064
+10084,Ornithine,MS2,Amino acid,HMDB0000214
+10085,Citrulline,MS1,Amino acid,HMDB0000904
+10086,Homocysteine,MS2,Amino acid,HMDB0000742
+10087,Taurochenodeoxycholic acid,MS1,Bile acid,HMDB0000951
+10088,Kynurenine,MS2,Tryptophan pathway,HMDB0000684
+10089,Quinolinic acid,MS1,Tryptophan pathway,HMDB0000232
+10090,Picolinic acid,MS2,Tryptophan pathway,HMDB0002243
+10091,3-Hydroxybutyric acid,MS1,Ketone body,HMDB0000357
+10092,Acetoacetic acid,MS2,Ketone body,HMDB0000060
+10093,Methylmalonic acid,MS1,Organic acid,HMDB0000202
+10094,Propionic acid,MS2,Short-chain fatty acid,HMDB0000176
+10095,Butyric acid,MS1,Short-chain fatty acid,HMDB0000039
+10096,Acetic acid,MS2,Short-chain fatty acid,HMDB0000042
+10097,Isovaleric acid,MS1,Short-chain fatty acid,HMDB0000718
+10098,2-Hydroxybutyric acid,MS2,Organic acid,HMDB0000008
+10099,3-Methyl-2-oxovaleric acid,MS1,Branched-chain keto acid,HMDB0000491
+10100,4-Hydroxyphenylacetic acid,MS2,Phenolic acid,HMDB0000020
