@@ -47,3 +47,8 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# SQLite databases
+artifacts/python-api/data/*.db
+artifacts/python-api/data/*.db-wal
+artifacts/python-api/data/*.db-shm

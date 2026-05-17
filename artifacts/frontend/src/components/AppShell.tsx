@@ -1,7 +1,9 @@
 import { type ReactNode } from "react";
 import { useRoute, Link, useLocation } from "wouter";
 import { useUser, useClerk } from "@clerk/react";
-import { UploadCloud, BarChart3 } from "lucide-react";
+import { UploadCloud, BarChart3, List } from "lucide-react";
+import { useListJobs } from "@workspace/api-client-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { EnvToggle } from "@/components/EnvToggle";
 import { Button } from "@/components/ui/button";
 
@@ -28,6 +30,14 @@ function SideNav() {
     });
   }
 
+  // Fetch recent jobs for sidebar
+  const { data: recentJobs, isLoading: jobsLoading } = useListJobs({
+    query: { retry: 1 },
+  });
+
+  // Take the 5 most recent
+  const topJobs = (recentJobs || []).slice(0, 5);
+
   return (
     <nav className="w-60 bg-neutral-50 border-r border-neutral-200 hidden lg:block py-4 px-3 space-y-1">
       {navItems.map((item) => (
@@ -44,6 +54,46 @@ function SideNav() {
           {item.label}
         </Link>
       ))}
+
+      {/* Recent Jobs section */}
+      <div className="mt-4 pt-4 border-t border-neutral-200">
+        <p className="px-3 mb-2 text-xs font-medium text-neutral-500 uppercase tracking-wider">
+          Recent Jobs
+        </p>
+        {jobsLoading ? (
+          <div className="space-y-2 px-3">
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+          </div>
+        ) : topJobs.length === 0 ? (
+          <p className="px-3 text-xs text-neutral-400">No recent jobs</p>
+        ) : (
+          <>
+            {topJobs.map((j) => (
+              <Link
+                key={j.jobId}
+                href={`/job/${j.jobId}`}
+                className={`flex items-center gap-3 px-3 py-2 rounded text-sm ${
+                  jobId === j.jobId
+                    ? "bg-neutral-200 text-neutral-900 font-medium"
+                    : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                }`}
+              >
+                <BarChart3 className="w-4 h-4 shrink-0" />
+                <span className="truncate">{j.displayName || `${j.jobId.slice(0, 8)}...`}</span>
+              </Link>
+            ))}
+            <Link
+              href="/jobs"
+              className="flex items-center gap-3 px-3 py-2 rounded text-sm text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+            >
+              <List className="w-4 h-4" />
+              View all
+            </Link>
+          </>
+        )}
+      </div>
     </nav>
   );
 }

@@ -14,6 +14,8 @@ tags:
     description: Entity linking / BioMapper2 mapping operations
   - name: discovery
     description: BioMapper2 discovery endpoints (entity types, annotators, vocabularies)
+  - name: jobs
+    description: Job history and management operations
 paths:
   /healthz:
     get:
@@ -175,6 +177,100 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /jobs:
+    get:
+      operationId: listJobs
+      tags: [jobs]
+      summary: List past jobs for the authenticated user
+      responses:
+        "200":
+          description: List of jobs (lightweight, no results)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/JobListItem"
+        "400":
+          description: Missing user ID header
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /jobs/{jobId}:
+    get:
+      operationId: getJob
+      tags: [jobs]
+      summary: Get full job details including results
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Full job detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobDetail"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateJob
+      tags: [jobs]
+      summary: Update job display name
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobUpdateRequest"
+      responses:
+        "200":
+          description: Updated job detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobDetail"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteJob
+      tags: [jobs]
+      summary: Delete a job
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Job deleted
         "404":
           description: Job not found
           content:
@@ -375,6 +471,62 @@ components:
         - total
         - error_count
         - results
+
+    JobListItem:
+      type: object
+      properties:
+        jobId:
+          type: string
+        displayName:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [pending, processing, complete, error]
+        total:
+          type: integer
+        completed:
+          type: integer
+        errorCount:
+          type: integer
+        errorMessage:
+          type: string
+          nullable: true
+        env:
+          type: string
+        createdAt:
+          type: number
+        updatedAt:
+          type: number
+      required:
+        - jobId
+        - status
+        - total
+        - completed
+        - errorCount
+        - env
+        - createdAt
+        - updatedAt
+
+    JobDetail:
+      allOf:
+        - $ref: "#/components/schemas/JobListItem"
+        - type: object
+          properties:
+            results:
+              type: array
+              items:
+                $ref: "#/components/schemas/MappingResultItem"
+            config:
+              $ref: "#/components/schemas/MappingConfig"
+              nullable: true
+
+    JobUpdateRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+          nullable: true
 
     ErrorResponse:
       type: object

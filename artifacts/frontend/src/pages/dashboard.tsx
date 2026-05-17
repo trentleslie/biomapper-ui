@@ -1,8 +1,9 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { useLocation, useParams, useSearch } from "wouter";
+import { useLocation, useParams, useSearch, Link } from "wouter";
 import { useMappingStream } from "@/hooks/use-mapping-stream";
 import { loadOriginalData, type OriginalData } from "@/lib/original-data-store";
-import { useGetMappingResult, getGetMappingResultQueryKey, JobResult } from "@workspace/api-client-react";
+import { useGetMappingResult, getGetMappingResultQueryKey, JobResult, useGetJob, ApiError } from "@workspace/api-client-react";
+import type { JobDetail } from "@workspace/api-client-react";
 import { SankeyChart } from "@/components/SankeyChart";
 import { EquivalentIds } from "@/components/EquivalentIds";
 import { useEnv } from "@/contexts/env-context";
@@ -26,7 +27,6 @@ import {
   Download, AlertCircle, Loader2,
   ChevronDown, ChevronRight, ChevronUp, Search, Flag, X, LogIn,
 } from "lucide-react";
-import { Link } from "wouter";
 
 const TIER_COLORS: Record<string, string> = {
   high: '#005B33',
@@ -69,10 +69,27 @@ export default function DashboardPage() {
   const { env, setEnv } = useEnv();
   const { toast } = useToast();
 
-  const { jobState, done, error: streamError } = useMappingStream(jobId || "");
+  const { data: persistedJob, error: persistedJobError, isLoading: persistedJobLoading } = useGetJob(jobId || "", {
+    query: {
+      enabled: !!jobId,
+      retry: (failureCount, error) => {
+        // Don't retry 404s — the job simply isn't persisted yet
+        if (error instanceof ApiError && error.status === 404) return false;
+        return failureCount < 2;
+      },
+    },
+  });
+
+  // SSE is enabled optimistically while we check persistence.
+  // Once we know the job is persisted and terminal, disable SSE.
+  const isPersistedTerminal = persistedJob &&
+    (persistedJob.status === "complete" || persistedJob.status === "error");
+  const sseEnabled = !isPersistedTerminal;
+
+  const { jobState, done, error: streamError } = useMappingStream(jobId || "", sseEnabled);
   const { data: finalResult, isLoading } = useGetMappingResult(jobId || "", {
     query: {
-      enabled: done || (!jobState && !!jobId),
+      enabled: !isPersistedTerminal && (done || (!jobState && !!jobId)),
       queryKey: getGetMappingResultQueryKey(jobId || ""),
     }
   });
@@ -97,10 +114,10 @@ export default function DashboardPage() {
   // hasn't fired yet (e.g., page reload of a completed job). The jobState ?? prefix
   // ensures live stream data takes precedence; the fallback is only reached when
   // jobState is null.
-  const job = jobState ?? (finalResult && "status" in finalResult ? finalResult : null);
+  const job = jobState ?? (persistedJob && "status" in persistedJob ? persistedJob : null) ?? (finalResult && "status" in finalResult ? finalResult : null);
   // Surface an error if: (a) API returned an error response with "detail", OR
   // (b) loading finished but we have no job data at all (network failure, 404, etc.)
-  const isError = !isLoading && !jobState && (!job || "detail" in job);
+  const isError = !isLoading && !persistedJobLoading && !jobState && (!job || "detail" in job);
   const jobData = job && !("detail" in job) ? job as JobResult : null;
   const results = (jobData?.results || []) as MappingResult[];
 
@@ -582,7 +599,15 @@ export default function DashboardPage() {
       )}
 
       <div className="mb-8">
-        <nav className="text-xs text-neutral-500 mb-2">{isDemo ? "Demo" : `Jobs / ${jobId}`}</nav>
+        <nav className="text-xs text-neutral-500 mb-2">
+          {isDemo ? "Demo" : (
+            <>
+              <Link href="/jobs" className="hover:text-neutral-700">Jobs</Link>
+              {" / "}
+              {persistedJob?.displayName || (jobId ? `${jobId.slice(0, 8)}...` : jobId)}
+            </>
+          )}
+        </nav>
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight flex items-center gap-2">

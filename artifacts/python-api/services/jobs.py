@@ -1,13 +1,20 @@
 import asyncio
+import logging
 import time
 from typing import Any
+
+from services.database import database
+
+logger = logging.getLogger("entity-linker")
 
 _TTL_SECONDS = 3600  # 1 hour
 _PURGE_INTERVAL = 300  # run purge at most every 5 minutes
 
 
 class Job:
-    def __init__(self, job_id: str, total: int, env: str = "production", ttl_seconds: int = _TTL_SECONDS):
+    def __init__(self, job_id: str, total: int, env: str = "production",
+                 user_id: str | None = None, config: Any = None,
+                 ttl_seconds: int = _TTL_SECONDS):
         self.job_id = job_id
         self.status = "pending"
         self.completed = 0
@@ -17,18 +24,21 @@ class Job:
         self.results: list[dict[str, Any]] = []
         self.created_at = time.time()
         self.env = env
+        self.user_id = user_id
+        self.config = config
         self.ttl_seconds = ttl_seconds
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "job_id": self.job_id,
+            "jobId": self.job_id,
             "status": self.status,
             "completed": self.completed,
             "total": self.total,
-            "error_count": self.error_count,
-            "error_message": self.error_message,
+            "errorCount": self.error_count,
+            "errorMessage": self.error_message,
             "results": self.results,
             "env": self.env,
+            "createdAt": self.created_at,
         }
 
 
@@ -44,10 +54,23 @@ class JobStore:
             self._last_purge = now
             self.purge_expired()
 
-    def create(self, job_id: str, total: int, env: str = "production", ttl_seconds: int = _TTL_SECONDS) -> Job:
+    async def create(self, job_id: str, total: int, env: str = "production",
+                     user_id: str | None = None, config: Any = None,
+                     ttl_seconds: int = _TTL_SECONDS) -> Job:
         self._maybe_purge()
-        job = Job(job_id, total, env=env, ttl_seconds=ttl_seconds)
+        job = Job(job_id, total, env=env, user_id=user_id, config=config, ttl_seconds=ttl_seconds)
         self._jobs[job_id] = job
+        try:
+            await database.insert_job(
+                job_id=job_id,
+                user_id=user_id,
+                status="pending",
+                total=total,
+                env=env,
+                config=config,
+            )
+        except Exception:
+            logger.exception("Failed to persist new job %s to database", job_id)
         return job
 
     def get(self, job_id: str) -> Job | None:
@@ -65,16 +88,36 @@ class JobStore:
         if job.status == "pending":
             job.status = "processing"
 
-    def complete(self, job_id: str) -> None:
+    async def complete(self, job_id: str) -> None:
         job = self._jobs.get(job_id)
         if job:
             job.status = "complete"
+            try:
+                await database.update_job(
+                    job_id,
+                    status="complete",
+                    completed=job.completed,
+                    error_count=job.error_count,
+                    results=job.results,
+                )
+            except Exception:
+                logger.exception("Failed to persist job completion %s to database", job_id)
 
-    def error(self, job_id: str, message: str) -> None:
+    async def error(self, job_id: str, message: str) -> None:
         job = self._jobs.get(job_id)
         if job:
             job.status = "error"
             job.error_message = message
+            try:
+                await database.update_job(
+                    job_id,
+                    status="error",
+                    error_message=message,
+                    completed=job.completed,
+                    error_count=job.error_count,
+                )
+            except Exception:
+                logger.exception("Failed to persist job error %s to database", job_id)
 
     def purge_expired(self) -> int:
         now = time.time()
