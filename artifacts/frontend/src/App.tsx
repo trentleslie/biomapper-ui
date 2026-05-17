@@ -164,11 +164,34 @@ function AppWithClerk() {
   );
 }
 
+/** Dev-only: renders app without auth gating (Clerk still provides context for hooks) */
+function DevBypassApp() {
+  return (
+    <ClerkProvider publishableKey={clerkPubKey}>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <AppShell>
+            <Switch>
+              <Route path="/">{() => <UploadPage />}</Route>
+              <Route path="/upload">{() => <UploadPage />}</Route>
+              <Route path="/job/:jobId">{() => <DashboardPage />}</Route>
+              <Route component={NotFound} />
+            </Switch>
+          </AppShell>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ClerkProvider>
+  );
+}
+
 function App() {
+  const bypassAuth = import.meta.env.DEV && import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
+
   return (
     <EnvProvider>
       <WouterRouter base={basePath}>
-        <AppWithClerk />
+        {bypassAuth ? <DevBypassApp /> : <AppWithClerk />}
       </WouterRouter>
     </EnvProvider>
   );

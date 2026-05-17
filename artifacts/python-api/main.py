@@ -11,8 +11,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from routes import health, map as map_router, demo as demo_router, discovery as discovery_router, jobs as jobs_router
+from routes import health, map as map_router, demo as demo_router, discovery as discovery_router, feedback as feedback_router, jobs as jobs_router
 from services.database import database
+from services.feedback_store import feedback_store
 from services.mapper import MapperService
 
 logger = logging.getLogger("entity-linker")
@@ -33,6 +34,7 @@ logger.info("biomapper base_url: %s", _resolved_base_url or "default")
 async def lifespan(app):
     await database.initialize()
     await database.recover_stale_jobs()
+    await feedback_store.init_db()
     yield
     await database.close()
 
@@ -51,6 +53,7 @@ app.include_router(health.router)
 app.include_router(map_router.router, prefix="/map")
 app.include_router(demo_router.router, prefix="/map")
 app.include_router(discovery_router.router, prefix="/discovery")
+app.include_router(feedback_router.router, prefix="/feedback")
 app.include_router(jobs_router.router, prefix="/jobs")
 
 
