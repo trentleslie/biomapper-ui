@@ -1,7 +1,7 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
-import { clerkMiddleware, getAuth, clerkClient } from "@clerk/express";
+import { clerkMiddleware, getAuth } from "@clerk/express";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { CLERK_PROXY_PATH, clerkProxyMiddleware } from "./middlewares/clerkProxyMiddleware";
 import router from "./routes";
@@ -10,15 +10,6 @@ import { logger } from "./lib/logger";
 const PYTHON_API_PORT = parseInt(process.env.PYTHON_API_PORT || "8000", 10);
 const PYTHON_API_BASE = `http://localhost:${PYTHON_API_PORT}`;
 
-// Configurable access policy (defaults to phenomehealth.org only per spec).
-// Set ALLOWED_EMAIL_DOMAINS or ALLOWED_EMAILS env vars to override without code changes.
-const rawDomains = process.env.ALLOWED_EMAIL_DOMAINS || "phenomehealth.org";
-const ALLOWED_EMAIL_DOMAINS = rawDomains.split(",").map(d => d.trim().toLowerCase()).filter(Boolean);
-
-const rawEmails = process.env.ALLOWED_EMAILS || "";
-const ALLOWED_EMAILS_SET = new Set(
-  rawEmails.split(",").map(e => e.trim().toLowerCase()).filter(Boolean)
-);
 
 // Clerk is optional — if no CLERK_SECRET_KEY is set, auth is skipped entirely
 const clerkEnabled = !!process.env.CLERK_SECRET_KEY;
@@ -61,40 +52,16 @@ if (clerkEnabled) {
 }
 
 /**
- * requireMapAuth — server-side gate for /api/map/* routes.
+ * requireMapAuth — server-side gate for /api/map/* and /api/discovery/* routes.
  *
- * Requires the request to be from an authenticated Clerk user whose verified
- * primary email EITHER belongs to an allowed domain (ALLOWED_EMAIL_DOMAINS)
- * OR is listed explicitly in ALLOWED_EMAILS.
- *
- * The backend is the authoritative source of truth; frontend gating is UX-only.
+ * Requires the request to be from an authenticated Clerk user.
  */
-const requireMapAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+const requireMapAuth = (req: Request, res: Response, next: NextFunction): void => {
   const auth = getAuth(req);
   if (!auth?.userId) {
     res.status(401).json({ detail: "Authentication required." });
     return;
   }
-
-  try {
-    const user = await clerkClient.users.getUser(auth.userId);
-    const primaryEmail = (user.primaryEmailAddress?.emailAddress || "").toLowerCase();
-    const emailDomain = primaryEmail.split("@")[1] || "";
-
-    const isAllowed =
-      ALLOWED_EMAILS_SET.has(primaryEmail) ||
-      ALLOWED_EMAIL_DOMAINS.includes(emailDomain);
-
-    if (!isAllowed) {
-      res.status(403).json({ detail: "Access restricted to PhenomeHealth team members." });
-      return;
-    }
-  } catch (err) {
-    logger.error({ err }, "Failed to validate user domain");
-    res.status(500).json({ detail: "Could not verify access permissions." });
-    return;
-  }
-
   next();
 };
 
@@ -121,8 +88,7 @@ app.use(
   }),
 );
 
-// Discovery endpoints — same auth gate as /api/map (read-only, but we keep
-// the PhenomeHealth domain restriction consistent across the BioMapper surface).
+// Discovery endpoints — same auth gate as /api/map.
 app.use(
   "/api/discovery",
   ...(clerkEnabled ? [requireMapAuth] : []),
