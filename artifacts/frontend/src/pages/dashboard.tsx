@@ -89,7 +89,7 @@ export default function DashboardPage() {
   const { jobState, done, error: streamError } = useMappingStream(jobId || "", sseEnabled);
   const { data: finalResult, isLoading } = useGetMappingResult(jobId || "", {
     query: {
-      enabled: done || (!jobState && !!jobId),
+      enabled: !isPersistedTerminal && (done || (!jobState && !!jobId)),
       queryKey: getGetMappingResultQueryKey(jobId || ""),
     }
   });

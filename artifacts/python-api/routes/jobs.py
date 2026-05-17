@@ -2,6 +2,7 @@ from fastapi import APIRouter, Header, HTTPException
 
 from models.schemas import JobDetail, JobListItem, JobUpdate  # type: ignore[attr-defined]
 from services.database import database
+from services.jobs import job_store
 
 router = APIRouter()
 
@@ -60,3 +61,4 @@ async def delete_job(
     if job is None or job.get("user_id") != x_clerk_user_id:
         raise HTTPException(status_code=404, detail="Job not found")
     await database.delete_job(job_id)
+    job_store._jobs.pop(job_id, None)
