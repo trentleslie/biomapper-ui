@@ -66,8 +66,8 @@ def _get_semaphore() -> asyncio.Semaphore:
     return _demo_semaphore
 
 
-@router.post("/demo")
-async def start_demo(background_tasks: BackgroundTasks) -> dict | JSONResponse:
+@router.post("/demo", response_model=None)
+async def start_demo(background_tasks: BackgroundTasks):
     if _demo_error or not _demo_names:
         return JSONResponse(
             status_code=503,
