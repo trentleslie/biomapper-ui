@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { useLocation, useParams, useSearch } from "wouter";
+import { useLocation, useParams, useSearch, Link } from "wouter";
 import { useMappingStream } from "@/hooks/use-mapping-stream";
 import { loadOriginalData, type OriginalData } from "@/lib/original-data-store";
 import { useGetMappingResult, getGetMappingResultQueryKey, JobResult, useGetJob, ApiError } from "@workspace/api-client-react";
@@ -600,7 +600,15 @@ export default function DashboardPage() {
       )}
 
       <div className="mb-8">
-        <nav className="text-xs text-neutral-500 mb-2">{isDemo ? "Demo" : `Jobs / ${jobId}`}</nav>
+        <nav className="text-xs text-neutral-500 mb-2">
+          {isDemo ? "Demo" : (
+            <>
+              <Link href="/jobs" className="hover:text-neutral-700">Jobs</Link>
+              {" / "}
+              {persistedJob?.displayName || (jobId ? `${jobId.slice(0, 8)}...` : jobId)}
+            </>
+          )}
+        </nav>
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight flex items-center gap-2">

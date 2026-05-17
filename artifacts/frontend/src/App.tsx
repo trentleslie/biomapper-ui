@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import UploadPage from "@/pages/upload";
 import DashboardPage from "@/pages/dashboard";
 import DemoPage from "@/pages/demo";
+import JobsPage from "@/pages/jobs";
 
 import NotFound from "@/pages/not-found";
 import { EnvProvider } from "@/contexts/env-context";
@@ -120,6 +121,11 @@ function Router() {
       {/* /upload kept as alias for / */}
       <Route path="/upload">
         {() => <ProtectedRoute component={UploadPage} />}
+      </Route>
+
+      {/* /jobs = full job history page */}
+      <Route path="/jobs">
+        {() => <ProtectedRoute component={JobsPage} />}
       </Route>
 
       {/* /job/:jobId = canonical dashboard route; demo mode bypasses auth */}
