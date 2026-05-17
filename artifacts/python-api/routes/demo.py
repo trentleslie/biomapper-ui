@@ -44,22 +44,30 @@ except FileNotFoundError:
 if not _demo_names:
     raise RuntimeError("Demo dataset contains no valid names.")
 
-# --- Concurrency cap via asyncio.Semaphore ---
+# --- Concurrency cap ---
 
 MAX_ACTIVE_DEMO_JOBS = 3
-_demo_semaphore = asyncio.Semaphore(MAX_ACTIVE_DEMO_JOBS)
+_demo_semaphore: asyncio.Semaphore | None = None
+
+
+def _get_semaphore() -> asyncio.Semaphore:
+    global _demo_semaphore
+    if _demo_semaphore is None:
+        _demo_semaphore = asyncio.Semaphore(MAX_ACTIVE_DEMO_JOBS)
+    return _demo_semaphore
 
 
 @router.post("/demo")
 async def start_demo(background_tasks: BackgroundTasks) -> dict | JSONResponse:
-    if _demo_semaphore.locked():
+    sem = _get_semaphore()
+    if sem.locked():
         return JSONResponse(
             status_code=429,
             content={"detail": "Demo is busy. Please try again in a moment."},
             headers={"Retry-After": "30"},
         )
 
-    await _demo_semaphore.acquire()
+    await sem.acquire()
 
     job_id = str(uuid.uuid4())
     job_store.create(job_id, total=len(_demo_names), env="production", ttl_seconds=DEMO_TTL_SECONDS)
@@ -83,4 +91,4 @@ async def _run_demo_mapping(job_id: str) -> None:
     except Exception as e:
         job_store.error(job_id, str(e))
     finally:
-        _demo_semaphore.release()
+        _get_semaphore().release()
