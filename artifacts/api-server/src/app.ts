@@ -67,9 +67,29 @@ const requireMapAuth = (req: Request, res: Response, next: NextFunction): void =
 
 // Mount the map proxy BEFORE body parsers so the raw body stream is still intact.
 // The SSE stream endpoint (/api/map/stream/*) requires unbuffered pass-through.
+
+// Auth gate that exempts demo-related paths:
+// - POST /api/map/demo (start demo job, unauthenticated)
+// - GET /api/map/stream/* (SSE streaming, needed for demo job progress)
+// - GET /api/map/result/* (fetch completed results, needed for demo fallback)
+const requireMapAuthUnlessDemoPath = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  // Skip auth for demo endpoint and stream/result endpoints
+  // (stream/result are safe because job IDs are UUIDv4 and results are non-sensitive)
+  const path = req.path; // path relative to mount point "/api/map"
+  if (path === "/demo" || path.startsWith("/stream/") || path.startsWith("/result/")) {
+    next();
+    return;
+  }
+  if (!clerkEnabled) {
+    next();
+    return;
+  }
+  await requireMapAuth(req, res, next);
+};
+
 app.use(
   "/api/map",
-  ...(clerkEnabled ? [requireMapAuth] : []),
+  requireMapAuthUnlessDemoPath,
   createProxyMiddleware({
     target: PYTHON_API_BASE,
     changeOrigin: true,
