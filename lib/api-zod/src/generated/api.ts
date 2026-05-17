@@ -161,3 +161,236 @@ export const GetMappingResultResponse = zod.object({
     }),
   ),
 });
+
+/**
+ * @summary List past jobs for the authenticated user
+ */
+export const ListJobsResponseItem = zod.object({
+  jobId: zod.string(),
+  userId: zod.string().nullish(),
+  displayName: zod.string().nullish(),
+  status: zod.enum(["pending", "processing", "complete", "error"]),
+  total: zod.number(),
+  completed: zod.number(),
+  errorCount: zod.number(),
+  errorMessage: zod.string().nullish(),
+  env: zod.string(),
+  createdAt: zod.number(),
+  updatedAt: zod.number(),
+});
+export const ListJobsResponse = zod.array(ListJobsResponseItem);
+
+/**
+ * @summary Get full job details including results
+ */
+export const GetJobParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const getJobResponseTwoResultsItemProvidedIdsDefault = {};
+export const getJobResponseTwoConfigAnnotationModeDefault = `missing`;
+export const getJobResponseTwoConfigEntityTypeDefault = `biolink:SmallMolecule`;
+export const getJobResponseTwoConfigHintColumnsDefault = {};
+
+export const GetJobResponse = zod
+  .object({
+    jobId: zod.string(),
+    userId: zod.string().nullish(),
+    displayName: zod.string().nullish(),
+    status: zod.enum(["pending", "processing", "complete", "error"]),
+    total: zod.number(),
+    completed: zod.number(),
+    errorCount: zod.number(),
+    errorMessage: zod.string().nullish(),
+    env: zod.string(),
+    createdAt: zod.number(),
+    updatedAt: zod.number(),
+  })
+  .and(
+    zod.object({
+      results: zod
+        .array(
+          zod.object({
+            name: zod.string(),
+            resolved: zod.boolean(),
+            primaryCurie: zod.string().nullish(),
+            confidenceScore: zod.number().nullish(),
+            confidenceTier: zod
+              .enum(["high", "medium", "low", "unknown"])
+              .nullish(),
+            needsReview: zod.boolean().optional(),
+            identifiers: zod
+              .record(zod.string(), zod.array(zod.string()))
+              .optional()
+              .describe(
+                'Map of vocabulary key → list of CURIEs\/identifiers found for this entity.\nKeys are vocabulary identifiers (e.g. \"hmdb\", \"chebi\", \"uniprot\").\nOpen record — backend may emit any vocabulary key the underlying\nBioMapper run produces, including ones not in the small-molecule\npreset.\n',
+              ),
+            kgEquivalentIds: zod
+              .record(zod.string(), zod.array(zod.string()))
+              .optional()
+              .describe(
+                'Map of CURIE prefix to list of equivalent local identifiers from the\nknowledge graph node. Keys are native CURIE prefixes (e.g. \"HMDB\",\n\"KEGG.COMPOUND\"). Empty object when no KG match.\n',
+              ),
+            providedIds: zod
+              .record(
+                zod.string(),
+                zod.union([zod.string(), zod.array(zod.string())]),
+              )
+              .default(getJobResponseTwoResultsItemProvidedIdsDefault)
+              .describe(
+                "Original provided ID values from user's uploaded file, keyed by original column name",
+              ),
+            error: zod.string().nullish(),
+            error_type: zod.string().nullish(),
+          }),
+        )
+        .optional(),
+      config: zod
+        .object({
+          annotationMode: zod
+            .enum(["missing", "all", "none"])
+            .default(getJobResponseTwoConfigAnnotationModeDefault),
+          entityType: zod
+            .string()
+            .default(getJobResponseTwoConfigEntityTypeDefault)
+            .describe(
+              "Biolink entity type (e.g. biolink:SmallMolecule, biolink:Drug, biolink:Protein).",
+            ),
+          annotators: zod
+            .array(zod.string())
+            .nullish()
+            .describe(
+              "Optional list of annotator slugs to restrict mapping to. Null\/omitted means use all available annotators.",
+            ),
+          hints: zod
+            .record(
+              zod.string(),
+              zod.record(
+                zod.string(),
+                zod.union([zod.string(), zod.array(zod.string())]),
+              ),
+            )
+            .optional(),
+          hintColumns: zod
+            .record(zod.string(), zod.string())
+            .default(getJobResponseTwoConfigHintColumnsDefault)
+            .describe(
+              "Maps inferred CURIE prefix to original column name from uploaded file",
+            ),
+        })
+        .nullish(),
+    }),
+  );
+
+/**
+ * @summary Update job display name
+ */
+export const UpdateJobParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const UpdateJobBody = zod.object({
+  displayName: zod.string().nullish(),
+});
+
+export const updateJobResponseTwoResultsItemProvidedIdsDefault = {};
+export const updateJobResponseTwoConfigAnnotationModeDefault = `missing`;
+export const updateJobResponseTwoConfigEntityTypeDefault = `biolink:SmallMolecule`;
+export const updateJobResponseTwoConfigHintColumnsDefault = {};
+
+export const UpdateJobResponse = zod
+  .object({
+    jobId: zod.string(),
+    userId: zod.string().nullish(),
+    displayName: zod.string().nullish(),
+    status: zod.enum(["pending", "processing", "complete", "error"]),
+    total: zod.number(),
+    completed: zod.number(),
+    errorCount: zod.number(),
+    errorMessage: zod.string().nullish(),
+    env: zod.string(),
+    createdAt: zod.number(),
+    updatedAt: zod.number(),
+  })
+  .and(
+    zod.object({
+      results: zod
+        .array(
+          zod.object({
+            name: zod.string(),
+            resolved: zod.boolean(),
+            primaryCurie: zod.string().nullish(),
+            confidenceScore: zod.number().nullish(),
+            confidenceTier: zod
+              .enum(["high", "medium", "low", "unknown"])
+              .nullish(),
+            needsReview: zod.boolean().optional(),
+            identifiers: zod
+              .record(zod.string(), zod.array(zod.string()))
+              .optional()
+              .describe(
+                'Map of vocabulary key → list of CURIEs\/identifiers found for this entity.\nKeys are vocabulary identifiers (e.g. \"hmdb\", \"chebi\", \"uniprot\").\nOpen record — backend may emit any vocabulary key the underlying\nBioMapper run produces, including ones not in the small-molecule\npreset.\n',
+              ),
+            kgEquivalentIds: zod
+              .record(zod.string(), zod.array(zod.string()))
+              .optional()
+              .describe(
+                'Map of CURIE prefix to list of equivalent local identifiers from the\nknowledge graph node. Keys are native CURIE prefixes (e.g. \"HMDB\",\n\"KEGG.COMPOUND\"). Empty object when no KG match.\n',
+              ),
+            providedIds: zod
+              .record(
+                zod.string(),
+                zod.union([zod.string(), zod.array(zod.string())]),
+              )
+              .default(updateJobResponseTwoResultsItemProvidedIdsDefault)
+              .describe(
+                "Original provided ID values from user's uploaded file, keyed by original column name",
+              ),
+            error: zod.string().nullish(),
+            error_type: zod.string().nullish(),
+          }),
+        )
+        .optional(),
+      config: zod
+        .object({
+          annotationMode: zod
+            .enum(["missing", "all", "none"])
+            .default(updateJobResponseTwoConfigAnnotationModeDefault),
+          entityType: zod
+            .string()
+            .default(updateJobResponseTwoConfigEntityTypeDefault)
+            .describe(
+              "Biolink entity type (e.g. biolink:SmallMolecule, biolink:Drug, biolink:Protein).",
+            ),
+          annotators: zod
+            .array(zod.string())
+            .nullish()
+            .describe(
+              "Optional list of annotator slugs to restrict mapping to. Null\/omitted means use all available annotators.",
+            ),
+          hints: zod
+            .record(
+              zod.string(),
+              zod.record(
+                zod.string(),
+                zod.union([zod.string(), zod.array(zod.string())]),
+              ),
+            )
+            .optional(),
+          hintColumns: zod
+            .record(zod.string(), zod.string())
+            .default(updateJobResponseTwoConfigHintColumnsDefault)
+            .describe(
+              "Maps inferred CURIE prefix to original column name from uploaded file",
+            ),
+        })
+        .nullish(),
+    }),
+  );
+
+/**
+ * @summary Delete a job
+ */
+export const DeleteJobParams = zod.object({
+  jobId: zod.coerce.string(),
+});
