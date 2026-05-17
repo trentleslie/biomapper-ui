@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 from typing import Literal
 
@@ -17,6 +17,6 @@ class FeedbackRequest(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     category: Literal["annotation_issue", "feature_request", "ui_error"]
-    description: str
+    description: str = Field(min_length=10, max_length=5000)
     metadata: FeedbackMeta = FeedbackMeta()
     user_email: str
