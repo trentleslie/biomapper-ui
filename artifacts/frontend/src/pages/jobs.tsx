@@ -62,7 +62,7 @@ export default function JobsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: jobs, isLoading } = useListJobs({ query: { retry: 1 } });
+  const { data: jobs, isLoading } = useListJobs({ query: { queryKey: getListJobsQueryKey(), retry: 1 } });
   const updateMutation = useUpdateJob();
   const deleteMutation = useDeleteJob();
 

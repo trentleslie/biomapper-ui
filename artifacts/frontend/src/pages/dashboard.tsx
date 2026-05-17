@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { useLocation, useParams, useSearch, Link } from "wouter";
 import { useMappingStream } from "@/hooks/use-mapping-stream";
 import { loadOriginalData, type OriginalData } from "@/lib/original-data-store";
-import { useGetMappingResult, getGetMappingResultQueryKey, JobResult, useGetJob, ApiError } from "@workspace/api-client-react";
+import { useGetMappingResult, getGetMappingResultQueryKey, JobResult, useGetJob, getGetJobQueryKey, ApiError } from "@workspace/api-client-react";
 import type { JobDetail } from "@workspace/api-client-react";
 import { SankeyChart } from "@/components/SankeyChart";
 import { EquivalentIds } from "@/components/EquivalentIds";
@@ -71,6 +71,7 @@ export default function DashboardPage() {
 
   const { data: persistedJob, error: persistedJobError, isLoading: persistedJobLoading } = useGetJob(jobId || "", {
     query: {
+      queryKey: getGetJobQueryKey(jobId || ""),
       enabled: !!jobId,
       retry: (failureCount, error) => {
         // Don't retry 404s — the job simply isn't persisted yet

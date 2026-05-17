@@ -2,7 +2,7 @@ import { type ReactNode } from "react";
 import { useRoute, Link, useLocation } from "wouter";
 import { useUser, useClerk } from "@clerk/react";
 import { UploadCloud, BarChart3, List } from "lucide-react";
-import { useListJobs } from "@workspace/api-client-react";
+import { useListJobs, getListJobsQueryKey } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EnvToggle } from "@/components/EnvToggle";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,7 @@ function SideNav() {
 
   // Fetch recent jobs for sidebar
   const { data: recentJobs, isLoading: jobsLoading } = useListJobs({
-    query: { retry: 1 },
+    query: { queryKey: getListJobsQueryKey(), retry: 1 },
   });
 
   // Take the 5 most recent
