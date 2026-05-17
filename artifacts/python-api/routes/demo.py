@@ -1,5 +1,6 @@
 import asyncio
 import csv
+import logging
 import uuid
 from pathlib import Path
 
@@ -11,38 +12,46 @@ from services.env_routing import resolve_env_base_url
 from services.jobs import job_store
 from services.mapper import MapperService
 
+logger = logging.getLogger("entity-linker.demo")
+
 router = APIRouter()
 
-# --- Demo dataset: read and validate at import time ---
+# --- Demo dataset: read at import time (non-fatal if missing) ---
 
 DEMO_NAME_COLUMN = "compound_name"
 DEMO_CSV_PATH = Path(__file__).resolve().parent.parent / "data" / "demo_dataset.csv"
 DEMO_TTL_SECONDS = 600  # 10 minutes
 
 _demo_names: list[str] = []
+_demo_error: str | None = None
 
 try:
     with open(DEMO_CSV_PATH, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         if DEMO_NAME_COLUMN not in (reader.fieldnames or []):
-            raise RuntimeError(
+            _demo_error = (
                 f"Demo CSV missing required column '{DEMO_NAME_COLUMN}'. "
                 f"Found columns: {reader.fieldnames}"
             )
-        seen: set[str] = set()
-        for row in reader:
-            name = row[DEMO_NAME_COLUMN].strip()
-            if name and name not in seen:
-                _demo_names.append(name)
-                seen.add(name)
+            logger.error(_demo_error)
+        else:
+            seen: set[str] = set()
+            for row in reader:
+                name = row[DEMO_NAME_COLUMN].strip()
+                if name and name not in seen:
+                    _demo_names.append(name)
+                    seen.add(name)
+            if not _demo_names:
+                _demo_error = "Demo dataset contains no valid names."
+                logger.error(_demo_error)
+            else:
+                logger.info("Demo dataset loaded: %d unique names from %s", len(_demo_names), DEMO_CSV_PATH)
 except FileNotFoundError:
-    raise RuntimeError(
-        f"Demo dataset not found at {DEMO_CSV_PATH}. "
-        "Cannot start server without demo data."
-    )
-
-if not _demo_names:
-    raise RuntimeError("Demo dataset contains no valid names.")
+    _demo_error = f"Demo dataset not found at {DEMO_CSV_PATH}"
+    logger.error(_demo_error)
+except Exception as e:
+    _demo_error = f"Failed to load demo dataset: {e}"
+    logger.error(_demo_error)
 
 # --- Concurrency cap ---
 
@@ -59,6 +68,12 @@ def _get_semaphore() -> asyncio.Semaphore:
 
 @router.post("/demo")
 async def start_demo(background_tasks: BackgroundTasks) -> dict | JSONResponse:
+    if _demo_error or not _demo_names:
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "Demo is temporarily unavailable."},
+        )
+
     sem = _get_semaphore()
     if sem.locked():
         return JSONResponse(
