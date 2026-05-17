@@ -17,7 +17,7 @@ export function FeedbackButton() {
             size="icon"
             aria-label="Submit feedback"
             className={cn(
-              "fixed bottom-6 right-6 z-50 rounded-full opacity-70 transition-all duration-200 hover:opacity-100 hover:scale-110",
+              "fixed bottom-4 right-4 md:bottom-6 md:right-6 z-50 rounded-full opacity-70 transition-all duration-200 hover:opacity-100 hover:scale-110",
               open && "opacity-0 pointer-events-none",
             )}
             onClick={() => setOpen(true)}

@@ -52,7 +52,7 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
   // Capture context when dialog opens
   useEffect(() => {
     if (open) {
-      setPageUrl(window.location.href);
+      setPageUrl(window.location.pathname);
       setJobId(extractJobId());
     }
   }, [open]);
