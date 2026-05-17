@@ -5,6 +5,7 @@ import { UploadCloud, BarChart3, List } from "lucide-react";
 import { useListJobs, getListJobsQueryKey } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EnvToggle } from "@/components/EnvToggle";
+import { FeedbackButton } from "@/components/FeedbackButton";
 import { Button } from "@/components/ui/button";
 
 function SideNav() {
@@ -139,6 +140,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </main>
       </div>
+
+      <FeedbackButton />
     </div>
   );
 }
