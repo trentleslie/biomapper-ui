@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { useLocation, useParams, useSearch, Link } from "wouter";
 import { useMappingStream } from "@/hooks/use-mapping-stream";
 import { loadOriginalData, type OriginalData } from "@/lib/original-data-store";
-import { useGetMappingResult, getGetMappingResultQueryKey, JobResult, useGetJob, getGetJobQueryKey, ApiError } from "@workspace/api-client-react";
+import { useGetMappingResult, getGetMappingResultQueryKey, JobResult, useGetJob, getGetJobQueryKey, useListFlags, getListFlagsQueryKey, useCreateFlag, useDeleteFlag, ApiError } from "@workspace/api-client-react";
 import type { JobDetail } from "@workspace/api-client-react";
 import { SankeyChart } from "@/components/SankeyChart";
 import { EquivalentIds } from "@/components/EquivalentIds";
@@ -68,6 +68,34 @@ export default function DashboardPage() {
 
   const { env, setEnv } = useEnv();
   const { toast } = useToast();
+
+  // --- Persistent flags (authenticated users only) ---
+  const { data: persistedFlags } = useListFlags({
+    query: {
+      queryKey: getListFlagsQueryKey(),
+      enabled: !isDemo,
+    },
+  });
+
+  const createFlagMutation = useCreateFlag();
+  const deleteFlagMutation = useDeleteFlag();
+
+  // Seed flaggedNames from API response, merging with any in-flight optimistic updates
+  useEffect(() => {
+    if (persistedFlags && !isDemo) {
+      setFlaggedNames(prev => {
+        const apiSet = new Set(persistedFlags);
+        // If there are no local flags yet (initial load), just use the API set
+        if (prev.size === 0) return apiSet;
+        // Otherwise merge: keep local optimistic state, add any from API not locally tracked
+        const merged = new Set(prev);
+        for (const name of persistedFlags) {
+          merged.add(name);
+        }
+        return merged;
+      });
+    }
+  }, [persistedFlags, isDemo]);
 
   const { data: persistedJob, error: persistedJobError, isLoading: persistedJobLoading } = useGetJob(jobId || "", {
     query: {
@@ -198,11 +226,37 @@ export default function DashboardPage() {
   );
 
   const flagReviewItem = (name: string) => {
+    const wasFlagged = flaggedNames.has(name);
+
+    // Optimistic update
     setFlaggedNames(prev => {
       const next = new Set(prev);
-      if (next.has(name)) next.delete(name); else next.add(name);
+      if (wasFlagged) next.delete(name); else next.add(name);
       return next;
     });
+
+    // Persist to API (skip for demo mode)
+    if (!isDemo) {
+      const mutation = wasFlagged ? deleteFlagMutation : createFlagMutation;
+      mutation.mutate(
+        { params: { name } },
+        {
+          onError: () => {
+            // Revert optimistic update on failure
+            setFlaggedNames(prev => {
+              const reverted = new Set(prev);
+              if (wasFlagged) reverted.add(name); else reverted.delete(name);
+              return reverted;
+            });
+            toast({
+              variant: "destructive",
+              title: "Failed to update flag",
+              description: `Could not ${wasFlagged ? "unflag" : "flag"} "${name}". Please try again.`,
+            });
+          },
+        },
+      );
+    }
   };
 
   const dismissReviewItem = (name: string) => {
