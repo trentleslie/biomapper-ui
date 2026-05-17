@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic.alias_generators import to_camel
 from typing import Literal
 
@@ -39,7 +39,7 @@ class JobListItem(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     job_id: str
-    user_id: str | None = None
+    user_id: str | None = Field(default=None, exclude=True)
     display_name: str | None = None
     status: str
     total: int

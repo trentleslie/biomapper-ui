@@ -159,7 +159,6 @@ export const JobListItemStatus = {
 
 export interface JobListItem {
   jobId: string;
-  userId?: string | null;
   displayName?: string | null;
   status: JobListItemStatus;
   total: number;

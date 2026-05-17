@@ -9,7 +9,6 @@ import type { JobListItemStatus } from "./jobListItemStatus";
 
 export interface JobListItem {
   jobId: string;
-  userId?: string | null;
   displayName?: string | null;
   status: JobListItemStatus;
   total: number;

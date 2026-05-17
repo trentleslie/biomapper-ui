@@ -167,7 +167,6 @@ export const GetMappingResultResponse = zod.object({
  */
 export const ListJobsResponseItem = zod.object({
   jobId: zod.string(),
-  userId: zod.string().nullish(),
   displayName: zod.string().nullish(),
   status: zod.enum(["pending", "processing", "complete", "error"]),
   total: zod.number(),
@@ -195,7 +194,6 @@ export const getJobResponseTwoConfigHintColumnsDefault = {};
 export const GetJobResponse = zod
   .object({
     jobId: zod.string(),
-    userId: zod.string().nullish(),
     displayName: zod.string().nullish(),
     status: zod.enum(["pending", "processing", "complete", "error"]),
     total: zod.number(),
@@ -301,7 +299,6 @@ export const updateJobResponseTwoConfigHintColumnsDefault = {};
 export const UpdateJobResponse = zod
   .object({
     jobId: zod.string(),
-    userId: zod.string().nullish(),
     displayName: zod.string().nullish(),
     status: zod.enum(["pending", "processing", "complete", "error"]),
     total: zod.number(),

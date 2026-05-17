@@ -113,6 +113,8 @@ class JobStore:
                     job_id,
                     status="error",
                     error_message=message,
+                    completed=job.completed,
+                    error_count=job.error_count,
                 )
             except Exception:
                 logger.exception("Failed to persist job error %s to database", job_id)
