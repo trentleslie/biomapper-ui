@@ -24,8 +24,9 @@ import {
 } from "@/components/ui/table";
 import {
   Download, AlertCircle, Loader2,
-  ChevronDown, ChevronRight, ChevronUp, Search, Flag, X,
+  ChevronDown, ChevronRight, ChevronUp, Search, Flag, X, LogIn,
 } from "lucide-react";
+import { Link } from "wouter";
 
 const TIER_COLORS: Record<string, string> = {
   high: '#005B33',
@@ -53,6 +54,7 @@ export default function DashboardPage() {
   const initialConfidence = (params.get("confidence") as ConfidenceFilter) || "all";
   // Total rows from the uploaded file (before dedup); passed from upload page via URL param
   const urlTotalRows = params.get("totalRows") ? parseInt(params.get("totalRows")!, 10) : null;
+  const isDemo = params.get("demo") === "true";
 
   const [visibleOntologies] = useState<Set<string>>(initialOntologies);
   const [confidenceFilter, setConfidenceFilter] = useState<ConfidenceFilter>(initialConfidence);
@@ -524,7 +526,9 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <p className="text-neutral-500">The job could not be loaded or an error occurred.</p>
-            <Button className="mt-4" onClick={() => setLocation("/upload")}>Return to Upload</Button>
+            <Button className="mt-4" onClick={() => setLocation(isDemo ? "/demo" : "/upload")}>
+              {isDemo ? "Try Again" : "Return to Upload"}
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -571,8 +575,14 @@ export default function DashboardPage() {
 
   return (
     <>
+      {isDemo && isProcessing && (
+        <div className="mb-4 text-sm text-neutral-600 bg-neutral-50 border border-neutral-200 rounded-lg px-4 py-3">
+          Mapping 100 sample metabolite names across biological databases...
+        </div>
+      )}
+
       <div className="mb-8">
-        <nav className="text-xs text-neutral-500 mb-2">Jobs / {jobId}</nav>
+        <nav className="text-xs text-neutral-500 mb-2">{isDemo ? "Demo" : `Jobs / ${jobId}`}</nav>
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight flex items-center gap-2">
@@ -799,7 +809,7 @@ export default function DashboardPage() {
                         <TableHead>Primary Curie</TableHead>
                         <TableHead>Tier</TableHead>
                         <TableHead>Reason</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        {!isDemo && <TableHead className="text-right">Actions</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -824,6 +834,7 @@ export default function DashboardPage() {
                             <TableCell className="text-xs text-neutral-500">
                               {!row.resolved ? "No match found" : row.needsReview ? "Flagged by system" : "Low confidence"}
                             </TableCell>
+                            {!isDemo && (
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-1">
                                 <Button
@@ -850,6 +861,7 @@ export default function DashboardPage() {
                                 </Button>
                               </div>
                             </TableCell>
+                            )}
                           </TableRow>
                         );
                       })}
@@ -1060,6 +1072,25 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </>
+        )}
+
+        {isDemo && done && !isProcessing && (
+          <Card className="border-ph-navy/20 bg-ph-navy/5">
+            <CardContent className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div>
+                <p className="font-medium text-neutral-900">Ready to annotate your own data?</p>
+                <p className="text-sm text-neutral-600 mt-0.5">
+                  Sign in to upload your datasets and run custom mapping jobs.
+                </p>
+              </div>
+              <Link href="/login">
+                <Button size="lg" className="shrink-0">
+                  <LogIn className="w-4 h-4 mr-2" />
+                  Sign In
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
         )}
       </div>
     </>

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { ClerkProvider, SignIn, SignUp, useClerk, useUser } from '@clerk/react';
-import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from 'wouter';
+import { Switch, Route, useLocation, useSearch, Router as WouterRouter, Redirect } from 'wouter';
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,6 +12,7 @@ import DemoPage from "@/pages/demo";
 import NotFound from "@/pages/not-found";
 import { EnvProvider } from "@/contexts/env-context";
 import { AppShell } from "@/components/AppShell";
+import { DemoShell } from "@/components/DemoShell";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 if (!clerkPubKey) {
@@ -83,6 +84,18 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   return <AppShell><Component /></AppShell>;
 }
 
+function JobRouteGate() {
+  const searchString = useSearch();
+  const params = new URLSearchParams(searchString);
+  const isDemo = params.get("demo") === "true";
+
+  if (isDemo) {
+    return <DemoShell><DashboardPage /></DemoShell>;
+  }
+
+  return <ProtectedRoute component={DashboardPage} />;
+}
+
 function Router() {
   return (
     <Switch>
@@ -109,9 +122,9 @@ function Router() {
         {() => <ProtectedRoute component={UploadPage} />}
       </Route>
 
-      {/* /job/:jobId = canonical dashboard route per spec */}
+      {/* /job/:jobId = canonical dashboard route; demo mode bypasses auth */}
       <Route path="/job/:jobId">
-        {() => <ProtectedRoute component={DashboardPage} />}
+        {() => <JobRouteGate />}
       </Route>
 
       {/* /dashboard/:jobId redirects to canonical /job/:jobId */}
