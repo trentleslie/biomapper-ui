@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { MessageSquarePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { cn } from "@/lib/utils";
 
 export function FeedbackButton() {
@@ -21,7 +22,7 @@ export function FeedbackButton() {
         <MessageSquarePlus />
       </Button>
 
-      {/* TODO: Replace with <FeedbackDialog open={open} onOpenChange={setOpen} /> in Unit 4 */}
+      <FeedbackDialog open={open} onOpenChange={setOpen} />
     </>
   );
 }
