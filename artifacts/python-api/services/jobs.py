@@ -119,6 +119,9 @@ class JobStore:
             except Exception:
                 logger.exception("Failed to persist job error %s to database", job_id)
 
+    def evict(self, job_id: str) -> None:
+        self._jobs.pop(job_id, None)
+
     def purge_expired(self) -> int:
         now = time.time()
         expired = [jid for jid, j in self._jobs.items() if now - j.created_at > j.ttl_seconds]

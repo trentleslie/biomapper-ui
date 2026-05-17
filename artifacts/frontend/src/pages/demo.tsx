@@ -95,7 +95,7 @@ export default function DemoPage() {
               <div>
                 <p className="text-sm font-medium text-neutral-900">Preloaded Dataset</p>
                 <p className="text-xs text-neutral-500 mt-0.5">
-                  102 unique metabolite names &middot; Entity type: <Badge variant="outline" className="text-xs ml-1">biolink:SmallMolecule</Badge>
+                  ~100 metabolite names &middot; Entity type: <Badge variant="outline" className="text-xs ml-1">biolink:SmallMolecule</Badge>
                 </p>
               </div>
               <Badge variant="secondary">Ready</Badge>

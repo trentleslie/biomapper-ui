@@ -19,4 +19,4 @@ class FeedbackRequest(BaseModel):
     category: Literal["annotation_issue", "feature_request", "ui_error"]
     description: str = Field(min_length=10, max_length=5000)
     metadata: FeedbackMeta = FeedbackMeta()
-    user_email: str
+    user_email: str = Field(max_length=254)
