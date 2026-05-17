@@ -47,3 +47,17 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.pyc
+
+# SQLite databases
+artifacts/python-api/data/*.db
+artifacts/python-api/data/*.db-wal
+artifacts/python-api/data/*.db-shm

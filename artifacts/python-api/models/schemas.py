@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic.alias_generators import to_camel
 from typing import Literal
 
@@ -33,3 +33,30 @@ class JobStatus(BaseModel):
     error_count: int
     error_message: str | None = None
     results: list[dict] = []
+
+
+class JobListItem(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    job_id: str
+    user_id: str | None = Field(default=None, exclude=True)
+    display_name: str | None = None
+    status: str
+    total: int
+    completed: int
+    error_count: int
+    error_message: str | None = None
+    env: str
+    created_at: float
+    updated_at: float
+
+
+class JobDetail(JobListItem):
+    results: list[dict] = []
+    config: dict | None = None
+
+
+class JobUpdate(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    display_name: str | None = None

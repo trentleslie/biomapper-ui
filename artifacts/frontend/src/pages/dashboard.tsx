@@ -1,8 +1,9 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { useLocation, useParams, useSearch } from "wouter";
+import { useLocation, useParams, useSearch, Link } from "wouter";
 import { useMappingStream } from "@/hooks/use-mapping-stream";
 import { loadOriginalData, type OriginalData } from "@/lib/original-data-store";
-import { useGetMappingResult, getGetMappingResultQueryKey, JobResult } from "@workspace/api-client-react";
+import { useGetMappingResult, getGetMappingResultQueryKey, JobResult, useGetJob, getGetJobQueryKey, ApiError } from "@workspace/api-client-react";
+import type { JobDetail } from "@workspace/api-client-react";
 import { SankeyChart } from "@/components/SankeyChart";
 import { EquivalentIds } from "@/components/EquivalentIds";
 import { useEnv } from "@/contexts/env-context";
@@ -24,7 +25,7 @@ import {
 } from "@/components/ui/table";
 import {
   Download, AlertCircle, Loader2,
-  ChevronDown, ChevronRight, ChevronUp, Search, Flag, X,
+  ChevronDown, ChevronRight, ChevronUp, Search, Flag, X, LogIn,
 } from "lucide-react";
 
 const TIER_COLORS: Record<string, string> = {
@@ -53,6 +54,7 @@ export default function DashboardPage() {
   const initialConfidence = (params.get("confidence") as ConfidenceFilter) || "all";
   // Total rows from the uploaded file (before dedup); passed from upload page via URL param
   const urlTotalRows = params.get("totalRows") ? parseInt(params.get("totalRows")!, 10) : null;
+  const isDemo = params.get("demo") === "true";
 
   const [visibleOntologies] = useState<Set<string>>(initialOntologies);
   const [confidenceFilter, setConfidenceFilter] = useState<ConfidenceFilter>(initialConfidence);
@@ -67,10 +69,28 @@ export default function DashboardPage() {
   const { env, setEnv } = useEnv();
   const { toast } = useToast();
 
-  const { jobState, done, error: streamError } = useMappingStream(jobId || "");
+  const { data: persistedJob, error: persistedJobError, isLoading: persistedJobLoading } = useGetJob(jobId || "", {
+    query: {
+      queryKey: getGetJobQueryKey(jobId || ""),
+      enabled: !!jobId && !isDemo,
+      retry: (failureCount, error) => {
+        // Don't retry 404s — the job simply isn't persisted yet
+        if (error instanceof ApiError && error.status === 404) return false;
+        return failureCount < 2;
+      },
+    },
+  });
+
+  // SSE is enabled optimistically while we check persistence.
+  // Once we know the job is persisted and terminal, disable SSE.
+  const isPersistedTerminal = persistedJob &&
+    (persistedJob.status === "complete" || persistedJob.status === "error");
+  const sseEnabled = !isPersistedTerminal;
+
+  const { jobState, done, error: streamError } = useMappingStream(jobId || "", sseEnabled);
   const { data: finalResult, isLoading } = useGetMappingResult(jobId || "", {
     query: {
-      enabled: done || (!jobState && !!jobId),
+      enabled: !isPersistedTerminal && (done || (!jobState && !!jobId)),
       queryKey: getGetMappingResultQueryKey(jobId || ""),
     }
   });
@@ -95,10 +115,13 @@ export default function DashboardPage() {
   // hasn't fired yet (e.g., page reload of a completed job). The jobState ?? prefix
   // ensures live stream data takes precedence; the fallback is only reached when
   // jobState is null.
-  const job = jobState ?? (finalResult && "status" in finalResult ? finalResult : null);
+  const job = jobState ?? (persistedJob && "status" in persistedJob ? persistedJob : null) ?? (finalResult && "status" in finalResult ? finalResult : null);
   // Surface an error if: (a) API returned an error response with "detail", OR
   // (b) loading finished but we have no job data at all (network failure, 404, etc.)
-  const isError = !isLoading && !jobState && (!job || "detail" in job);
+  // Don't flag an error while SSE is still active — the result endpoint returns
+  // 202 before the job completes, which looks like a failure to TanStack Query.
+  const sseStillActive = sseEnabled && !done && !streamError;
+  const isError = !sseStillActive && !isLoading && !persistedJobLoading && !jobState && (!job || "detail" in job);
   const jobData = job && !("detail" in job) ? job as JobResult : null;
   const results = (jobData?.results || []) as MappingResult[];
 
@@ -524,7 +547,9 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <p className="text-neutral-500">The job could not be loaded or an error occurred.</p>
-            <Button className="mt-4" onClick={() => setLocation("/upload")}>Return to Upload</Button>
+            <Button className="mt-4" onClick={() => setLocation(isDemo ? "/demo" : "/upload")}>
+              {isDemo ? "Try Again" : "Return to Upload"}
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -571,8 +596,22 @@ export default function DashboardPage() {
 
   return (
     <>
+      {isDemo && isProcessing && (
+        <div className="mb-4 text-sm text-neutral-600 bg-neutral-50 border border-neutral-200 rounded-lg px-4 py-3">
+          Mapping {jobData.total} sample metabolite names across biological databases...
+        </div>
+      )}
+
       <div className="mb-8">
-        <nav className="text-xs text-neutral-500 mb-2">Jobs / {jobId}</nav>
+        <nav className="text-xs text-neutral-500 mb-2">
+          {isDemo ? "Demo" : (
+            <>
+              <Link href="/jobs" className="hover:text-neutral-700">Jobs</Link>
+              {" / "}
+              {persistedJob?.displayName || (jobId ? `${jobId.slice(0, 8)}...` : jobId)}
+            </>
+          )}
+        </nav>
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight flex items-center gap-2">
@@ -799,7 +838,7 @@ export default function DashboardPage() {
                         <TableHead>Primary Curie</TableHead>
                         <TableHead>Tier</TableHead>
                         <TableHead>Reason</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        {!isDemo && <TableHead className="text-right">Actions</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -824,6 +863,7 @@ export default function DashboardPage() {
                             <TableCell className="text-xs text-neutral-500">
                               {!row.resolved ? "No match found" : row.needsReview ? "Flagged by system" : "Low confidence"}
                             </TableCell>
+                            {!isDemo && (
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-1">
                                 <Button
@@ -850,6 +890,7 @@ export default function DashboardPage() {
                                 </Button>
                               </div>
                             </TableCell>
+                            )}
                           </TableRow>
                         );
                       })}
@@ -1060,6 +1101,25 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </>
+        )}
+
+        {isDemo && done && !isProcessing && (
+          <Card className="border-ph-navy/20 bg-ph-navy/5">
+            <CardContent className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div>
+                <p className="font-medium text-neutral-900">Ready to annotate your own data?</p>
+                <p className="text-sm text-neutral-600 mt-0.5">
+                  Sign in to upload your datasets and run custom mapping jobs.
+                </p>
+              </div>
+              <Link href="/login">
+                <Button size="lg" className="shrink-0">
+                  <LogIn className="w-4 h-4 mr-2" />
+                  Sign In
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
         )}
       </div>
     </>

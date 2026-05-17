@@ -147,6 +147,38 @@ export interface JobResult {
   results: MappingResultItem[];
 }
 
+export type JobListItemStatus =
+  (typeof JobListItemStatus)[keyof typeof JobListItemStatus];
+
+export const JobListItemStatus = {
+  pending: "pending",
+  processing: "processing",
+  complete: "complete",
+  error: "error",
+} as const;
+
+export interface JobListItem {
+  jobId: string;
+  displayName?: string | null;
+  status: JobListItemStatus;
+  total: number;
+  completed: number;
+  errorCount: number;
+  errorMessage?: string | null;
+  env: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type JobDetail = JobListItem & {
+  results?: MappingResultItem[];
+  config?: MappingConfig | null;
+};
+
+export interface JobUpdateRequest {
+  displayName?: string | null;
+}
+
 export interface ErrorResponse {
   detail: string;
 }

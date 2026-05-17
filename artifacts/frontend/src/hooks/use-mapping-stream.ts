@@ -11,7 +11,7 @@ export interface StreamError {
 
 type JobResultWithEnv = JobResult & { env?: string };
 
-export function useMappingStream(jobId: string) {
+export function useMappingStream(jobId: string, enabled: boolean = true) {
   const [jobState, setJobState] = useState<JobResult | null>(null);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<StreamError | null>(null);
@@ -21,6 +21,7 @@ export function useMappingStream(jobId: string) {
 
   useEffect(() => {
     mountedRef.current = true;
+    if (!enabled) return;
     if (!jobId) return;
 
     function connect(retryCount: number) {
@@ -40,7 +41,7 @@ export function useMappingStream(jobId: string) {
           } else if (data.status === "error") {
             const isDevEnv = data.env === "dev";
             setError({
-              message: data.error_message ?? "Mapping failed",
+              message: (data as any).errorMessage ?? data.error_message ?? "Mapping failed",
               isDevEnvError: isDevEnv,
             });
             setDone(true);
@@ -77,7 +78,7 @@ export function useMappingStream(jobId: string) {
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
       esRef.current?.close();
     };
-  }, [jobId]);
+  }, [jobId, enabled]);
 
   return { jobState, done, error };
 }
