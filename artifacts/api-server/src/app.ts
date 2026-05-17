@@ -56,7 +56,7 @@ if (clerkEnabled) {
  *
  * Requires the request to be from an authenticated Clerk user.
  */
-const requireMapAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+const requireMapAuth = (req: Request, res: Response, next: NextFunction): void => {
   const auth = getAuth(req);
   if (!auth?.userId) {
     res.status(401).json({ detail: "Authentication required." });
