@@ -14,6 +14,8 @@ tags:
     description: Entity linking / BioMapper2 mapping operations
   - name: discovery
     description: BioMapper2 discovery endpoints (entity types, annotators, vocabularies)
+  - name: flags
+    description: User-scoped metabolite flag operations
   - name: jobs
     description: Job history and management operations
 paths:
@@ -179,6 +181,89 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /flags:
+    get:
+      operationId: listFlags
+      tags: [flags]
+      summary: List flagged metabolite names for the authenticated user
+      responses:
+        "200":
+          description: List of flagged metabolite names
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "400":
+          description: Missing user ID header
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: createFlag
+      tags: [flags]
+      summary: Flag a metabolite name for the authenticated user
+      parameters:
+        - name: name
+          in: query
+          required: true
+          description: Metabolite name to flag
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 500
+      responses:
+        "204":
+          description: Flag created or already exists
+        "400":
+          description: Missing user ID header
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Flag limit reached (max 1000 per user)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Invalid name parameter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteFlag
+      tags: [flags]
+      summary: Unflag a metabolite name for the authenticated user
+      parameters:
+        - name: name
+          in: query
+          required: true
+          description: Metabolite name to unflag
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 500
+      responses:
+        "204":
+          description: Flag removed
+        "400":
+          description: Missing user ID header
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Invalid name parameter
           content:
             application/json:
               schema:

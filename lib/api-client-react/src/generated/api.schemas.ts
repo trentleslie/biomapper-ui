@@ -182,3 +182,17 @@ export interface JobUpdateRequest {
 export interface ErrorResponse {
   detail: string;
 }
+
+export type CreateFlagParams = {
+  /**
+   * Metabolite name to flag
+   */
+  name: string;
+};
+
+export type DeleteFlagParams = {
+  /**
+   * Metabolite name to unflag
+   */
+  name: string;
+};
