@@ -174,7 +174,7 @@ app.use(
   createProxyMiddleware({
     target: PYTHON_API_BASE,
     changeOrigin: true,
-    pathRewrite: (path: string) => "/feedback" + (path === "/" ? "" : path),
+    pathRewrite: (path: string) => "/feedback" + path.replace(/^\/(?=\?|$)/, ""),
     on: {
       error: (_err, _req, res) => {
         if (!("headersSent" in res && res.headersSent)) {
