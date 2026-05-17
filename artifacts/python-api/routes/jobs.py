@@ -40,7 +40,9 @@ async def update_job(
     job = await database.get_job(job_id)
     if job is None or job.get("user_id") != x_clerk_user_id:
         raise HTTPException(status_code=404, detail="Job not found")
-    await database.update_job(job_id, display_name=body.display_name)
+    updates = body.model_dump(exclude_unset=True)
+    if updates:
+        await database.update_job(job_id, **updates)
     updated = await database.get_job(job_id)
     if updated is None:
         raise HTTPException(status_code=404, detail="Job not found")
