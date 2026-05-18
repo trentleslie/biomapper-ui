@@ -1,3 +1,4 @@
+import hmac
 import logging
 import os
 
@@ -23,11 +24,8 @@ async def submit_feedback(
         raise HTTPException(status_code=400, detail="Missing x-clerk-user-id header")
 
     feedback_id = await feedback_store.save(feedback)
-    masked_email = (
-        feedback.user_email[:3] + "...@" + feedback.user_email.split("@")[-1]
-        if "@" in feedback.user_email
-        else feedback.user_email[:3] + "..."
-    )
+    local, sep, domain = feedback.user_email.partition("@")
+    masked_email = local[:3] + "...@" + domain if sep else local[:3] + "..."
     logger.info(
         "Feedback received: category=%s user=%s id=%s",
         feedback.category,
@@ -46,6 +44,6 @@ async def list_feedback(
     limit: int = Query(100, ge=1, le=1000),
     x_api_key: str | None = Header(None),
 ) -> list[dict]:
-    if not _FEEDBACK_API_KEY or x_api_key != _FEEDBACK_API_KEY:
+    if not _FEEDBACK_API_KEY or not x_api_key or not hmac.compare_digest(x_api_key, _FEEDBACK_API_KEY):
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
     return await feedback_store.query(category=category, limit=limit)
