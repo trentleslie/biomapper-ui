@@ -61,4 +61,4 @@ async def delete_job(
     if job is None or job.get("user_id") != x_clerk_user_id:
         raise HTTPException(status_code=404, detail="Job not found")
     await database.delete_job(job_id)
-    job_store._jobs.pop(job_id, None)
+    job_store.evict(job_id)
