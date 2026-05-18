@@ -236,6 +236,15 @@ export default function DashboardPage() {
         { params: { name } },
         {
           onSuccess: () => {
+            // Synchronously update the query cache so the useEffect sees
+            // correct data when isMutating transitions to false (avoids
+            // a visible revert while invalidateQueries refetches async).
+            queryClient.setQueryData<string[]>(getListFlagsQueryKey(), (old) => {
+              if (!old) return wasFlagged ? [] : [name];
+              return wasFlagged
+                ? old.filter((n) => n !== name)
+                : old.includes(name) ? old : [...old, name];
+            });
             queryClient.invalidateQueries({ queryKey: getListFlagsQueryKey() });
           },
           onError: () => {
