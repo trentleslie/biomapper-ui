@@ -202,12 +202,23 @@ class Database:
         row = await cursor.fetchone()
         return row[0] if row else 0
 
-    async def upsert_flag(self, user_id: str, name: str) -> None:
-        await self._conn.execute(
-            "INSERT OR IGNORE INTO flagged_names (user_id, name, created_at) VALUES (?, ?, ?)",
-            (user_id, name, time.time()),
+    async def upsert_flag(self, user_id: str, name: str, cap: int = 1000) -> bool:
+        """Insert flag if under cap. Returns True if inserted or already exists, False if cap reached."""
+        cursor = await self._conn.execute(
+            """INSERT OR IGNORE INTO flagged_names (user_id, name, created_at)
+               SELECT ?, ?, ?
+               WHERE (SELECT COUNT(*) FROM flagged_names WHERE user_id = ?) < ?""",
+            (user_id, name, time.time(), user_id, cap),
         )
         await self._conn.commit()
+        if cursor.rowcount > 0:
+            return True  # Inserted
+        # rowcount == 0: either duplicate (idempotent) or cap reached
+        check = await self._conn.execute(
+            "SELECT 1 FROM flagged_names WHERE user_id = ? AND name = ?",
+            (user_id, name),
+        )
+        return (await check.fetchone()) is not None
 
     async def delete_flag(self, user_id: str, name: str) -> None:
         await self._conn.execute(

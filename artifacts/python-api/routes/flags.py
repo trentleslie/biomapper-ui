@@ -24,10 +24,9 @@ async def create_flag(
 ) -> None:
     if x_clerk_user_id is None:
         raise HTTPException(status_code=400, detail="Missing x-clerk-user-id header")
-    count = await database.count_flags(x_clerk_user_id)
-    if count >= _MAX_FLAGS_PER_USER:
+    ok = await database.upsert_flag(x_clerk_user_id, name, cap=_MAX_FLAGS_PER_USER)
+    if not ok:
         raise HTTPException(status_code=409, detail="Flag limit reached (max 1000)")
-    await database.upsert_flag(x_clerk_user_id, name)
 
 
 @router.delete("", status_code=204)

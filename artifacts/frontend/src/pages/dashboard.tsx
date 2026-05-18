@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { useLocation, useParams, useSearch, Link } from "wouter";
 import { useMappingStream } from "@/hooks/use-mapping-stream";
 import { loadOriginalData, type OriginalData } from "@/lib/original-data-store";
+import { useQueryClient } from "@tanstack/react-query";
 import { useGetMappingResult, getGetMappingResultQueryKey, JobResult, useGetJob, getGetJobQueryKey, useListFlags, getListFlagsQueryKey, useCreateFlag, useDeleteFlag, ApiError } from "@workspace/api-client-react";
 import type { JobDetail } from "@workspace/api-client-react";
 import { SankeyChart } from "@/components/SankeyChart";
@@ -68,6 +69,7 @@ export default function DashboardPage() {
 
   const { env, setEnv } = useEnv();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // --- Persistent flags (authenticated users only) ---
   const { data: persistedFlags } = useListFlags({
@@ -79,23 +81,15 @@ export default function DashboardPage() {
 
   const createFlagMutation = useCreateFlag();
   const deleteFlagMutation = useDeleteFlag();
+  const isMutating = createFlagMutation.isPending || deleteFlagMutation.isPending;
 
-  // Seed flaggedNames from API response, merging with any in-flight optimistic updates
+  // Sync flaggedNames from API response. Skip while mutations are in-flight
+  // to avoid stale refetches overwriting optimistic state.
   useEffect(() => {
-    if (persistedFlags && !isDemo) {
-      setFlaggedNames(prev => {
-        const apiSet = new Set(persistedFlags);
-        // If there are no local flags yet (initial load), just use the API set
-        if (prev.size === 0) return apiSet;
-        // Otherwise merge: keep local optimistic state, add any from API not locally tracked
-        const merged = new Set(prev);
-        for (const name of persistedFlags) {
-          merged.add(name);
-        }
-        return merged;
-      });
+    if (persistedFlags && !isDemo && !isMutating) {
+      setFlaggedNames(new Set(persistedFlags));
     }
-  }, [persistedFlags, isDemo]);
+  }, [persistedFlags, isDemo, isMutating]);
 
   const { data: persistedJob, error: persistedJobError, isLoading: persistedJobLoading } = useGetJob(jobId || "", {
     query: {
@@ -241,6 +235,9 @@ export default function DashboardPage() {
       mutation.mutate(
         { params: { name } },
         {
+          onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: getListFlagsQueryKey() });
+          },
           onError: () => {
             // Revert optimistic update on failure
             setFlaggedNames(prev => {
