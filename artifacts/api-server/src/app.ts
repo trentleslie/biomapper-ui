@@ -146,6 +146,27 @@ app.use(
   }),
 );
 
+// Flags endpoints — user-scoped, same auth gate as /api/map.
+app.use(
+  "/api/flags",
+  ...(clerkEnabled ? [requireMapAuth] : []),
+  createProxyMiddleware({
+    target: PYTHON_API_BASE,
+    changeOrigin: true,
+    pathRewrite: (path: string) => "/flags" + path.replace(/^\/(?=\?|$)/, ""),
+    on: {
+      proxyReq: onProxyReqInjectUser,
+      error: (_err, _req, res) => {
+        if (!("headersSent" in res && res.headersSent)) {
+          (res as express.Response)
+            .status(502)
+            .json({ detail: "Flags service unavailable. Please try again later." });
+        }
+      },
+    },
+  }),
+);
+
 // Jobs endpoints — user-scoped, same auth gate as /api/map.
 app.use(
   "/api/jobs",

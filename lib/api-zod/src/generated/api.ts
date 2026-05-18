@@ -391,3 +391,22 @@ export const UpdateJobResponse = zod
 export const DeleteJobParams = zod.object({
   jobId: zod.coerce.string(),
 });
+
+/**
+ * @summary List flagged metabolite names for the authenticated user
+ */
+export const ListFlagsResponse = zod.array(zod.string());
+
+/**
+ * @summary Flag a metabolite name for the authenticated user
+ */
+export const CreateFlagParams = zod.object({
+  name: zod.coerce.string().min(1).max(500),
+});
+
+/**
+ * @summary Unflag a metabolite name for the authenticated user
+ */
+export const DeleteFlagParams = zod.object({
+  name: zod.coerce.string().min(1).max(500),
+});

@@ -34,6 +34,15 @@ CREATE INDEX IF NOT EXISTS idx_jobs_user_created
 ON jobs (user_id, created_at DESC)
 """
 
+_CREATE_FLAGGED_NAMES_TABLE = """
+CREATE TABLE IF NOT EXISTS flagged_names (
+    user_id    TEXT NOT NULL,
+    name       TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    PRIMARY KEY (user_id, name)
+)
+"""
+
 
 class Database:
     """Async SQLite persistence layer for job history."""
@@ -53,6 +62,7 @@ class Database:
         await self._conn.execute("PRAGMA journal_mode=WAL")
         await self._conn.execute(_CREATE_TABLE)
         await self._conn.execute(_CREATE_INDEX)
+        await self._conn.execute(_CREATE_FLAGGED_NAMES_TABLE)
         await self._conn.commit()
 
         if existed:
@@ -171,6 +181,51 @@ class Database:
         if count:
             logger.info("Recovered %d stale job(s) on startup", count)
         return count
+
+    # ------------------------------------------------------------------
+    # Flags CRUD
+    # ------------------------------------------------------------------
+
+    async def list_flags(self, user_id: str) -> list[str]:
+        cursor = await self._conn.execute(
+            "SELECT name FROM flagged_names WHERE user_id = ? ORDER BY created_at DESC",
+            (user_id,),
+        )
+        rows = await cursor.fetchall()
+        return [row[0] for row in rows]
+
+    async def count_flags(self, user_id: str) -> int:
+        cursor = await self._conn.execute(
+            "SELECT COUNT(*) FROM flagged_names WHERE user_id = ?",
+            (user_id,),
+        )
+        row = await cursor.fetchone()
+        return row[0] if row else 0
+
+    async def upsert_flag(self, user_id: str, name: str, cap: int = 1000) -> bool:
+        """Insert flag if under cap. Returns True if inserted or already exists, False if cap reached."""
+        cursor = await self._conn.execute(
+            """INSERT OR IGNORE INTO flagged_names (user_id, name, created_at)
+               SELECT ?, ?, ?
+               WHERE (SELECT COUNT(*) FROM flagged_names WHERE user_id = ?) < ?""",
+            (user_id, name, time.time(), user_id, cap),
+        )
+        await self._conn.commit()
+        if cursor.rowcount > 0:
+            return True  # Inserted
+        # rowcount == 0: either duplicate (idempotent) or cap reached
+        check = await self._conn.execute(
+            "SELECT 1 FROM flagged_names WHERE user_id = ? AND name = ?",
+            (user_id, name),
+        )
+        return (await check.fetchone()) is not None
+
+    async def delete_flag(self, user_id: str, name: str) -> None:
+        await self._conn.execute(
+            "DELETE FROM flagged_names WHERE user_id = ? AND name = ?",
+            (user_id, name),
+        )
+        await self._conn.commit()
 
     # ------------------------------------------------------------------
     # Helpers
