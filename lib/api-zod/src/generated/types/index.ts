@@ -13,6 +13,8 @@ export * from "./createFlagParams";
 export * from "./deleteFlagParams";
 export * from "./entityType";
 export * from "./errorResponse";
+export * from "./flaggedNameCount";
+export * from "./flaggedNameCountResponse";
 export * from "./healthStatus";
 export * from "./jobDetail";
 export * from "./jobListItem";

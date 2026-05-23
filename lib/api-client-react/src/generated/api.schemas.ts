@@ -180,6 +180,16 @@ export interface JobUpdateRequest {
   displayName?: string | null;
 }
 
+export interface FlaggedNameCount {
+  name: string;
+  count: number;
+}
+
+export interface FlaggedNameCountResponse {
+  items: FlaggedNameCount[];
+  total: number;
+}
+
 export interface ErrorResponse {
   detail: string;
 }

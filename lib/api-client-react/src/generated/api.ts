@@ -24,6 +24,7 @@ import type {
   DeleteFlagParams,
   EntityType,
   ErrorResponse,
+  FlaggedNameCountResponse,
   HealthStatus,
   JobDetail,
   JobListItem,
@@ -842,6 +843,86 @@ export const useDeleteFlag = <
 > => {
   return useMutation(getDeleteFlagMutationOptions(options));
 };
+
+/**
+ * Returns metabolite names and the number of distinct users who have flagged each,
+ordered by count descending. The x-clerk-user-id header is required for
+authentication but the results are not filtered by user.
+
+ * @summary Aggregated flag counts across all users
+ */
+export const getListAllFlagsAggregatedUrl = () => {
+  return `/api/flags/all`;
+};
+
+export const listAllFlagsAggregated = async (
+  options?: RequestInit,
+): Promise<FlaggedNameCountResponse> => {
+  return customFetch<FlaggedNameCountResponse>(getListAllFlagsAggregatedUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAllFlagsAggregatedQueryKey = () => {
+  return [`/api/flags/all`] as const;
+};
+
+export const getListAllFlagsAggregatedQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAllFlagsAggregated>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listAllFlagsAggregated>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListAllFlagsAggregatedQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listAllFlagsAggregated>>
+  > = ({ signal }) => listAllFlagsAggregated({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAllFlagsAggregated>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAllFlagsAggregatedQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAllFlagsAggregated>>
+>;
+export type ListAllFlagsAggregatedQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Aggregated flag counts across all users
+ */
+
+export function useListAllFlagsAggregated<
+  TData = Awaited<ReturnType<typeof listAllFlagsAggregated>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listAllFlagsAggregated>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAllFlagsAggregatedQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary List past jobs for the authenticated user

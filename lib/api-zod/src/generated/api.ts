@@ -196,6 +196,27 @@ export const DeleteFlagQueryParams = zod.object({
 });
 
 /**
+ * Returns metabolite names and the number of distinct users who have flagged each,
+ordered by count descending. The x-clerk-user-id header is required for
+authentication but the results are not filtered by user.
+
+ * @summary Aggregated flag counts across all users
+ */
+export const ListAllFlagsAggregatedHeader = zod.object({
+  "x-clerk-user-id": zod.string(),
+});
+
+export const ListAllFlagsAggregatedResponse = zod.object({
+  items: zod.array(
+    zod.object({
+      name: zod.string(),
+      count: zod.number(),
+    }),
+  ),
+  total: zod.number(),
+});
+
+/**
  * @summary List past jobs for the authenticated user
  */
 export const ListJobsResponseItem = zod.object({

@@ -220,6 +220,28 @@ class Database:
         )
         return (await check.fetchone()) is not None
 
+    async def list_all_flags_aggregated(self) -> dict[str, Any]:
+        """Return aggregated flag counts across all users, ordered by count descending."""
+        cursor = await self._conn.execute(
+            """WITH grouped AS (
+                 SELECT name, COUNT(DISTINCT user_id) AS count
+                 FROM flagged_names
+                 GROUP BY name
+               )
+               SELECT name, count, COUNT(*) OVER () AS total
+               FROM grouped
+               ORDER BY count DESC
+               LIMIT 1000"""
+        )
+        rows = list(await cursor.fetchall())
+        if not rows:
+            return {"items": [], "total": 0}
+        total = rows[0][2]  # total from window function
+        if len(rows) == 1000 and total > 1000:
+            logger.debug("Flagged names truncated: returning 1000 of %d", total)
+        items = [{"name": row[0], "count": row[1]} for row in rows]
+        return {"items": items, "total": total}
+
     async def delete_flag(self, user_id: str, name: str) -> None:
         await self._conn.execute(
             "DELETE FROM flagged_names WHERE user_id = ? AND name = ?",

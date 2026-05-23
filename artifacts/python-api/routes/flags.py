@@ -17,6 +17,15 @@ async def list_flags(
     return await database.list_flags(x_clerk_user_id)
 
 
+@router.get("/all")
+async def list_all_flags_aggregated(
+    x_clerk_user_id: str | None = Header(None),
+) -> dict:
+    if x_clerk_user_id is None:
+        raise HTTPException(status_code=400, detail="Missing x-clerk-user-id header")
+    return await database.list_all_flags_aggregated()
+
+
 @router.put("", status_code=204)
 async def create_flag(
     name: str = Query(..., min_length=1, max_length=_MAX_NAME_LENGTH),

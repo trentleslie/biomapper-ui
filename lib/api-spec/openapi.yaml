@@ -269,6 +269,35 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /flags/all:
+    get:
+      operationId: listAllFlagsAggregated
+      tags: [flags]
+      summary: Aggregated flag counts across all users
+      description: |
+        Returns metabolite names and the number of distinct users who have flagged each,
+        ordered by count descending. The x-clerk-user-id header is required for
+        authentication but the results are not filtered by user.
+      parameters:
+        - name: x-clerk-user-id
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Aggregated flag counts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlaggedNameCountResponse"
+        "400":
+          description: Missing user ID header
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /jobs:
     get:
       operationId: listJobs
@@ -616,6 +645,30 @@ components:
         displayName:
           type: string
           nullable: true
+
+    FlaggedNameCount:
+      type: object
+      properties:
+        name:
+          type: string
+        count:
+          type: integer
+      required:
+        - name
+        - count
+
+    FlaggedNameCountResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/FlaggedNameCount"
+        total:
+          type: integer
+      required:
+        - items
+        - total
 
     ErrorResponse:
       type: object
