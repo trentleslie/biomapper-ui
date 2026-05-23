@@ -197,6 +197,7 @@ app.use(
     changeOrigin: true,
     pathRewrite: (path: string) => "/feedback" + path.replace(/^\/(?=\?|$)/, ""),
     on: {
+      proxyReq: onProxyReqInjectUser,
       error: (_err, _req, res) => {
         if (!("headersSent" in res && res.headersSent)) {
           (res as express.Response)

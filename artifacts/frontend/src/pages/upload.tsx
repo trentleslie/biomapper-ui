@@ -151,7 +151,8 @@ export default function UploadPage() {
   const entityTypes = entityTypesQuery.data ?? [];
   useEffect(() => {
     const matched = entityTypesQuery.data?.find(et => et.type === entityType);
-    const preset = matched?.defaultPrefixes ?? [];
+    const preset = matched?.defaultPrefixes ?? (entityTypesQuery.data ? [] : undefined);
+    if (preset === undefined) return;
     setSelectedVocabPrefixes(new Set(preset));
   }, [entityType, entityTypesQuery.data]);
 

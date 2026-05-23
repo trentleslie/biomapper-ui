@@ -488,10 +488,11 @@ export default function DashboardPage() {
   const handleDownloadCSV = async () => {
     if (!results || results.length === 0) return;
     const csvEscape = (val: string) => {
-      if (val.includes(",") || val.includes('"') || val.includes("\n")) {
-        return `"${val.replace(/"/g, '""')}"`;
+      const safe = /^[=+\-@]/.test(val) ? `\t${val}` : val;
+      if (safe.includes(",") || safe.includes('"') || safe.includes("\n")) {
+        return `"${safe.replace(/"/g, '""')}"`;
       }
-      return val;
+      return safe;
     };
     try {
       const { content } = await buildEnrichedDownload(",", csvEscape);
