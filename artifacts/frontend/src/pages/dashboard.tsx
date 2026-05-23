@@ -288,7 +288,8 @@ export default function DashboardPage() {
     if (!jobData || !summary) return;
     try {
       const originalData = jobId ? await loadOriginalData(jobId) : undefined;
-      const payload: Record<string, unknown> = { summary, results };
+      const flaggedResults = results.map(r => ({ ...r, flagged: flaggedNames.has(r.name) }));
+      const payload: Record<string, unknown> = { summary, results: flaggedResults };
       if (originalData) {
         payload.originalRows = originalData.parsedRows;
       }
@@ -327,7 +328,7 @@ export default function DashboardPage() {
     return { vocabCols, equivCols };
   };
 
-  const biomapperRowValues = (r: MappingResult, vocabCols: string[], equivCols: string[]) => {
+  const biomapperRowValues = (r: MappingResult, vocabCols: string[], equivCols: string[], flagged: boolean) => {
     const row: string[] = [
       r.resolved ? "true" : "false",
       r.primaryCurie || "",
@@ -347,6 +348,7 @@ export default function DashboardPage() {
     equivCols.forEach(p => {
       row.push(r.kgEquivalentIds?.[p]?.join("|") || "");
     });
+    row.push(flagged ? "true" : "false");
     return row;
   };
 
@@ -380,7 +382,7 @@ export default function DashboardPage() {
       const coreHeaders = ["resolved_biomapper", "primary_curie_biomapper", "confidence_tier_biomapper", "confidence_score_biomapper", "needs_review_biomapper"];
       const vocabHeaders = vocabCols.map(v => `${v}_biomapper`);
       const equivHeaders = equivCols.map(p => `equiv_${p}_biomapper`);
-      const allBiomapperHeaders = [...coreHeaders, ...vocabHeaders, ...equivHeaders];
+      const allBiomapperHeaders = [...coreHeaders, ...vocabHeaders, ...equivHeaders, "flagged_biomapper"];
 
       // Deduplicate biomapper headers against original column names.
       // Track generated names so two biomapper headers that collide with the same
@@ -408,7 +410,7 @@ export default function DashboardPage() {
 
         const originalValues = columns.map(col => esc(row[col] ?? ""));
         const bmValues = result
-          ? biomapperRowValues(result, vocabCols, equivCols).map(esc)
+          ? biomapperRowValues(result, vocabCols, equivCols, flaggedNames.has(result.name)).map(esc)
           : allBiomapperHeaders.map(() => "");
 
         return [...originalValues, ...bmValues].join(delimiter);
@@ -431,6 +433,7 @@ export default function DashboardPage() {
       ...sortedProvidedIdCols,
       ...vocabCols.map(v => hasProvidedIds ? `${v}_biomapper` : v),
       ...equivCols.map(p => hasProvidedIds ? `equiv_${p}_biomapper` : `equiv_${p}`),
+      "Flagged",
     ];
     const rows = results.map(r => {
       const row = [
@@ -457,6 +460,7 @@ export default function DashboardPage() {
       equivCols.forEach(p => {
         row.push(r.kgEquivalentIds?.[p]?.join("|") || "");
       });
+      row.push(flaggedNames.has(r.name) ? "true" : "false");
       return row.map(esc).join(delimiter);
     });
 
@@ -549,6 +553,11 @@ export default function DashboardPage() {
       .map(r => `- ${r.name}`)
       .join("\n") || "_None_";
 
+    const flaggedNamesList = results
+      .filter(r => flaggedNames.has(r.name))
+      .map(r => `- ${r.name}`)
+      .join("\n") || "_None_";
+
     const lines = [
       `# Entity Linking Report`,
       ``,
@@ -585,6 +594,10 @@ export default function DashboardPage() {
       `${unresolved} name(s) could not be resolved:`,
       ``,
       unresolvedNames,
+      ``,
+      `## Flagged Names`,
+      ``,
+      flaggedNamesList,
     ];
 
     const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
