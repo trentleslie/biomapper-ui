@@ -163,6 +163,59 @@ export const GetMappingResultResponse = zod.object({
 });
 
 /**
+ * @summary List flagged metabolite names for the authenticated user
+ */
+export const ListFlagsResponseItem = zod.string();
+export const ListFlagsResponse = zod.array(ListFlagsResponseItem);
+
+/**
+ * @summary Flag a metabolite name for the authenticated user
+ */
+export const createFlagQueryNameMax = 500;
+
+export const CreateFlagQueryParams = zod.object({
+  name: zod.coerce
+    .string()
+    .min(1)
+    .max(createFlagQueryNameMax)
+    .describe("Metabolite name to flag"),
+});
+
+/**
+ * @summary Unflag a metabolite name for the authenticated user
+ */
+export const deleteFlagQueryNameMax = 500;
+
+export const DeleteFlagQueryParams = zod.object({
+  name: zod.coerce
+    .string()
+    .min(1)
+    .max(deleteFlagQueryNameMax)
+    .describe("Metabolite name to unflag"),
+});
+
+/**
+ * Returns metabolite names and the number of distinct users who have flagged each,
+ordered by count descending. The x-clerk-user-id header is required for
+authentication but the results are not filtered by user.
+
+ * @summary Aggregated flag counts across all users
+ */
+export const ListAllFlagsAggregatedHeader = zod.object({
+  "x-clerk-user-id": zod.string(),
+});
+
+export const ListAllFlagsAggregatedResponse = zod.object({
+  items: zod.array(
+    zod.object({
+      name: zod.string(),
+      count: zod.number(),
+    }),
+  ),
+  total: zod.number(),
+});
+
+/**
  * @summary List past jobs for the authenticated user
  */
 export const ListJobsResponseItem = zod.object({
@@ -390,23 +443,4 @@ export const UpdateJobResponse = zod
  */
 export const DeleteJobParams = zod.object({
   jobId: zod.coerce.string(),
-});
-
-/**
- * @summary List flagged metabolite names for the authenticated user
- */
-export const ListFlagsResponse = zod.array(zod.string());
-
-/**
- * @summary Flag a metabolite name for the authenticated user
- */
-export const CreateFlagParams = zod.object({
-  name: zod.coerce.string().min(1).max(500),
-});
-
-/**
- * @summary Unflag a metabolite name for the authenticated user
- */
-export const DeleteFlagParams = zod.object({
-  name: zod.coerce.string().min(1).max(500),
 });
