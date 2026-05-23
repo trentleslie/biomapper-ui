@@ -237,6 +237,8 @@ class Database:
         if not rows:
             return {"items": [], "total": 0}
         total = rows[0][2]  # total from window function
+        if len(rows) == 1000 and total > 1000:
+            logger.debug("Flagged names truncated: returning 1000 of %d", total)
         items = [{"name": row[0], "count": row[1]} for row in rows]
         return {"items": items, "total": total}
 

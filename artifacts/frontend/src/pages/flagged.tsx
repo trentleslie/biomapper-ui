@@ -5,8 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Flag, Download } from "lucide-react";
 
 function escapeCsvField(value: string): string {
-  // Quote all fields; double any internal quotes to prevent CSV injection
-  return `"${value.replace(/"/g, '""')}"`;
+  // Quote all fields and double internal quotes.
+  // Also prefix formula-trigger characters (=, +, -, @) with a tab to
+  // neutralise spreadsheet formula injection (Excel / Google Sheets).
+  const safe = /^[=+\-@]/.test(value) ? `\t${value}` : value;
+  return `"${safe.replace(/"/g, '""')}"`;
 }
 
 export default function FlaggedPage() {
