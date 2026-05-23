@@ -147,12 +147,13 @@ export default function UploadPage() {
   const startMapping = useStartMappingBatch();
 
   // When entity type changes (or entity types data loads), swap the default vocab selection preset.
+  // Use entityTypesQuery.data directly in the dep array to avoid unstable [] reference on every render.
   const entityTypes = entityTypesQuery.data ?? [];
   useEffect(() => {
-    const matched = entityTypes.find(et => et.type === entityType);
+    const matched = entityTypesQuery.data?.find(et => et.type === entityType);
     const preset = matched?.defaultPrefixes ?? [];
     setSelectedVocabPrefixes(new Set(preset));
-  }, [entityType, entityTypes]);
+  }, [entityType, entityTypesQuery.data]);
 
   // Reconcile hint columns when name column changes (drop collisions).
   useEffect(() => {
