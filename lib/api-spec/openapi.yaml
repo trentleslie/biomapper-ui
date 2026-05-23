@@ -417,6 +417,10 @@ components:
           type: array
           items:
             type: string
+        defaultPrefixes:
+          type: array
+          items:
+            type: string
       required: [type]
 
     Annotator:
