@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 import { useRoute, Link, useLocation } from "wouter";
 import { useUser, useClerk } from "@clerk/react";
-import { UploadCloud, BarChart3, List } from "lucide-react";
+import { UploadCloud, BarChart3, List, Flag } from "lucide-react";
 import { useListJobs, getListJobsQueryKey } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EnvToggle } from "@/components/EnvToggle";
@@ -95,6 +95,19 @@ function SideNav() {
           </>
         )}
       </div>
+
+      {/* Flagged Annotations */}
+      <Link
+        href="/flagged"
+        className={`flex items-center gap-3 px-3 py-2 rounded text-sm mt-1 ${
+          location === "/flagged"
+            ? "bg-neutral-200 text-neutral-900 font-medium"
+            : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+        }`}
+      >
+        <Flag className="w-4 h-4" />
+        Flagged Annotations
+      </Link>
     </nav>
   );
 }
