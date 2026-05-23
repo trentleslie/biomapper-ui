@@ -88,6 +88,7 @@ export const StreamMappingProgressParams = zod.object({
 export const ListEntityTypesResponseItem = zod.object({
   type: zod.string(),
   aliases: zod.array(zod.string()).optional(),
+  defaultPrefixes: zod.array(zod.string()).optional(),
 });
 export const ListEntityTypesResponse = zod.array(ListEntityTypesResponseItem);
 

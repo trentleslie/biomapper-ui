@@ -41,6 +41,7 @@ export interface MappingConfig {
 export interface EntityType {
   type: string;
   aliases?: string[];
+  defaultPrefixes?: string[];
 }
 
 export interface Annotator {
