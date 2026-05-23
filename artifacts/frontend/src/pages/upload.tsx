@@ -28,20 +28,9 @@ import { useEnv } from "@/contexts/env-context";
 import { ToastAction } from "@/components/ui/toast";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// Default selected vocabularies per entity type. These act as a UX preset;
-// the full list of selectable vocabularies is fetched from /discovery/vocabularies.
-// Keys are CURIE prefixes as returned by BioMapper discovery (uppercase).
-const ENTITY_TYPE_DEFAULT_PREFIXES: Record<string, string[]> = {
-  "biolink:SmallMolecule":  ["HMDB", "CHEBI", "REFMET", "LIPIDMAPS", "PUBCHEM.COMPOUND"],
-  "biolink:Drug":           ["CHEMBL", "UNII", "MESH", "CHEBI", "PUBCHEM.COMPOUND"],
-  "biolink:ChemicalEntity": ["CHEBI", "PUBCHEM.COMPOUND", "HMDB", "LIPIDMAPS", "KEGG.COMPOUND"],
-  "biolink:Protein":        ["UNIPROT", "NCBIGENE", "ENSEMBL"],
-  "biolink:Gene":           ["NCBIGENE", "ENSEMBL", "HGNC"],
-  "biolink:Pathway":        ["REACT", "KEGG.PATHWAY", "WIKIPATHWAYS"],
-  "biolink:Disease":        ["MONDO", "DOID", "MESH"],
-  "biolink:PhenotypicFeature": ["HP", "MESH"],
-  "biolink:ClinicalFinding":   ["LOINC", "SNOMEDCT"],
-};
+// Default vocabulary presets per entity type are now fetched from the API
+// via the `defaultPrefixes` field on each EntityType object. The useEffect
+// below applies them when the entity type changes or entity types data loads.
 
 // Heuristic suggestion for "Provided ID Columns" — maps column-name fragments
 // to a CURIE prefix. Used for auto-default only; the user can still select
@@ -136,7 +125,7 @@ export default function UploadPage() {
   const [entityType, setEntityType] = useState<string>("biolink:SmallMolecule");
   const [selectedAnnotators, setSelectedAnnotators] = useState<Set<string>>(new Set());
   const [selectedVocabPrefixes, setSelectedVocabPrefixes] = useState<Set<string>>(
-    new Set(ENTITY_TYPE_DEFAULT_PREFIXES["biolink:SmallMolecule"])
+    new Set<string>()
   );
   const [showAllVocabs, setShowAllVocabs] = useState(false);
   const [vocabSearch, setVocabSearch] = useState("");
@@ -157,11 +146,13 @@ export default function UploadPage() {
 
   const startMapping = useStartMappingBatch();
 
-  // When entity type changes, swap the default vocab selection preset.
+  // When entity type changes (or entity types data loads), swap the default vocab selection preset.
+  const entityTypes = entityTypesQuery.data ?? [];
   useEffect(() => {
-    const preset = ENTITY_TYPE_DEFAULT_PREFIXES[entityType] ?? [];
+    const matched = entityTypes.find(et => et.type === entityType);
+    const preset = matched?.defaultPrefixes ?? [];
     setSelectedVocabPrefixes(new Set(preset));
-  }, [entityType]);
+  }, [entityType, entityTypes]);
 
   // Reconcile hint columns when name column changes (drop collisions).
   useEffect(() => {
@@ -429,13 +420,13 @@ export default function UploadPage() {
     );
   };
 
-  const entityTypes = entityTypesQuery.data || [];
   const annotators = annotatorsQuery.data || [];
   const allVocabularies = vocabulariesQuery.data || [];
 
   // Vocab list shown by default = entity-type preset + currently selected.
   // "Show all" reveals the full discovery list (310 entries), with optional search.
-  const presetPrefixes = ENTITY_TYPE_DEFAULT_PREFIXES[entityType] ?? [];
+  const matchedEntityType = entityTypes?.find(et => et.type === entityType);
+  const presetPrefixes = matchedEntityType?.defaultPrefixes ?? [];
   const featuredPrefixSet = new Set<string>([...presetPrefixes, ...selectedVocabPrefixes]);
   const visibleVocabs = useMemo(() => {
     if (!showAllVocabs) {
@@ -675,7 +666,7 @@ export default function UploadPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {entityTypes.length === 0 && !entityTypesQuery.isLoading && (
-                        <SelectItem value="biolink:SmallMolecule">biolink:SmallMolecule (default)</SelectItem>
+                        <SelectItem value="biolink:SmallMolecule">biolink:SmallMolecule</SelectItem>
                       )}
                       {entityTypes.map(et => (
                         <SelectItem key={et.type} value={et.type}>

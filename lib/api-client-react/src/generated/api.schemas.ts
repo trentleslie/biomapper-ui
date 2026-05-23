@@ -41,6 +41,7 @@ export interface MappingConfig {
 export interface EntityType {
   type: string;
   aliases?: string[];
+  defaultPrefixes?: string[];
 }
 
 export interface Annotator {
@@ -186,6 +187,8 @@ export interface ErrorResponse {
 export type CreateFlagParams = {
   /**
    * Metabolite name to flag
+   * @minLength 1
+   * @maxLength 500
    */
   name: string;
 };
@@ -193,6 +196,8 @@ export type CreateFlagParams = {
 export type DeleteFlagParams = {
   /**
    * Metabolite name to unflag
+   * @minLength 1
+   * @maxLength 500
    */
   name: string;
 };

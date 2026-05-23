@@ -9,4 +9,5 @@
 export interface EntityType {
   type: string;
   aliases?: string[];
+  defaultPrefixes?: string[];
 }
