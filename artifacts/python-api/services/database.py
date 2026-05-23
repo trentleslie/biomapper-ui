@@ -233,7 +233,7 @@ class Database:
                ORDER BY count DESC
                LIMIT 1000"""
         )
-        rows = await cursor.fetchall()
+        rows = list(await cursor.fetchall())
         if not rows:
             return {"items": [], "total": 0}
         total = rows[0][2]  # total from window function
