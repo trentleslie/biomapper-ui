@@ -470,7 +470,10 @@ export default function DashboardPage() {
 
   const handleDownloadTSV = async () => {
     if (!results || results.length === 0) return;
-    const tsvEscape = (val: string) => val.replace(/[\t\n\r]/g, " ");
+    const tsvEscape = (val: string) => {
+      const safe = /^[=+\-@]/.test(val) ? ` ${val}` : val;
+      return safe.replace(/[\t\n\r]/g, " ");
+    };
     try {
       const { content } = await buildEnrichedDownload("\t", tsvEscape);
       const blob = new Blob([content], { type: "text/tab-separated-values" });
