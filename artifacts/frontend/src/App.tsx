@@ -9,6 +9,7 @@ import UploadPage from "@/pages/upload";
 import DashboardPage from "@/pages/dashboard";
 import DemoPage from "@/pages/demo";
 import JobsPage from "@/pages/jobs";
+import FlaggedPage from "@/pages/flagged";
 
 import NotFound from "@/pages/not-found";
 import { EnvProvider } from "@/contexts/env-context";
@@ -128,6 +129,11 @@ function Router() {
         {() => <ProtectedRoute component={JobsPage} />}
       </Route>
 
+      {/* /flagged = aggregated flagged annotations page */}
+      <Route path="/flagged">
+        {() => <ProtectedRoute component={FlaggedPage} />}
+      </Route>
+
       {/* /job/:jobId = canonical dashboard route; demo mode bypasses auth */}
       <Route path="/job/:jobId">
         {() => <JobRouteGate />}
@@ -175,6 +181,7 @@ function DevBypassApp() {
               <Route path="/">{() => <UploadPage />}</Route>
               <Route path="/upload">{() => <UploadPage />}</Route>
               <Route path="/job/:jobId">{() => <DashboardPage />}</Route>
+              <Route path="/flagged">{() => <FlaggedPage />}</Route>
               <Route component={NotFound} />
             </Switch>
           </AppShell>

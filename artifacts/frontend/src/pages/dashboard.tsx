@@ -2,7 +2,8 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { useLocation, useParams, useSearch, Link } from "wouter";
 import { useMappingStream } from "@/hooks/use-mapping-stream";
 import { loadOriginalData, type OriginalData } from "@/lib/original-data-store";
-import { useGetMappingResult, getGetMappingResultQueryKey, JobResult, useGetJob, getGetJobQueryKey, ApiError } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useGetMappingResult, getGetMappingResultQueryKey, JobResult, useGetJob, getGetJobQueryKey, useListFlags, getListFlagsQueryKey, useCreateFlag, useDeleteFlag, ApiError } from "@workspace/api-client-react";
 import type { JobDetail } from "@workspace/api-client-react";
 import { SankeyChart } from "@/components/SankeyChart";
 import { EquivalentIds } from "@/components/EquivalentIds";
@@ -68,6 +69,27 @@ export default function DashboardPage() {
 
   const { env, setEnv } = useEnv();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // --- Persistent flags (authenticated users only) ---
+  const { data: persistedFlags } = useListFlags({
+    query: {
+      queryKey: getListFlagsQueryKey(),
+      enabled: !isDemo,
+    },
+  });
+
+  const createFlagMutation = useCreateFlag();
+  const deleteFlagMutation = useDeleteFlag();
+  const isMutating = createFlagMutation.isPending || deleteFlagMutation.isPending;
+
+  // Sync flaggedNames from API response. Skip while mutations are in-flight
+  // to avoid stale refetches overwriting optimistic state.
+  useEffect(() => {
+    if (persistedFlags && !isDemo && !isMutating) {
+      setFlaggedNames(new Set(persistedFlags));
+    }
+  }, [persistedFlags, isDemo, isMutating]);
 
   const { data: persistedJob, error: persistedJobError, isLoading: persistedJobLoading } = useGetJob(jobId || "", {
     query: {
@@ -198,11 +220,49 @@ export default function DashboardPage() {
   );
 
   const flagReviewItem = (name: string) => {
+    const wasFlagged = flaggedNames.has(name);
+
+    // Optimistic update
     setFlaggedNames(prev => {
       const next = new Set(prev);
-      if (next.has(name)) next.delete(name); else next.add(name);
+      if (wasFlagged) next.delete(name); else next.add(name);
       return next;
     });
+
+    // Persist to API (skip for demo mode)
+    if (!isDemo) {
+      const mutation = wasFlagged ? deleteFlagMutation : createFlagMutation;
+      mutation.mutate(
+        { params: { name } },
+        {
+          onSuccess: () => {
+            // Synchronously update the query cache so the useEffect sees
+            // correct data when isMutating transitions to false (avoids
+            // a visible revert while invalidateQueries refetches async).
+            queryClient.setQueryData<string[]>(getListFlagsQueryKey(), (old) => {
+              if (!old) return wasFlagged ? [] : [name];
+              return wasFlagged
+                ? old.filter((n) => n !== name)
+                : old.includes(name) ? old : [...old, name];
+            });
+            queryClient.invalidateQueries({ queryKey: getListFlagsQueryKey() });
+          },
+          onError: () => {
+            // Revert optimistic update on failure
+            setFlaggedNames(prev => {
+              const reverted = new Set(prev);
+              if (wasFlagged) reverted.add(name); else reverted.delete(name);
+              return reverted;
+            });
+            toast({
+              variant: "destructive",
+              title: "Failed to update flag",
+              description: `Could not ${wasFlagged ? "unflag" : "flag"} "${name}". Please try again.`,
+            });
+          },
+        },
+      );
+    }
   };
 
   const dismissReviewItem = (name: string) => {
@@ -228,7 +288,8 @@ export default function DashboardPage() {
     if (!jobData || !summary) return;
     try {
       const originalData = jobId ? await loadOriginalData(jobId) : undefined;
-      const payload: Record<string, unknown> = { summary, results };
+      const flaggedResults = results.map(r => ({ ...r, flagged: flaggedNames.has(r.name) }));
+      const payload: Record<string, unknown> = { summary, results: flaggedResults };
       if (originalData) {
         payload.originalRows = originalData.parsedRows;
       }
@@ -267,7 +328,7 @@ export default function DashboardPage() {
     return { vocabCols, equivCols };
   };
 
-  const biomapperRowValues = (r: MappingResult, vocabCols: string[], equivCols: string[]) => {
+  const biomapperRowValues = (r: MappingResult, vocabCols: string[], equivCols: string[], flagged: boolean) => {
     const row: string[] = [
       r.resolved ? "true" : "false",
       r.primaryCurie || "",
@@ -287,6 +348,7 @@ export default function DashboardPage() {
     equivCols.forEach(p => {
       row.push(r.kgEquivalentIds?.[p]?.join("|") || "");
     });
+    row.push(flagged ? "true" : "false");
     return row;
   };
 
@@ -320,7 +382,7 @@ export default function DashboardPage() {
       const coreHeaders = ["resolved_biomapper", "primary_curie_biomapper", "confidence_tier_biomapper", "confidence_score_biomapper", "needs_review_biomapper"];
       const vocabHeaders = vocabCols.map(v => `${v}_biomapper`);
       const equivHeaders = equivCols.map(p => `equiv_${p}_biomapper`);
-      const allBiomapperHeaders = [...coreHeaders, ...vocabHeaders, ...equivHeaders];
+      const allBiomapperHeaders = [...coreHeaders, ...vocabHeaders, ...equivHeaders, "flagged_biomapper"];
 
       // Deduplicate biomapper headers against original column names.
       // Track generated names so two biomapper headers that collide with the same
@@ -348,7 +410,7 @@ export default function DashboardPage() {
 
         const originalValues = columns.map(col => esc(row[col] ?? ""));
         const bmValues = result
-          ? biomapperRowValues(result, vocabCols, equivCols).map(esc)
+          ? biomapperRowValues(result, vocabCols, equivCols, flaggedNames.has(result.name)).map(esc)
           : allBiomapperHeaders.map(() => "");
 
         return [...originalValues, ...bmValues].join(delimiter);
@@ -371,6 +433,7 @@ export default function DashboardPage() {
       ...sortedProvidedIdCols,
       ...vocabCols.map(v => hasProvidedIds ? `${v}_biomapper` : v),
       ...equivCols.map(p => hasProvidedIds ? `equiv_${p}_biomapper` : `equiv_${p}`),
+      "Flagged",
     ];
     const rows = results.map(r => {
       const row = [
@@ -397,6 +460,7 @@ export default function DashboardPage() {
       equivCols.forEach(p => {
         row.push(r.kgEquivalentIds?.[p]?.join("|") || "");
       });
+      row.push(flaggedNames.has(r.name) ? "true" : "false");
       return row.map(esc).join(delimiter);
     });
 
@@ -406,7 +470,10 @@ export default function DashboardPage() {
 
   const handleDownloadTSV = async () => {
     if (!results || results.length === 0) return;
-    const tsvEscape = (val: string) => val.replace(/[\t\n\r]/g, " ");
+    const tsvEscape = (val: string) => {
+      const safe = /^[=+\-@]/.test(val) ? ` ${val}` : val;
+      return safe.replace(/[\t\n\r]/g, " ");
+    };
     try {
       const { content } = await buildEnrichedDownload("\t", tsvEscape);
       const blob = new Blob([content], { type: "text/tab-separated-values" });
@@ -424,10 +491,11 @@ export default function DashboardPage() {
   const handleDownloadCSV = async () => {
     if (!results || results.length === 0) return;
     const csvEscape = (val: string) => {
-      if (val.includes(",") || val.includes('"') || val.includes("\n")) {
-        return `"${val.replace(/"/g, '""')}"`;
+      const safe = /^[=+\-@]/.test(val) ? `\t${val}` : val;
+      if (safe.includes(",") || safe.includes('"') || safe.includes("\n")) {
+        return `"${safe.replace(/"/g, '""')}"`;
       }
-      return val;
+      return safe;
     };
     try {
       const { content } = await buildEnrichedDownload(",", csvEscape);
@@ -489,6 +557,11 @@ export default function DashboardPage() {
       .map(r => `- ${r.name}`)
       .join("\n") || "_None_";
 
+    const flaggedNamesList = results
+      .filter(r => flaggedNames.has(r.name))
+      .map(r => `- ${r.name}`)
+      .join("\n") || "_None_";
+
     const lines = [
       `# Entity Linking Report`,
       ``,
@@ -525,6 +598,10 @@ export default function DashboardPage() {
       `${unresolved} name(s) could not be resolved:`,
       ``,
       unresolvedNames,
+      ``,
+      `## Flagged Names`,
+      ``,
+      flaggedNamesList,
     ];
 
     const blob = new Blob([lines.join("\n")], { type: "text/markdown" });

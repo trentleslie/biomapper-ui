@@ -88,6 +88,7 @@ export const StreamMappingProgressParams = zod.object({
 export const ListEntityTypesResponseItem = zod.object({
   type: zod.string(),
   aliases: zod.array(zod.string()).optional(),
+  defaultPrefixes: zod.array(zod.string()).optional(),
 });
 export const ListEntityTypesResponse = zod.array(ListEntityTypesResponseItem);
 
@@ -160,6 +161,59 @@ export const GetMappingResultResponse = zod.object({
       error_type: zod.string().nullish(),
     }),
   ),
+});
+
+/**
+ * @summary List flagged metabolite names for the authenticated user
+ */
+export const ListFlagsResponseItem = zod.string();
+export const ListFlagsResponse = zod.array(ListFlagsResponseItem);
+
+/**
+ * @summary Flag a metabolite name for the authenticated user
+ */
+export const createFlagQueryNameMax = 500;
+
+export const CreateFlagQueryParams = zod.object({
+  name: zod.coerce
+    .string()
+    .min(1)
+    .max(createFlagQueryNameMax)
+    .describe("Metabolite name to flag"),
+});
+
+/**
+ * @summary Unflag a metabolite name for the authenticated user
+ */
+export const deleteFlagQueryNameMax = 500;
+
+export const DeleteFlagQueryParams = zod.object({
+  name: zod.coerce
+    .string()
+    .min(1)
+    .max(deleteFlagQueryNameMax)
+    .describe("Metabolite name to unflag"),
+});
+
+/**
+ * Returns metabolite names and the number of distinct users who have flagged each,
+ordered by count descending. The x-clerk-user-id header is required for
+authentication but the results are not filtered by user.
+
+ * @summary Aggregated flag counts across all users
+ */
+export const ListAllFlagsAggregatedHeader = zod.object({
+  "x-clerk-user-id": zod.string(),
+});
+
+export const ListAllFlagsAggregatedResponse = zod.object({
+  items: zod.array(
+    zod.object({
+      name: zod.string(),
+      count: zod.number(),
+    }),
+  ),
+  total: zod.number(),
 });
 
 /**

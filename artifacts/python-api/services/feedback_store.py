@@ -54,17 +54,18 @@ class FeedbackStore:
             await db.commit()
         return feedback_id
 
-    async def query(self, category: str | None = None) -> list[dict[str, Any]]:
+    async def query(self, category: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
         async with aiosqlite.connect(self._db_path) as db:
             db.row_factory = aiosqlite.Row
             if category:
                 cursor = await db.execute(
-                    "SELECT * FROM feedback WHERE category = ? ORDER BY created_at DESC",
-                    (category,),
+                    "SELECT * FROM feedback WHERE category = ? ORDER BY created_at DESC LIMIT ?",
+                    (category, limit),
                 )
             else:
                 cursor = await db.execute(
-                    "SELECT * FROM feedback ORDER BY created_at DESC"
+                    "SELECT * FROM feedback ORDER BY created_at DESC LIMIT ?",
+                    (limit,),
                 )
             rows = await cursor.fetchall()
             return [

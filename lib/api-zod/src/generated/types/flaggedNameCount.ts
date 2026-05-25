@@ -6,8 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface EntityType {
-  type: string;
-  aliases?: string[];
-  defaultPrefixes?: string[];
+export interface FlaggedNameCount {
+  name: string;
+  count: number;
 }

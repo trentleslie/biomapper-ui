@@ -20,8 +20,11 @@ import type {
   Annotator,
   BatchMapRequest,
   BatchMapResponse,
+  CreateFlagParams,
+  DeleteFlagParams,
   EntityType,
   ErrorResponse,
+  FlaggedNameCountResponse,
   HealthStatus,
   JobDetail,
   JobListItem,
@@ -600,6 +603,319 @@ export function useGetMappingResult<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetMappingResultQueryOptions(jobId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List flagged metabolite names for the authenticated user
+ */
+export const getListFlagsUrl = () => {
+  return `/api/flags`;
+};
+
+export const listFlags = async (options?: RequestInit): Promise<string[]> => {
+  return customFetch<string[]>(getListFlagsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListFlagsQueryKey = () => {
+  return [`/api/flags`] as const;
+};
+
+export const getListFlagsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listFlags>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof listFlags>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListFlagsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listFlags>>> = ({
+    signal,
+  }) => listFlags({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listFlags>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListFlagsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listFlags>>
+>;
+export type ListFlagsQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary List flagged metabolite names for the authenticated user
+ */
+
+export function useListFlags<
+  TData = Awaited<ReturnType<typeof listFlags>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof listFlags>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListFlagsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Flag a metabolite name for the authenticated user
+ */
+export const getCreateFlagUrl = (params: CreateFlagParams) => {
+  return `/api/flags?name=${encodeURIComponent(params.name)}`;
+};
+
+export const createFlag = async (
+  params: CreateFlagParams,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getCreateFlagUrl(params), {
+    ...options,
+    method: "PUT",
+  });
+};
+
+export const getCreateFlagMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createFlag>>,
+    TError,
+    { params: CreateFlagParams },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createFlag>>,
+  TError,
+  { params: CreateFlagParams },
+  TContext
+> => {
+  const mutationKey = ["createFlag"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createFlag>>,
+    { params: CreateFlagParams }
+  > = (props) => {
+    const { params } = props ?? {};
+
+    return createFlag(params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateFlagMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createFlag>>
+>;
+
+export type CreateFlagMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Flag a metabolite name for the authenticated user
+ */
+export const useCreateFlag = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createFlag>>,
+    TError,
+    { params: CreateFlagParams },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createFlag>>,
+  TError,
+  { params: CreateFlagParams },
+  TContext
+> => {
+  return useMutation(getCreateFlagMutationOptions(options));
+};
+
+/**
+ * @summary Unflag a metabolite name for the authenticated user
+ */
+export const getDeleteFlagUrl = (params: DeleteFlagParams) => {
+  return `/api/flags?name=${encodeURIComponent(params.name)}`;
+};
+
+export const deleteFlag = async (
+  params: DeleteFlagParams,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteFlagUrl(params), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteFlagMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteFlag>>,
+    TError,
+    { params: DeleteFlagParams },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteFlag>>,
+  TError,
+  { params: DeleteFlagParams },
+  TContext
+> => {
+  const mutationKey = ["deleteFlag"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteFlag>>,
+    { params: DeleteFlagParams }
+  > = (props) => {
+    const { params } = props ?? {};
+
+    return deleteFlag(params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteFlagMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteFlag>>
+>;
+
+export type DeleteFlagMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Unflag a metabolite name for the authenticated user
+ */
+export const useDeleteFlag = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteFlag>>,
+    TError,
+    { params: DeleteFlagParams },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteFlag>>,
+  TError,
+  { params: DeleteFlagParams },
+  TContext
+> => {
+  return useMutation(getDeleteFlagMutationOptions(options));
+};
+
+/**
+ * Returns metabolite names and the number of distinct users who have flagged each,
+ordered by count descending. The x-clerk-user-id header is required for
+authentication but the results are not filtered by user.
+
+ * @summary Aggregated flag counts across all users
+ */
+export const getListAllFlagsAggregatedUrl = () => {
+  return `/api/flags/all`;
+};
+
+export const listAllFlagsAggregated = async (
+  options?: RequestInit,
+): Promise<FlaggedNameCountResponse> => {
+  return customFetch<FlaggedNameCountResponse>(getListAllFlagsAggregatedUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAllFlagsAggregatedQueryKey = () => {
+  return [`/api/flags/all`] as const;
+};
+
+export const getListAllFlagsAggregatedQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAllFlagsAggregated>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listAllFlagsAggregated>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListAllFlagsAggregatedQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listAllFlagsAggregated>>
+  > = ({ signal }) => listAllFlagsAggregated({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAllFlagsAggregated>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAllFlagsAggregatedQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAllFlagsAggregated>>
+>;
+export type ListAllFlagsAggregatedQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Aggregated flag counts across all users
+ */
+
+export function useListAllFlagsAggregated<
+  TData = Awaited<ReturnType<typeof listAllFlagsAggregated>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listAllFlagsAggregated>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAllFlagsAggregatedQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

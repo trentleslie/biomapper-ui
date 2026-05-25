@@ -1,3 +1,4 @@
+import hmac
 import logging
 import os
 
@@ -11,14 +12,24 @@ logger = logging.getLogger("entity-linker")
 
 router = APIRouter()
 
+_FEEDBACK_API_KEY = os.environ.get("FEEDBACK_API_KEY", "")
+
 
 @router.post("")
-async def submit_feedback(feedback: FeedbackRequest) -> JSONResponse:
+async def submit_feedback(
+    feedback: FeedbackRequest,
+    x_clerk_user_id: str | None = Header(None),
+) -> JSONResponse:
+    if x_clerk_user_id is None:
+        raise HTTPException(status_code=400, detail="Missing x-clerk-user-id header")
+
     feedback_id = await feedback_store.save(feedback)
+    local, sep, domain = feedback.user_email.partition("@")
+    masked_email = local[:3] + "...@" + domain if sep else local[:3] + "..."
     logger.info(
         "Feedback received: category=%s user=%s id=%s",
         feedback.category,
-        feedback.user_email,
+        masked_email,
         feedback_id,
     )
     return JSONResponse(
@@ -30,11 +41,9 @@ async def submit_feedback(feedback: FeedbackRequest) -> JSONResponse:
 @router.get("")
 async def list_feedback(
     category: str | None = Query(None, pattern="^(annotation_issue|feature_request|ui_error)$"),
-    x_clerk_user_id: str | None = Header(None),
+    limit: int = Query(100, ge=1, le=1000),
+    x_api_key: str | None = Header(None),
 ) -> list[dict]:
-    if x_clerk_user_id is None:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    # Only allow in local dev — production feedback is reviewed via direct DB access
-    if os.environ.get("ENVIRONMENT", "production") != "development":
-        raise HTTPException(status_code=403, detail="Admin access only")
-    return await feedback_store.query(category=category)
+    if not _FEEDBACK_API_KEY or not x_api_key or not hmac.compare_digest(x_api_key, _FEEDBACK_API_KEY):
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+    return await feedback_store.query(category=category, limit=limit)

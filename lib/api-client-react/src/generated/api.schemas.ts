@@ -41,6 +41,7 @@ export interface MappingConfig {
 export interface EntityType {
   type: string;
   aliases?: string[];
+  defaultPrefixes?: string[];
 }
 
 export interface Annotator {
@@ -179,6 +180,34 @@ export interface JobUpdateRequest {
   displayName?: string | null;
 }
 
+export interface FlaggedNameCount {
+  name: string;
+  count: number;
+}
+
+export interface FlaggedNameCountResponse {
+  items: FlaggedNameCount[];
+  total: number;
+}
+
 export interface ErrorResponse {
   detail: string;
 }
+
+export type CreateFlagParams = {
+  /**
+   * Metabolite name to flag
+   * @minLength 1
+   * @maxLength 500
+   */
+  name: string;
+};
+
+export type DeleteFlagParams = {
+  /**
+   * Metabolite name to unflag
+   * @minLength 1
+   * @maxLength 500
+   */
+  name: string;
+};
