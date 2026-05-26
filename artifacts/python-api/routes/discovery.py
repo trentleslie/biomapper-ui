@@ -59,7 +59,7 @@ async def _fetch_with_cache(
     try:
         async with BioMapperClient(**client_kwargs) as client:
             items = await fetcher(client)
-        serialized = [item.model_dump() for item in items]
+        serialized = [item.model_dump(by_alias=True) for item in items]
         _set_cache(key, serialized, POSITIVE_TTL_SECONDS)
         return serialized
     except BioMapperConfigError as e:
