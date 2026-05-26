@@ -666,7 +666,7 @@ export default function UploadPage() {
                     <SelectTrigger id="entity-type" data-testid="select-entity-type">
                       <SelectValue placeholder={entityTypesQuery.isLoading ? "Loading..." : "Select entity type"} />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="max-h-72 overflow-y-auto">
                       {entityTypes.length === 0 && !entityTypesQuery.isLoading && (
                         <SelectItem value="biolink:SmallMolecule">biolink:SmallMolecule</SelectItem>
                       )}
