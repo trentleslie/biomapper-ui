@@ -146,15 +146,13 @@ export default function UploadPage() {
 
   const startMapping = useStartMappingBatch();
 
-  // When entity type changes (or entity types data loads), swap the default vocab selection preset.
-  // Use entityTypesQuery.data directly in the dep array to avoid unstable [] reference on every render.
+  // When entity type changes, clear the vocab selection (user picks what they need).
+  // defaultPrefixes from the API controls which vocabs are *featured* in the condensed
+  // view, not which are pre-selected.
   const entityTypes = entityTypesQuery.data ?? [];
   useEffect(() => {
-    const matched = entityTypesQuery.data?.find(et => et.type === entityType);
-    const preset = matched?.defaultPrefixes ?? (entityTypesQuery.data ? [] : undefined);
-    if (preset === undefined) return;
-    setSelectedVocabPrefixes(new Set(preset));
-  }, [entityType, entityTypesQuery.data]);
+    setSelectedVocabPrefixes(new Set<string>());
+  }, [entityType]);
 
   // Reconcile hint columns when name column changes (drop collisions).
   useEffect(() => {
