@@ -80,14 +80,17 @@ def build_payload(row: dict, meta: dict[str, dict]) -> dict:
     return payload
 
 
-def openai_chat(payload: dict, *, model: str = DEFAULT_MODEL, timeout: float = 60.0,
-                retries: int = 2, backoff: float = 2.0) -> dict | None:
-    """Call OpenAI chat completions (JSON mode) with the allowlisted facts. Returns parsed dict or None."""
+def openai_chat(payload: dict, *, system: str = _SYSTEM, model: str = DEFAULT_MODEL,
+                timeout: float = 60.0, retries: int = 2, backoff: float = 2.0) -> dict | None:
+    """Call OpenAI chat completions (JSON mode) with the allowlisted facts. Returns parsed dict or None.
+
+    ``system`` defaults to this module's mismatch-cause prompt; callers with a different task (e.g. the
+    two-way fault-localization prompt) pass their own."""
     body = json.dumps({
         "model": model,
         "response_format": {"type": "json_object"},
         "temperature": 0,
-        "messages": [{"role": "system", "content": _SYSTEM},
+        "messages": [{"role": "system", "content": system},
                      {"role": "user", "content": json.dumps(payload)}],
     }).encode()
     req = urllib.request.Request(

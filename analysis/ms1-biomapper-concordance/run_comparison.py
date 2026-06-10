@@ -21,11 +21,11 @@ import compare as C
 import hmdb_api
 import input_hints as ih
 import io_and_normalize as io
-import llm_characterize as LC
 import refmet_api
 import report as R
 import run_pipeline as rp
-import spectral_delta as SD
+import two_way as TW
+import two_way_llm as TL
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 INPUT_CSV = DATA_DIR / "unique_features_by_best_tier.csv"        # names to map (input side)
@@ -120,18 +120,20 @@ def main() -> None:
     # UI-style export: original input columns + Biomapper mappings appended (_biomapper suffix).
     C.write_mapped_final(C.build_mapped_final(gt_df, name_only), mapped_path)
 
-    # Spectral-ID delta characterization (Phase 1, deterministic). Three-way classification is fully
-    # offline (comp + xlsx). HMDB metadata for the structural relation/export is gated:
-    # --allow-metadata-fetch permits live MW/PubChem calls; otherwise offline cache-replay only.
-    delta = SD.build_spectral_delta(comp, gt_df, XLSX)
-    delta_path = run_dir / "spectral_delta.csv"
-    spectral_export_path = run_dir / "metabolon_spectral_export.csv"
+    # Two-way spectral<->Biomapper delta characterization (curated-free). Compares Metabolon's embedded
+    # spectral HMDB id(s) against Biomapper's name-only mapping for the same matched_name; localizes a
+    # disagreement to Biomapper's name->id step vs the upstream spectral-id->name derivation. Deterministic
+    # (state + structural_relation) is offline; HMDB metadata is gated (--allow-metadata-fetch); the LLM
+    # fault-localization is gated (--allow-llm).
+    delta = TW.build_two_way(comp, XLSX)
+    delta_path = run_dir / "two_way_delta.csv"
+    two_way_export_path = run_dir / "two_way_export.csv"
     if len(delta):
         comp_ids = set()
-        for col in ("spectral_hmdb", "bmap_hmdb", "ref_hmdb"):
+        for col in ("spectral_hmdb", "bmap_hmdb"):
             for cell in delta[col]:
                 comp_ids |= {x for x in str(cell).split(";") if x.strip()}
-        # name hints for PubChem fallback: spectral + truth (ref/bmap) representative names
+        # name hints for PubChem fallback: each feature's representative spectral id -> matched_name
         name_hints = {r["rep_spectral_id"]: r["matched_name"] for _, r in delta.iterrows()}
         cache = rp.OUTPUTS_ROOT / "hmdb_metadata_cache.json"
         if args.allow_metadata_fetch:
@@ -143,29 +145,28 @@ def main() -> None:
                   "(pass --allow-metadata-fetch to fetch live).")
             meta = hmdb_api.resolve_hmdb_metadata(comp_ids, cache, name_hints=name_hints, retrieved=ts,
                                                   mw=lambda _id: None, pubchem=lambda _n: None)
-        delta = SD.enrich_with_relation(delta, meta)
+        delta = TW.enrich_with_relation(delta, meta)
         if args.allow_llm:
-            mm = delta[LC.mismatch_mask(delta)]
-            print(f"[run_comparison] LLM characterizing {len(mm)} mismatch rows (OpenAI, paced)...")
-            results = LC.characterize([dict(r) for _, r in mm.iterrows()], meta,
-                                      rp.OUTPUTS_ROOT / "llm_cache.json", sleep_s=0.3)
-            delta = LC.attach_llm(delta, results)
-            print(f"[run_comparison] LLM characterized {len(results)} rows")
+            mm = delta[TL.mismatch_mask(delta)]
+            print(f"[run_comparison] LLM fault-localizing {len(mm)} conflict rows (OpenAI, paced)...")
+            results = TL.characterize([dict(r) for _, r in mm.iterrows()], meta,
+                                      rp.OUTPUTS_ROOT / "two_way_llm_cache.json", sleep_s=0.25)
+            delta = TL.attach_llm(delta, results)
+            print(f"[run_comparison] LLM fault-localized {len(results)} rows")
         else:
             print("[run_comparison] LLM: skipped (pass --allow-llm; export keeps 'pending').")
-        SD.write_metabolon_export(SD.build_metabolon_export(delta, meta), spectral_export_path)
-        sd_metrics = R.aggregate_spectral_delta(delta, total_features=len(gt_df))
-        with report_path.open("a") as fh:
-            fh.write("\n" + R.render_spectral_delta_markdown(sd_metrics))
-        mres = int((delta["structural_relation"] != "undetermined_no_metadata").sum())
-        print(f"[run_comparison] spectral delta: {sd_metrics['features']} embedded-HMDB features; "
-              f"spectral matches curation {sd_metrics['spectral_matches_curation']}/"
-              f"{sd_metrics['arbiter_present']}; {mres}/{len(delta)} rows have a structural relation")
+        TW.write_export(TW.build_export(delta, meta), two_way_export_path)
+        states = delta["two_way_state"].value_counts().to_dict()
+        dis = delta[delta["two_way_state"] == TW.DISAGREE]
+        rels = dis["structural_relation"].value_counts().to_dict()
+        print(f"[run_comparison] two-way: concordant={states.get(TW.CONCORDANT, 0)} "
+              f"disagree={states.get(TW.DISAGREE, 0)} no-biomapper={states.get(TW.NO_BIOMAPPER, 0)}; "
+              f"disagree relation breakdown={rels}")
     delta.to_csv(delta_path, index=False)  # after enrichment (carries structural_relation)
 
     print("\n[run_comparison] DONE — artifacts:")
-    print(f"  spectral delta : {delta_path}")
-    print(f"  metabolon expt : {spectral_export_path}")
+    print(f"  two-way delta  : {delta_path}")
+    print(f"  two-way export : {two_way_export_path}")
     print(f"  raw (name-only): {run_dir / 'raw_name_only.json'}")
     if hinted is not None:
         print(f"  raw (hinted)   : {run_dir / 'raw_hinted.json'}")
