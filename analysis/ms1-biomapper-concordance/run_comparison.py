@@ -18,11 +18,13 @@ from datetime import datetime
 from pathlib import Path
 
 import compare as C
+import hmdb_api
 import input_hints as ih
 import io_and_normalize as io
 import refmet_api
 import report as R
 import run_pipeline as rp
+import spectral_delta as SD
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 INPUT_CSV = DATA_DIR / "unique_features_by_best_tier.csv"        # names to map (input side)
@@ -41,6 +43,9 @@ def main() -> None:
     ap.add_argument("--pause", type=float, default=10.0, help="seconds between sub-batches")
     ap.add_argument("--pass-pause", type=float, default=30.0,
                     help="seconds between the name-only and hinted passes")
+    ap.add_argument("--allow-metadata-fetch", action="store_true",
+                    help="permit live MW/PubChem HMDB-metadata calls (dataset-derived outbound; "
+                         "off = offline cache-replay only)")
     args = ap.parse_args()
 
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -111,7 +116,39 @@ def main() -> None:
     # UI-style export: original input columns + Biomapper mappings appended (_biomapper suffix).
     C.write_mapped_final(C.build_mapped_final(gt_df, name_only), mapped_path)
 
+    # Spectral-ID delta characterization (Phase 1, deterministic). Three-way classification is fully
+    # offline (comp + xlsx). HMDB metadata for the structural relation/export is gated:
+    # --allow-metadata-fetch permits live MW/PubChem calls; otherwise offline cache-replay only.
+    delta = SD.build_spectral_delta(comp, gt_df, XLSX)
+    delta_path = run_dir / "spectral_delta.csv"
+    delta.to_csv(delta_path, index=False)
+    spectral_export_path = run_dir / "metabolon_spectral_export.csv"
+    if len(delta):
+        comp_ids = set()
+        for col in ("spectral_hmdb", "bmap_hmdb", "ref_hmdb"):
+            for cell in delta[col]:
+                comp_ids |= {x for x in str(cell).split(";") if x.strip()}
+        name_hints = {r["rep_spectral_id"]: r["matched_name"] for _, r in delta.iterrows()}
+        cache = rp.OUTPUTS_ROOT / "hmdb_metadata_cache.json"
+        if args.allow_metadata_fetch:
+            print(f"[run_comparison] resolving HMDB metadata for {len(comp_ids)} IDs (live MW/PubChem)...")
+            meta = hmdb_api.resolve_hmdb_metadata(comp_ids, cache, name_hints=name_hints, retrieved=ts)
+        else:
+            print("[run_comparison] HMDB metadata: offline cache-replay only "
+                  "(pass --allow-metadata-fetch to fetch live).")
+            meta = hmdb_api.resolve_hmdb_metadata(comp_ids, cache, name_hints=name_hints, retrieved=ts,
+                                                  mw=lambda _id: None, pubchem=lambda _n: None)
+        delta = SD.enrich_with_relation(delta, meta)
+        SD.write_metabolon_export(SD.build_metabolon_export(delta, meta), spectral_export_path)
+        sd_metrics = R.aggregate_spectral_delta(delta, total_features=len(gt_df))
+        with report_path.open("a") as fh:
+            fh.write("\n" + R.render_spectral_delta_markdown(sd_metrics))
+        print(f"[run_comparison] spectral delta: {sd_metrics['features']} embedded-HMDB features; "
+              f"spectral matches curation {sd_metrics['spectral_matches_curation']}/{sd_metrics['arbiter_present']}")
+
     print("\n[run_comparison] DONE — artifacts:")
+    print(f"  spectral delta : {delta_path}")
+    print(f"  metabolon expt : {spectral_export_path}")
     print(f"  raw (name-only): {run_dir / 'raw_name_only.json'}")
     if hinted is not None:
         print(f"  raw (hinted)   : {run_dir / 'raw_hinted.json'}")

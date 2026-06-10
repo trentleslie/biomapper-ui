@@ -80,6 +80,33 @@ Open questions for the data owner: (1) what success bar makes Biomapper useful h
 (2) provenance of the curated IDs (cross-walk vs independent), which bounds how much weight
 agreement can bear.
 
+## Spectral-ID delta characterization (Phase 1, deterministic)
+
+Characterizes where Metabolon's **embedded spectral HMDB** (parsed from `ms1/ms2_compound_name`)
+diverges from Biomapper name-only and the curated reference, at **feature/spectrum grain** (joined on
+`matched_name`; multiplicity preserved). `run_comparison.py` produces, per run:
+
+- `spectral_delta.csv` — per-feature three-way state (`all-agree` / `spectral-disagrees` /
+  `biomapper-disagrees` / `curation-outlier-candidate` / `all-differ` / `no-curated-arbiter`) +
+  embedded HMDBs, cosine, provenance.
+- `metabolon_spectral_export.csv` — shareable: identities + official HMDB metadata for the competing
+  IDs + the deterministic structural relation. Carries a leading **`PROVISIONAL`** marker row.
+- a "Spectral-ID delta characterization" section appended to `report.md` (three-way distribution,
+  spectral-vs-curation rate, structural-relation + cosine-band breakdown).
+
+The three-way classification is **fully offline** (from cached `comparison.csv` + the xlsx). The HMDB
+**metadata** (for the structural relation + export columns) requires live MW/PubChem calls, which send
+dataset-derived IDs — **gated** behind `--allow-metadata-fetch` (default = offline cache-replay;
+structural relations are `undetermined_no_metadata` until the cache is populated). Confirm the
+data-sharing agreement before enabling. The **LLM cause narration (Phase 2)** is a separate gate.
+
+### Validation spot-check (Unit 7 — clear the PROVISIONAL marker)
+
+Before sharing the export, manually spot-check a **stratified sample (N≈15, across three-way states +
+cosine bands)** against the facts; the deterministic verdicts are checkable in Phase 1 (no LLM). When
+agreement ≥90%, remove the `PROVISIONAL` header row. The marker — not code — is the gate; share only
+via the original channel.
+
 ## Confidentiality
 
 `comparison.csv`, `mapped_final.csv`, and `report.md` embed the curated reference IDs — share

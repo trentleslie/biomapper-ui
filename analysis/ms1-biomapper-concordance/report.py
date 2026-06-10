@@ -320,6 +320,65 @@ def render_markdown(m: dict, meta: dict) -> str:
     return "\n".join(L)
 
 
+def aggregate_spectral_delta(delta: pd.DataFrame, total_features: int | None = None) -> dict:
+    """Sibling aggregator for the spectral-delta table (NOT report.aggregate — different schema/grain).
+
+    Reports the three-way state distribution, spectral-vs-curation correctness (over arbiter-present
+    rows), structural-relation distribution (if enriched), and cosine-band stratification.
+    """
+    import spectral_delta as sd
+    n = len(delta)
+    states = {k: int(v) for k, v in delta["three_way_state"].value_counts().items()} if n else {}
+    arb = delta[delta["three_way_state"] != sd.NO_ARBITER]
+    n_arb = len(arb)
+    spectral_correct = int(pd.Series(arb["three_way_state"]).isin([sd.ALL_AGREE, sd.BIOMAPPER_DISAGREES]).sum())
+
+    def cosine_band(v):
+        try:
+            return "high (>=0.8)" if float(v) >= 0.8 else "low (<0.8)"
+        except (TypeError, ValueError):
+            return "no-cosine"
+    bands = {k: int(v) for k, v in delta["spectral_cosine_max"].map(cosine_band).value_counts().items()} \
+        if n else {}
+
+    out = {
+        "features": n,
+        "three_way_states": states,
+        "arbiter_present": n_arb,
+        "spectral_matches_curation": spectral_correct,
+        "spectral_correct_rate": (spectral_correct / n_arb) if n_arb else None,
+        "cosine_bands": bands,
+        "coverage_fraction": (n / total_features) if total_features else None,
+        "total_features": total_features,
+    }
+    if "structural_relation" in delta.columns and n:
+        out["structural_relations"] = {k: int(v) for k, v
+                                       in delta["structural_relation"].value_counts().items()}
+    return out
+
+
+def render_spectral_delta_markdown(m: dict) -> str:
+    L = ["## Spectral-ID delta characterization\n"]
+    L.append(f"_Embedded-HMDB, name-parseable slice: {m['features']} features"
+             + (f" ({_pct(m['coverage_fraction'])} of all {m['total_features']})" if m.get("coverage_fraction") is not None else "")
+             + ". Curation is a fallible arbiter; values are advisory/UNVALIDATED until spot-checked._\n")
+    L.append("| Three-way state | count |\n|---|---|")
+    for k, v in sorted(m["three_way_states"].items(), key=lambda x: -x[1]):
+        L.append(f"| {k} | {v} |")
+    L.append("")
+    L.append(f"- Spectral hit matches curation: **{m['spectral_matches_curation']}/{m['arbiter_present']}** "
+             f"({_pct(m['spectral_correct_rate'])}) of arbiter-present features.")
+    if "structural_relations" in m:
+        L.append("\n| Structural relation (spectral vs truth) | count |\n|---|---|")
+        for k, v in sorted(m["structural_relations"].items(), key=lambda x: -x[1]):
+            L.append(f"| {k} | {v} |")
+    L.append("\n| Spectral cosine band | features |\n|---|---|")
+    for k, v in sorted(m["cosine_bands"].items()):
+        L.append(f"| {k} | {v} |")
+    L.append("")
+    return "\n".join(L)
+
+
 def write_report(comp: pd.DataFrame, path: str | Path, meta: dict | None = None) -> dict:
     m = aggregate(comp)
     md = render_markdown(m, meta or {})
