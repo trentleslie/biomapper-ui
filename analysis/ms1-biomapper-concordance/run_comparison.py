@@ -121,18 +121,19 @@ def main() -> None:
     # --allow-metadata-fetch permits live MW/PubChem calls; otherwise offline cache-replay only.
     delta = SD.build_spectral_delta(comp, gt_df, XLSX)
     delta_path = run_dir / "spectral_delta.csv"
-    delta.to_csv(delta_path, index=False)
     spectral_export_path = run_dir / "metabolon_spectral_export.csv"
     if len(delta):
         comp_ids = set()
         for col in ("spectral_hmdb", "bmap_hmdb", "ref_hmdb"):
             for cell in delta[col]:
                 comp_ids |= {x for x in str(cell).split(";") if x.strip()}
+        # name hints for PubChem fallback: spectral + truth (ref/bmap) representative names
         name_hints = {r["rep_spectral_id"]: r["matched_name"] for _, r in delta.iterrows()}
         cache = rp.OUTPUTS_ROOT / "hmdb_metadata_cache.json"
         if args.allow_metadata_fetch:
-            print(f"[run_comparison] resolving HMDB metadata for {len(comp_ids)} IDs (live MW/PubChem)...")
-            meta = hmdb_api.resolve_hmdb_metadata(comp_ids, cache, name_hints=name_hints, retrieved=ts)
+            print(f"[run_comparison] resolving HMDB metadata for {len(comp_ids)} IDs (live MW/PubChem, paced)...")
+            meta = hmdb_api.resolve_hmdb_metadata(comp_ids, cache, name_hints=name_hints,
+                                                  retrieved=ts, sleep_s=0.2)
         else:
             print("[run_comparison] HMDB metadata: offline cache-replay only "
                   "(pass --allow-metadata-fetch to fetch live).")
@@ -143,8 +144,11 @@ def main() -> None:
         sd_metrics = R.aggregate_spectral_delta(delta, total_features=len(gt_df))
         with report_path.open("a") as fh:
             fh.write("\n" + R.render_spectral_delta_markdown(sd_metrics))
+        mres = int((delta["structural_relation"] != "undetermined_no_metadata").sum())
         print(f"[run_comparison] spectral delta: {sd_metrics['features']} embedded-HMDB features; "
-              f"spectral matches curation {sd_metrics['spectral_matches_curation']}/{sd_metrics['arbiter_present']}")
+              f"spectral matches curation {sd_metrics['spectral_matches_curation']}/"
+              f"{sd_metrics['arbiter_present']}; {mres}/{len(delta)} rows have a structural relation")
+    delta.to_csv(delta_path, index=False)  # after enrichment (carries structural_relation)
 
     print("\n[run_comparison] DONE — artifacts:")
     print(f"  spectral delta : {delta_path}")

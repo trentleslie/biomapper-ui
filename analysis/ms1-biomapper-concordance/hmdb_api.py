@@ -17,6 +17,7 @@ HMDB→name→RefMet hop, deferred).
 from __future__ import annotations
 
 import json
+import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -34,12 +35,22 @@ FIELDS = ("name", "formula", "monoisotopic_mass", "inchikey", "pubchem_cid",
           "chebi_id", "kegg_id", "smiles", "class", "link", "source", "retrieved")
 
 
-def _http_json(url: str, timeout: float = 30.0) -> dict | None:
-    try:
-        with urllib.request.urlopen(url, timeout=timeout) as resp:
-            return json.loads(resp.read().decode())
-    except Exception:
-        return None
+def _http_json(url: str, timeout: float = 30.0, retries: int = 2, backoff: float = 1.5) -> dict | None:
+    """GET + parse JSON. Retries on network/HTTP error (transient throttling) with backoff.
+
+    Returns the parsed body, or None only after exhausting retries (or a clean non-JSON body).
+    A genuine 'no record' is a JSON body without the expected keys (handled by the caller), not None.
+    """
+    for attempt in range(retries + 1):
+        try:
+            with urllib.request.urlopen(url, timeout=timeout) as resp:
+                return json.loads(resp.read().decode())
+        except Exception:
+            if attempt < retries:
+                time.sleep(backoff * (attempt + 1))
+                continue
+            return None
+    return None
 
 
 def mw_fetch(hmdb_id: str) -> dict | None:
@@ -86,6 +97,7 @@ def resolve_hmdb_metadata(
     *,
     name_hints: dict[str, str] | None = None,
     retrieved: str = "",
+    sleep_s: float = 0.0,
     mw: Callable[[str], dict | None] = mw_fetch,
     pubchem: Callable[[str], dict | None] = pubchem_fetch,
 ) -> dict[str, dict]:
@@ -108,6 +120,8 @@ def resolve_hmdb_metadata(
     for hid in sorted({i for i in ids if i}):
         if hid in cache:
             continue
+        if dirty and sleep_s:
+            time.sleep(sleep_s)  # pace live calls to avoid MW/PubChem throttling
         meta = mw(hid)
         if meta is None and name_hints.get(hid):
             meta = pubchem(name_hints[hid])
