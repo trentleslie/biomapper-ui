@@ -119,6 +119,21 @@ def _pct(x: float | None) -> str:
     return "n/a" if x is None else f"{x * 100:.1f}%"
 
 
+def _emit_ns_table(L: list, get_metrics, refmet_available: bool) -> None:
+    """Append a per-namespace concordance table given a callable ns -> metrics dict."""
+    L.append("| Namespace | Comparable (n, %) | Exact | Agreement (exact+partial) | New coverage | Missed |")
+    L.append("|---|---|---|---|---|---|")
+    for ns in ALL_NAMESPACES:
+        if ns == "refmet" and not refmet_available:
+            L.append(f"| {ns} | bridge unavailable | — | — | — | — |")
+            continue
+        d = get_metrics(ns)
+        L.append(f"| {ns} | {d['comparable']} ({_pct(d['comparable_frac'])}) | "
+                 f"{_pct(d['exact_rate'])} | {_pct(d['agreement_rate'])} | "
+                 f"{d['new_coverage']} | {d['missed']} |")
+    L.append("")
+
+
 def render_markdown(m: dict, meta: dict) -> str:
     L: list[str] = []
     L.append("# MS1 ↔ Biomapper Concordance Report\n")
@@ -133,33 +148,30 @@ def render_markdown(m: dict, meta: dict) -> str:
              "and Missed. The **hinted** pass contributes resolution lift only; hinted-namespace "
              "agreement is circular and excluded.\n")
 
-    # Per-namespace
-    L.append("## Concordance by namespace (name-only)\n")
-    L.append("| Namespace | Comparable (n, % of all) | Exact | Agreement (exact+partial) | New coverage | Missed |")
-    L.append("|---|---|---|---|---|---|")
-    for ns in ALL_NAMESPACES:
-        d = m["namespaces"][ns]
-        if ns == "refmet" and not m["refmet_available"]:
-            L.append(f"| {ns} | bridge unavailable — RefMet master list not in data/ | — | — | — | — |")
-            continue
-        L.append(f"| {ns} | {d['comparable']} ({_pct(d['comparable_frac'])}) | "
-                 f"{_pct(d['exact_rate'])} | {_pct(d['agreement_rate'])} | "
-                 f"{d['new_coverage']} | {d['missed']} |")
-    L.append("")
+    # Per-namespace (all tiers combined) — the headline
+    L.append("## Concordance by namespace (name-only, all tiers)\n")
+    L.append("_'Comparable %' is the comparable subset as a fraction of all features._\n")
+    _emit_ns_table(L, lambda ns: m["namespaces"][ns], m["refmet_available"])
 
-    # Per-tier agreement
-    L.append("## Agreement by tier (name-only)\n")
+    # Compact agreement matrix (quick cross-tier glance)
+    L.append("## Agreement by tier (name-only) — quick view\n")
     L.append("| Namespace | " + " | ".join(str(t) for t in m["tiers"]) + " |")
     L.append("|---" * (len(m["tiers"]) + 1) + "|")
     for ns in ALL_NAMESPACES:
         if ns == "refmet" and not m["refmet_available"]:
             continue
-        cells = []
-        for t in m["tiers"]:
-            d = m["by_tier"][ns][t]
-            cells.append(f"{_pct(d['agreement_rate'])} (n={d['comparable']})")
+        cells = [f"{_pct(m['by_tier'][ns][t]['agreement_rate'])} (n={m['by_tier'][ns][t]['comparable']})"
+                 for t in m["tiers"]]
         L.append(f"| {ns} | " + " | ".join(cells) + " |")
     L.append("")
+
+    # Full concordance broken down per tier (MS1 / MS2 / CURATION)
+    L.append("## Full concordance by tier (name-only)\n")
+    L.append("_Same columns as the headline, computed within each tier ('Comparable %' is of that "
+             "tier's features)._\n")
+    for t in m["tiers"]:
+        L.append(f"### Tier: {t}\n")
+        _emit_ns_table(L, lambda ns, t=t: m["by_tier"][ns][t], m["refmet_available"])
 
     # Partial agreement by cardinality
     L.append("## Partial-agreement by Biomapper candidate-set size\n")
