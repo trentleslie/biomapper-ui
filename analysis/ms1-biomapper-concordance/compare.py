@@ -113,10 +113,17 @@ def compare(
     name_only: list[dict],
     hinted: list[dict] | None,
     bridge: RefMetBridge,
+    hints_by_name: dict[str, dict[str, str]] | None = None,
 ) -> pd.DataFrame:
-    """Build the per-feature comparison table (name-only authoritative + hinted lift columns)."""
+    """Build the per-feature comparison table (name-only authoritative + hinted lift columns).
+
+    ``hints_by_name`` records which input-side hints were given per feature so the hinted-pass
+    columns can mark a namespace circular (``__hinted_here``) only when it was actually hinted.
+    Only HMDB among the scored namespaces is ever hintable here (CAS is not scored).
+    """
     no_by_name = _index_by_name(name_only)
     hi_by_name = _index_by_name(hinted or [])
+    hints_by_name = hints_by_name or {}
     empty: dict = {}
     rows: list[dict] = []
 
@@ -124,6 +131,7 @@ def compare(
         name = str(feat["matched_name"]).strip()
         res = no_by_name.get(name, empty)
         hres = hi_by_name.get(name, empty)
+        feat_hints = hints_by_name.get(name, {})
 
         row: dict[str, object] = {
             "feature_id": feat["feature_id"],
@@ -143,9 +151,11 @@ def compare(
             row[f"{ns}__bmap"] = ";".join(sorted(bmap_ids))
             row[f"{ns}__class"] = classify(ref_ids, bmap_ids)
             row[f"{ns}__card"] = len(bmap_ids)
-            # hinted: class only, for cross-namespace lift (hinted-namespace agreement excluded in report)
+            # hinted: class only, for cross-namespace lift. A namespace is "hinted_here" (and
+            # thus circular, excluded from hinted concordance) only if it was actually supplied
+            # as a hint for this feature — i.e. HMDB when an HMDB hint was given.
             row[f"{ns}__class_hinted"] = classify(ref_ids, io.biomapper_ids(hres, ns))
-            row[f"{ns}__hinted_here"] = bool(ref_ids)  # this namespace was a hint for this feature
+            row[f"{ns}__hinted_here"] = ns in feat_hints
 
         # RefMet (name-bridge)
         ref_refmet = feat.get("refmet_name")

@@ -92,6 +92,24 @@ def aggregate(comp: pd.DataFrame) -> dict:
         if "hinted_resolved" in comp else 0
     out["lift"] = {"name_only_resolved": resolved, "hinted_resolved": hinted_resolved,
                    "resolution_lift": lift}
+
+    # Hinted-pass cross-namespace agreement (only meaningful if a hinted pass actually ran).
+    out["hinted_ran"] = bool(comp["hinted_resolved"].any()) if "hinted_resolved" in comp else False
+    out["hinted"] = {}
+    if out["hinted_ran"]:
+        for ns in io.SCORED_NAMESPACES:
+            hh = f"{ns}__hinted_here"
+            sub = comp[~comp[hh]] if hh in comp else comp.iloc[0:0]
+            no = metrics_for(pd.DataFrame(sub), ns)  # name-only on the same un-hinted subset
+            hsub = _counts(pd.Series(sub[f"{ns}__class_hinted"])) if len(sub) else _counts(pd.Series([], dtype=object))
+            comparable = hsub[C.AGREE_EXACT] + hsub[C.AGREE_PARTIAL] + hsub[C.DISAGREE]
+            agree = hsub[C.AGREE_EXACT] + hsub[C.AGREE_PARTIAL]
+            out["hinted"][ns] = {
+                "n_excluded_circular": int(comp[hh].sum()) if hh in comp else 0,
+                "name_only_agreement": no["agreement_rate"],
+                "hinted_agreement": (agree / comparable) if comparable else None,
+                "comparable": comparable,
+            }
     return out
 
 
@@ -170,14 +188,31 @@ def render_markdown(m: dict, meta: dict) -> str:
         L.append(f"| {ns} | {desc} |")
     L.append("")
 
-    # Hinted lift
-    L.append("## Hinted-pass resolution lift\n")
+    # Hinted pass
     lift = m["lift"]
-    L.append(f"- Resolved name-only: {lift['name_only_resolved']} | with hints: "
-             f"{lift['hinted_resolved']} | **lift (newly resolved via hint): {lift['resolution_lift']}**")
-    L.append("- Hinted-namespace agreement is excluded (circular). Cross-namespace (un-hinted) "
-             "agreement is in `comparison.csv` (`*__class_hinted` where `*__hinted_here` is False) "
-             "and is provenance-dependent corroboration, not independent validation.\n")
+    if not m.get("hinted_ran"):
+        L.append("## Hinted pass\n")
+        L.append("- Not run for this report (`--no-hinted`). Hints would come from the **input "
+                 "side only** (HMDB parsed from MS1/MS2 names + CAS from `ms2_cas_id`), never "
+                 "from the curated reference.\n")
+    else:
+        L.append("## Hinted-pass resolution lift\n")
+        L.append(f"- Resolved name-only: {lift['name_only_resolved']} | with hints: "
+                 f"{lift['hinted_resolved']} | **lift (newly resolved via hint): "
+                 f"{lift['resolution_lift']}**\n")
+        L.append("## Hinted-pass cross-namespace agreement (input-side hints)\n")
+        L.append("_Hints are input-side (HMDB-from-names + CAS). Each namespace is scored only "
+                 "on features where it was **not** itself the hint (circular cases excluded). "
+                 "Compares name-only vs hinted agreement on that same un-hinted subset._\n")
+        L.append("| Namespace | Name-only | Hinted | Δ | Comparable (excl. circular) |")
+        L.append("|---|---|---|---|---|")
+        for ns in io.SCORED_NAMESPACES:
+            d = m["hinted"].get(ns) or {}
+            no_a, hi_a = d.get("name_only_agreement"), d.get("hinted_agreement")
+            delta = "n/a" if (no_a is None or hi_a is None) else f"{(hi_a - no_a) * 100:+.1f} pts"
+            L.append(f"| {ns} | {_pct(no_a)} | {_pct(hi_a)} | {delta} | "
+                     f"{d.get('comparable', 0)} (−{d.get('n_excluded_circular', 0)} HMDB-hinted) |")
+        L.append("")
 
     L.append("## Confident-but-wrong\n")
     L.append("- The SDK exposes no resolved-entity *name*, so name-divergence flagging isn't "
