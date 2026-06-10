@@ -21,6 +21,7 @@ import compare as C
 import hmdb_api
 import input_hints as ih
 import io_and_normalize as io
+import llm_characterize as LC
 import refmet_api
 import report as R
 import run_pipeline as rp
@@ -46,6 +47,9 @@ def main() -> None:
     ap.add_argument("--allow-metadata-fetch", action="store_true",
                     help="permit live MW/PubChem HMDB-metadata calls (dataset-derived outbound; "
                          "off = offline cache-replay only)")
+    ap.add_argument("--allow-llm", action="store_true",
+                    help="permit Phase-2 LLM cause narration (OpenAI; payload-minimized; gated on "
+                         "data-sharing). Off = export keeps the 'pending' LLM columns.")
     args = ap.parse_args()
 
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -140,6 +144,15 @@ def main() -> None:
             meta = hmdb_api.resolve_hmdb_metadata(comp_ids, cache, name_hints=name_hints, retrieved=ts,
                                                   mw=lambda _id: None, pubchem=lambda _n: None)
         delta = SD.enrich_with_relation(delta, meta)
+        if args.allow_llm:
+            mm = delta[LC.mismatch_mask(delta)]
+            print(f"[run_comparison] LLM characterizing {len(mm)} mismatch rows (OpenAI, paced)...")
+            results = LC.characterize([dict(r) for _, r in mm.iterrows()], meta,
+                                      rp.OUTPUTS_ROOT / "llm_cache.json", sleep_s=0.3)
+            delta = LC.attach_llm(delta, results)
+            print(f"[run_comparison] LLM characterized {len(results)} rows")
+        else:
+            print("[run_comparison] LLM: skipped (pass --allow-llm; export keeps 'pending').")
         SD.write_metabolon_export(SD.build_metabolon_export(delta, meta), spectral_export_path)
         sd_metrics = R.aggregate_spectral_delta(delta, total_features=len(gt_df))
         with report_path.open("a") as fh:

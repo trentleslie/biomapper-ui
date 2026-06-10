@@ -94,7 +94,7 @@ def test_enrich_and_export_with_provisional_marker(tmp_path):
     enriched = SD.enrich_with_relation(delta, meta)
     assert "structural_relation" in enriched.columns
     out = SD.build_metabolon_export(enriched, meta)
-    assert "spectral_name" in out.columns and "llm_cause" in out.columns
+    assert "spectral_name" in out.columns and "llm_category" in out.columns
     exp = tmp_path / "export.csv"
     SD.write_metabolon_export(out, exp)
     text = exp.read_text()

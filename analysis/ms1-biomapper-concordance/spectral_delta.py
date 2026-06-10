@@ -75,7 +75,11 @@ def build_embedded_by_feature(xlsx_path: str | Path) -> dict[str, dict]:
                     cosine = float(str(cos))
                 except (TypeError, ValueError):
                     cosine = None
-            rec = out.setdefault(fid, {"matched_name": name, "hmdb": {}})
+            rec = out.setdefault(fid, {"matched_name": name, "hmdb": {},
+                                       "mean_mz": None, "neutral_mass": None, "adduct_type": None})
+            for fld in ("mean_mz", "neutral_mass", "adduct_type"):  # measured evidence (first non-missing)
+                if rec[fld] is None and not io.is_missing(row.get(fld, "")):
+                    rec[fld] = str(row.get(fld)).strip()
             for col in NAME_COLUMNS:
                 raw = str(row.get(col, ""))
                 for m in _HMDB_RE.findall(raw):
@@ -145,6 +149,9 @@ def build_spectral_delta(comp: pd.DataFrame, gt_df: pd.DataFrame, xlsx_path: str
             "spectral_n": len(spectral),
             "spectral_cosine_max": prov["cosine"],
             "spectral_src": f"{prov['sheet']}:{prov['col']}",
+            "mean_mz": rec.get("mean_mz"),
+            "neutral_mass": rec.get("neutral_mass"),
+            "adduct_type": rec.get("adduct_type"),
             "rep_spectral_id": rep_spectral,
             "bmap_hmdb": ";".join(sorted(bmap)),
             "ref_hmdb": ";".join(sorted(ref)),
@@ -189,8 +196,9 @@ def build_metabolon_export(enriched: pd.DataFrame, meta: dict[str, dict]) -> pd.
         out[f"{side}_inchikey"] = out[idcol].map(lambda i: m(i, "inchikey"))
         out[f"{side}_link"] = out[idcol].map(lambda i: m(i, "link"))
         out[f"{side}_meta_source"] = out[idcol].map(lambda i: m(i, "source"))
-    out["llm_cause"] = "pending"        # Phase-2 (gated); stable column + sentinel
-    out["llm_adjudication"] = "pending"
+    # Phase-2 LLM columns: use them if attach_llm populated them, else stable "pending" sentinel.
+    for c in ("llm_category", "llm_adjudication", "llm_confidence", "llm_rationale"):
+        out[c] = enriched[c] if c in enriched.columns else "pending"
     return out
 
 
