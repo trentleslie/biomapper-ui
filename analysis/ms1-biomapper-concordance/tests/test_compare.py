@@ -138,3 +138,26 @@ def test_write_comparison_sanitizes(tmp_path):
     C.write_comparison(df, p)
     text = p.read_text()
     assert "'=DANGER()" in text
+
+
+def test_mapped_final_preserves_originals_and_appends():
+    df = _feature_df()
+    out = C.build_mapped_final(df, _name_only_results())
+    for col in df.columns:                       # every original column preserved
+        assert col in out.columns
+    for col in ["hmdb_id", "chebi_id", "kegg_id", "lipidmaps_id", "pubchem_cid"]:
+        assert f"{col}_biomapper" in out.columns  # appended parallel to originals
+    assert {"resolved_biomapper", "primary_curie_biomapper",
+            "confidence_tier_biomapper", "refmet_id_biomapper"} <= set(out.columns)
+    assert len(out) == len(df)                    # row count unchanged
+    glucose = out[out["matched_name"] == "Glucose"].iloc[0]
+    assert glucose["hmdb_id"] == "HMDB0000122"            # original untouched
+    assert glucose["hmdb_id_biomapper"] == "HMDB0000122"  # biomapper mapping appended
+    assert bool(glucose["resolved_biomapper"])
+
+
+def test_write_mapped_final_sanitizes(tmp_path):
+    df = pd.DataFrame({"matched_name": ["=EVIL()"], "hmdb_id_biomapper": ["HMDB0000001"]})
+    p = tmp_path / "mapped.csv"
+    C.write_mapped_final(df, p)
+    assert "'=EVIL()" in p.read_text()

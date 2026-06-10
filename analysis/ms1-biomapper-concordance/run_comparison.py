@@ -97,13 +97,17 @@ def main() -> None:
     comp = C.compare(df, name_only, hinted, bridge)
     comparison_path = run_dir / "comparison.csv"
     report_path = run_dir / "report.md"
+    mapped_path = run_dir / "mapped_final.csv"
     C.write_comparison(comp, comparison_path)
     metrics = R.write_report(comp, report_path, meta={"timestamp": ts, "base_url": rp.base_url()})
+    # UI-style export: original input columns + Biomapper mappings appended (_biomapper suffix).
+    C.write_mapped_final(C.build_mapped_final(df, name_only), mapped_path)
 
     print("\n[run_comparison] DONE — artifacts:")
     print(f"  raw (name-only): {run_dir / 'raw_name_only.json'}")
     if hinted is not None:
         print(f"  raw (hinted)   : {run_dir / 'raw_hinted.json'}")
+    print(f"  mapped final   : {mapped_path}")
     print(f"  comparison CSV : {comparison_path}")
     print(f"  report (md)    : {report_path}")
     print(f"  resolved (name-only): {metrics['lift']['name_only_resolved']}/{metrics['total']}")

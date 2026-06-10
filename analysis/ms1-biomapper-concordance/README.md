@@ -5,7 +5,10 @@ resulting cross-database identifiers against his curated annotations.
 
 - **Input** (in `data/`, git-ignored — the unpublished input data): `unique_features_by_best_tier.csv`,
   `per_metabolite_annotation.csv` (the curated ground truth), `All_Methods_Features.xlsx`.
-- **Output** (in `outputs/<timestamp>/`, git-ignored): raw pass JSON, `comparison.csv`, `report.md`.
+- **Output** (in `outputs/<timestamp>/`, git-ignored):
+  - `mapped_final.csv` — UI-style export: all original input columns preserved, with Biomapper's name-only mappings appended (`*_biomapper` suffix, parallel to the original ID columns).
+  - `comparison.csv` — analysis/scoring view: per-feature reference-vs-Biomapper IDs and agreement class per namespace.
+  - `report.md` — concordance summary; `raw_*.json` — raw pass results.
 
 ## Method
 

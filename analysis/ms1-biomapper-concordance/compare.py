@@ -165,6 +165,51 @@ def _column_for(namespace: str) -> str:
     raise KeyError(namespace)
 
 
+def build_mapped_final(df: pd.DataFrame, name_only: list[dict]) -> pd.DataFrame:
+    """UI-style export: ALL original input columns preserved, Biomapper's name-only mappings
+    appended with a ``_biomapper`` suffix (parallel to the original ID columns).
+
+    Mirrors the biomapper-ui behavior of suffixing generated columns when originals are
+    present, joined to source rows by the entity-name column.
+    """
+    by_name = _index_by_name(name_only)
+    out = df.copy()
+    appended: dict[str, list] = {
+        "resolved_biomapper": [],
+        "primary_curie_biomapper": [],
+        "confidence_tier_biomapper": [],
+        "confidence_score_biomapper": [],
+        "refmet_id_biomapper": [],
+    }
+    for col in io.COLUMN_TO_IDENTIFIERS_PREFIX:  # hmdb_id_biomapper, chebi_id_biomapper, ...
+        appended[f"{col}_biomapper"] = []
+
+    for _, feat in df.iterrows():
+        res = by_name.get(str(feat["matched_name"]).strip(), {})
+        appended["resolved_biomapper"].append(bool(res.get("resolved", False)))
+        appended["primary_curie_biomapper"].append(res.get("primary_curie"))
+        appended["confidence_tier_biomapper"].append(res.get("confidence_tier"))
+        appended["confidence_score_biomapper"].append(res.get("confidence_score"))
+        appended["refmet_id_biomapper"].append(";".join(sorted(io.biomapper_refmet_ids(res))))
+        for col, ns in io.COLUMN_TO_IDENTIFIERS_PREFIX.items():
+            appended[f"{col}_biomapper"].append(";".join(sorted(io.biomapper_ids(res, ns))))
+
+    for c, vals in appended.items():
+        out[c] = vals
+    return out
+
+
+def write_mapped_final(df_out: pd.DataFrame, path: str | Path) -> None:
+    """Write the mapped-final CSV, sanitizing every cell against formula injection."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as fh:
+        w = csv.writer(fh)
+        w.writerow(df_out.columns)
+        for _, r in df_out.iterrows():
+            w.writerow([sanitize_cell("" if pd.isna(v) else v) for v in r])
+
+
 def write_comparison(df_out: pd.DataFrame, path: str | Path) -> None:
     """Write the comparison CSV with formula-injection sanitization on text cells."""
     path = Path(path)
