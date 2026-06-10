@@ -213,6 +213,17 @@ def render_markdown(m: dict, meta: dict) -> str:
             L.append(f"| {ns} | {_pct(no_a)} | {_pct(hi_a)} | {delta} | "
                      f"{d.get('comparable', 0)} (−{d.get('n_excluded_circular', 0)} HMDB-hinted) |")
         L.append("")
+        L.append("> **Interpreting the negative Δ.** The input-side hints are *spectral* evidence "
+                 "(HMDB embedded in MS1/MS2 compound-name strings + CAS from `ms2_cas_id`). A drop "
+                 "in agreement does **not** by itself mean the hint is wrong or that Biomapper got "
+                 "worse — it means the **spectral-anchored** identity diverges from the "
+                 "**name-based curation** this study compares against. Whether the hint pulls "
+                 "toward a *more* correct structure (the spectral match) or a *noisier* one is a "
+                 "domain judgment that hinges on whether the spectral annotation and the curated "
+                 "name refer to the same analyte (the classic isomer/tautomer/adduct ambiguity). "
+                 "So read this table as *\"spectral-anchored vs curation\"*, not as a quality score "
+                 "for Biomapper. The name-only concordance above remains the authoritative "
+                 "Biomapper-vs-curation measure.\n")
 
     L.append("## Confident-but-wrong\n")
     L.append("- The SDK exposes no resolved-entity *name*, so name-divergence flagging isn't "
