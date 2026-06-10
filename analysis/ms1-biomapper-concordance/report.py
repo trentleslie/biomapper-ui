@@ -110,6 +110,36 @@ def aggregate(comp: pd.DataFrame) -> dict:
                 "hinted_agreement": (agree / comparable) if comparable else None,
                 "comparable": comparable,
             }
+
+    # Marginal mapping contribution per tier: of each tier's features, how many Biomapper maps,
+    # how many the reference already had, and how many are net-new (Biomapper mapped, no ref ID).
+    out["contribution_by_tier"] = {}
+    NS = io.SCORED_NAMESPACES
+    needed = ([f"{ns}__bmap" for ns in NS] + [f"{ns}__ref" for ns in NS]
+              + [f"{ns}__class" for ns in NS]
+              + ["refmet__bmap_ids", "refmet__ref", "refmet__class", "resolved", "match_level"])
+    if all(col in comp.columns for col in needed):
+        def _notempty(s):
+            return ~s.astype(str).str.strip().str.lower().isin(["", "nan", "none"])
+        bmap_any = pd.concat([_notempty(comp[f"{ns}__bmap"]) for ns in NS]
+                             + [_notempty(comp["refmet__bmap_ids"])], axis=1).any(axis=1)
+        ref_any = pd.concat([_notempty(comp[f"{ns}__ref"]) for ns in NS]
+                            + [_notempty(comp["refmet__ref"])], axis=1).any(axis=1)
+        newcov = pd.concat([(comp[f"{ns}__class"] == C.NEW_COVERAGE) for ns in NS]
+                           + [(comp["refmet__class"] == C.NEW_COVERAGE)], axis=1).any(axis=1)
+        res = comp["resolved"].astype(str).str.strip().str.lower().isin(["true", "1"])
+        d2 = pd.DataFrame({"tier": comp["match_level"], "bmap": bmap_any, "ref": ref_any,
+                           "newcov": newcov, "res": res})
+        for t in tiers:
+            s = d2[d2["tier"] == t]
+            out["contribution_by_tier"][t] = {
+                "features": len(s),
+                "resolved": int(s["res"].sum()),
+                "with_bmap_id": int(s["bmap"].sum()),
+                "ref_had_id": int(s["ref"].sum()),
+                "new_coverage_any": int(s["newcov"].sum()),
+                "net_new": int((s["bmap"] & ~s["ref"]).sum()),
+            }
     return out
 
 
@@ -172,6 +202,23 @@ def render_markdown(m: dict, meta: dict) -> str:
     for t in m["tiers"]:
         L.append(f"### Tier: {t}\n")
         _emit_ns_table(L, lambda ns, t=t: m["by_tier"][ns][t], m["refmet_available"])
+
+    # Marginal contribution by tier
+    if m.get("contribution_by_tier"):
+        L.append("## Mapping contribution by tier\n")
+        L.append("_What each tier adds: of its features, how many Biomapper maps to ≥1 ID, how "
+                 "many the reference already had an ID for, and **net-new** = Biomapper mapped it "
+                 "AND the reference had no ID at all (the only mappings that wouldn't exist "
+                 "otherwise). Net-new IDs are UNVALIDATED — and lowest-tier evidence is least "
+                 "certain, so spot-check before trusting._\n")
+        L.append("| Tier | Features | Resolved | Biomapper ≥1 ID | Reference had ID | New-coverage (any ns) | Net-new (no ref ID) |")
+        L.append("|---|---|---|---|---|---|---|")
+        for t in m["tiers"]:
+            d = m["contribution_by_tier"].get(t, {})
+            L.append(f"| {t} | {d.get('features', 0)} | {d.get('resolved', 0)} | "
+                     f"{d.get('with_bmap_id', 0)} | {d.get('ref_had_id', 0)} | "
+                     f"{d.get('new_coverage_any', 0)} | **{d.get('net_new', 0)}** |")
+        L.append("")
 
     # Partial agreement by cardinality
     L.append("## Partial-agreement by Biomapper candidate-set size\n")
