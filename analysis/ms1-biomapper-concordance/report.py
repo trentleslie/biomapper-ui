@@ -220,6 +220,35 @@ def render_markdown(m: dict, meta: dict) -> str:
                      f"{d.get('new_coverage_any', 0)} | **{d.get('net_new', 0)}** |")
         L.append("")
 
+    # Marginal value of the MS1 tier (with vs without MS1)
+    ms1 = m.get("contribution_by_tier", {}).get("MS1")
+    if ms1:
+        total = m["total"]
+        resolved = m["lift"]["name_only_resolved"]
+        L.append("## Marginal value of the MS1 tier (with vs without MS1)\n")
+        L.append("_MS1-tier features are those whose only annotation evidence was MS1; their names "
+                 "are unique to MS1, so excluding the MS1 tier simply removes them (MS2/CURATION "
+                 "mappings are unchanged). Biomapper is name-driven, so a feature with no name is "
+                 "never mapped — and 'embedded ID but no name' is not a hidden gap here: of the "
+                 "~7.6k raw unnamed feature-rows in the xlsx, essentially none carry a usable ID "
+                 "(the name and the embedded ID come from the same annotation event)._\n")
+        L.append("| | With MS1 | Without MS1 (drop MS1 tier) |")
+        L.append("|---|---|---|")
+        L.append(f"| Features in dataset | {total} | {total - ms1['features']} |")
+        L.append(f"| Resolved (name-only) | {resolved} | {resolved - ms1['resolved']} |")
+        L.append("")
+        L.append(f"- Including MS1 adds **{ms1['features']} features**, of which "
+                 f"**{ms1['with_bmap_id']}** map to ≥1 cross-DB ID — results that would simply be "
+                 f"absent without MS1 (~{100 * ms1['with_bmap_id'] / max(1, resolved):.1f}% of the "
+                 f"resolved set).")
+        L.append(f"- Beyond the curation, MS1's *additive* gain is modest: **{ms1['net_new']} "
+                 f"net-new** mappings (no reference ID existed anywhere) and **"
+                 f"{ms1['new_coverage_any']}** features that gained an ID in a namespace the "
+                 f"reference lacked. The remaining {ms1['ref_had_id']} were compounds the curation "
+                 f"already had an ID for.")
+        L.append("- These additions are the **least-certain** (MS1 = mass/intensity-only evidence), "
+                 "so the net-new/incremental IDs are exactly the ones to spot-check.\n")
+
     # Partial agreement by cardinality
     L.append("## Partial-agreement by Biomapper candidate-set size\n")
     L.append("_A partial agreement on a large candidate set is weaker (overlap by chance)._\n")
