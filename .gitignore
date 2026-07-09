@@ -61,3 +61,7 @@ __pycache__/
 artifacts/python-api/data/*.db
 artifacts/python-api/data/*.db-wal
 artifacts/python-api/data/*.db-shm
+
+# MS1 ↔ Biomapper concordance study — unpublished data + paid-API outputs
+analysis/ms1-biomapper-concordance/data/
+analysis/ms1-biomapper-concordance/outputs/

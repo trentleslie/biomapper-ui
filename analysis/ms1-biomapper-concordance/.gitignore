@@ -1,0 +1,8 @@
+# Unpublished input data — never commit
+data/
+
+# Raw paid-API results, reload cache, comparison CSV, report — never commit
+outputs/
+
+# Notebook checkpoints
+.ipynb_checkpoints/
