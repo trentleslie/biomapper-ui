@@ -188,6 +188,29 @@ app.use(
   }),
 );
 
+// Benchmark endpoints — user-scoped. STRICT auth on every path (incl. /stream and
+// /result): benchmark runs store the curator's ground-truth dataset (sensitive), so
+// unlike /api/map there is NO demo/stream/result exemption.
+app.use(
+  "/api/benchmark",
+  ...(clerkEnabled ? [requireMapAuth] : []),
+  createProxyMiddleware({
+    target: PYTHON_API_BASE,
+    changeOrigin: true,
+    pathRewrite: (path: string) => "/benchmark" + (path === "/" ? "" : path),
+    on: {
+      proxyReq: onProxyReqInjectUser,
+      error: (_err, _req, res) => {
+        if (!("headersSent" in res && res.headersSent)) {
+          (res as express.Response)
+            .status(502)
+            .json({ detail: "Benchmark service unavailable. Please try again later." });
+        }
+      },
+    },
+  }),
+);
+
 // Feedback endpoints — same auth gate as /api/map.
 app.use(
   "/api/feedback",
