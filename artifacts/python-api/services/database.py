@@ -43,6 +43,51 @@ CREATE TABLE IF NOT EXISTS flagged_names (
 )
 """
 
+_CREATE_BENCHMARK_RUNS_TABLE = """
+CREATE TABLE IF NOT EXISTS benchmark_runs (
+    run_id         TEXT PRIMARY KEY,
+    user_id        TEXT,
+    display_name   TEXT,
+    dataset_name   TEXT,
+    status         TEXT NOT NULL DEFAULT 'pending',
+    error_message  TEXT,
+    config         TEXT,
+    vocabularies   TEXT,
+    sdk_version    TEXT,
+    env            TEXT NOT NULL DEFAULT 'production',
+    base_url       TEXT,
+    order_asserted INTEGER NOT NULL DEFAULT 0,
+    input_names    TEXT,
+    corpus_metrics TEXT,
+    total          INTEGER NOT NULL DEFAULT 0,
+    created_at     REAL NOT NULL,
+    updated_at     REAL NOT NULL
+)
+"""
+
+_CREATE_BENCHMARK_RUNS_INDEX = """
+CREATE INDEX IF NOT EXISTS idx_bench_user_created
+ON benchmark_runs (user_id, created_at DESC)
+"""
+
+_CREATE_BENCHMARK_ROW_LOGS_TABLE = """
+CREATE TABLE IF NOT EXISTS benchmark_row_logs (
+    run_id       TEXT NOT NULL,
+    name         TEXT NOT NULL,
+    vocabulary   TEXT NOT NULL,
+    ground_truth TEXT,
+    returned_ids TEXT,
+    hit_ranks    TEXT,
+    category     TEXT NOT NULL,
+    first_hit    INTEGER
+)
+"""
+
+_CREATE_BENCHMARK_ROW_LOGS_INDEX = """
+CREATE INDEX IF NOT EXISTS idx_bench_rowlog_run
+ON benchmark_row_logs (run_id)
+"""
+
 
 class Database:
     """Async SQLite persistence layer for job history."""
@@ -63,6 +108,10 @@ class Database:
         await self._conn.execute(_CREATE_TABLE)
         await self._conn.execute(_CREATE_INDEX)
         await self._conn.execute(_CREATE_FLAGGED_NAMES_TABLE)
+        await self._conn.execute(_CREATE_BENCHMARK_RUNS_TABLE)
+        await self._conn.execute(_CREATE_BENCHMARK_RUNS_INDEX)
+        await self._conn.execute(_CREATE_BENCHMARK_ROW_LOGS_TABLE)
+        await self._conn.execute(_CREATE_BENCHMARK_ROW_LOGS_INDEX)
         await self._conn.commit()
 
         if existed:
@@ -248,6 +297,189 @@ class Database:
             (user_id, name),
         )
         await self._conn.commit()
+
+    # ------------------------------------------------------------------
+    # Benchmark runs CRUD
+    # ------------------------------------------------------------------
+
+    _BENCHMARK_JSON_FIELDS = ("config", "vocabularies", "input_names", "corpus_metrics")
+
+    async def insert_benchmark_run(
+        self,
+        *,
+        run_id: str,
+        user_id: str | None,
+        dataset_name: str | None,
+        total: int,
+        env: str,
+        base_url: str | None,
+        sdk_version: str | None,
+        order_asserted: bool,
+        config: dict[str, Any] | None,
+        vocabularies: list[str] | None,
+        input_names: list[str] | None,
+        display_name: str | None = None,
+        status: str = "pending",
+    ) -> None:
+        now = time.time()
+        await self._conn.execute(
+            """INSERT INTO benchmark_runs
+               (run_id, user_id, display_name, dataset_name, status, config,
+                vocabularies, sdk_version, env, base_url, order_asserted,
+                input_names, total, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                run_id, user_id, display_name, dataset_name, status,
+                json.dumps(config) if config is not None else None,
+                json.dumps(vocabularies) if vocabularies is not None else None,
+                sdk_version, env, base_url, 1 if order_asserted else 0,
+                json.dumps(input_names) if input_names is not None else None,
+                total, now, now,
+            ),
+        )
+        await self._conn.commit()
+
+    async def update_benchmark_run(self, run_id: str, **fields: Any) -> None:
+        if not fields:
+            return
+        allowed = {
+            "status", "error_message", "display_name", "corpus_metrics",
+            "sdk_version", "order_asserted",
+        }
+        parts: list[str] = []
+        values: list[Any] = []
+        for key, val in fields.items():
+            if key not in allowed:
+                continue
+            if key == "corpus_metrics" and val is not None and not isinstance(val, str):
+                val = json.dumps(val)
+            if key == "order_asserted":
+                val = 1 if val else 0
+            parts.append(f"{key} = ?")
+            values.append(val)
+        if not parts:
+            return
+        parts.append("updated_at = ?")
+        values.append(time.time())
+        values.append(run_id)
+        await self._conn.execute(
+            f"UPDATE benchmark_runs SET {', '.join(parts)} WHERE run_id = ?", values
+        )
+        await self._conn.commit()
+
+    async def get_benchmark_run(self, run_id: str) -> dict[str, Any] | None:
+        cursor = await self._conn.execute(
+            "SELECT * FROM benchmark_runs WHERE run_id = ?", (run_id,)
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        return self._benchmark_row_to_dict(row, include_heavy=True)
+
+    async def list_benchmark_runs(self, user_id: str) -> list[dict[str, Any]]:
+        cursor = await self._conn.execute(
+            """SELECT run_id, user_id, display_name, dataset_name, status,
+                      error_message, sdk_version, env, order_asserted, total,
+                      corpus_metrics, created_at, updated_at
+               FROM benchmark_runs
+               WHERE user_id = ?
+               ORDER BY created_at DESC
+               LIMIT 100""",
+            (user_id,),
+        )
+        rows = await cursor.fetchall()
+        # input_names is intentionally excluded from the list response (can be up to 10k).
+        return [self._benchmark_row_to_dict(row, include_heavy=False) for row in rows]
+
+    async def delete_benchmark_run(self, run_id: str) -> bool:
+        await self._conn.execute(
+            "DELETE FROM benchmark_row_logs WHERE run_id = ?", (run_id,)
+        )
+        cursor = await self._conn.execute(
+            "DELETE FROM benchmark_runs WHERE run_id = ?", (run_id,)
+        )
+        await self._conn.commit()
+        return cursor.rowcount > 0
+
+    async def insert_row_logs(self, run_id: str, rows: list[dict[str, Any]]) -> None:
+        if not rows:
+            return
+        payload = []
+        for r in rows:
+            hit_ranks = r.get("hit_ranks", "")
+            first = None
+            if hit_ranks:
+                try:
+                    first = int(str(hit_ranks).split(";")[0])
+                except (ValueError, IndexError):
+                    first = None
+            payload.append((
+                run_id, r.get("name"), r.get("vocabulary"), r.get("ground_truth"),
+                r.get("returned_ids"), hit_ranks, r.get("category"), first,
+            ))
+        await self._conn.executemany(
+            """INSERT INTO benchmark_row_logs
+               (run_id, name, vocabulary, ground_truth, returned_ids, hit_ranks,
+                category, first_hit)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            payload,
+        )
+        await self._conn.commit()
+
+    async def get_row_logs(
+        self,
+        run_id: str,
+        *,
+        limit: int = 500,
+        category: str | None = None,
+        vocabulary: str | None = None,
+        rerankable: bool = False,
+    ) -> list[dict[str, Any]]:
+        clauses = ["run_id = ?"]
+        params: list[Any] = [run_id]
+        if category:
+            clauses.append("category = ?")
+            params.append(category)
+        if vocabulary:
+            clauses.append("vocabulary = ?")
+            params.append(vocabulary)
+        if rerankable:
+            # hit exists, not at rank 0, within top 5 (0-indexed): 0 < first_hit < 5
+            clauses.append("first_hit IS NOT NULL AND first_hit > 0 AND first_hit < 5")
+        params.append(limit)
+        cursor = await self._conn.execute(
+            f"""SELECT name, vocabulary, ground_truth, returned_ids, hit_ranks, category
+                FROM benchmark_row_logs
+                WHERE {' AND '.join(clauses)}
+                LIMIT ?""",
+            params,
+        )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
+
+    async def recover_stale_benchmark_runs(self) -> int:
+        cursor = await self._conn.execute(
+            """UPDATE benchmark_runs
+               SET status = 'interrupted',
+                   error_message = 'Run interrupted by server restart. Please re-run.',
+                   updated_at = ?
+               WHERE status IN ('pending', 'processing')""",
+            (time.time(),),
+        )
+        await self._conn.commit()
+        count = cursor.rowcount
+        if count:
+            logger.info("Recovered %d stale benchmark run(s) on startup", count)
+        return count
+
+    @staticmethod
+    def _benchmark_row_to_dict(row: aiosqlite.Row, *, include_heavy: bool) -> dict[str, Any]:
+        d: dict[str, Any] = dict(row)
+        d["order_asserted"] = bool(d.get("order_asserted"))
+        for field in ("config", "vocabularies", "input_names", "corpus_metrics"):
+            if field in d:
+                d[field] = json.loads(d[field]) if d.get(field) else None
+        return d
 
     # ------------------------------------------------------------------
     # Helpers

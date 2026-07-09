@@ -1,0 +1,47 @@
+{
+  "counts": {
+    "total": 27,
+    "curation": 15,
+    "ms2": 12
+  },
+  "cases": [
+    {
+      "name": "2-O-methylascorbic acid",
+      "gt_hmdb": [
+        "HMDB0240294"
+      ],
+      "returned_hmdb": [
+        "HMDB0240294"
+      ],
+      "expect_category": "EXACT_MATCH",
+      "expect_hit_ranks": [
+        0
+      ]
+    },
+    {
+      "name": "3-aminoisobutyrate",
+      "gt_hmdb": [
+        "HMDB003911"
+      ],
+      "returned_hmdb": [
+        "HMDB9999999",
+        "HMDB0003911"
+      ],
+      "expect_category": "NORMALIZED_MATCH",
+      "expect_hit_ranks": [
+        1
+      ]
+    },
+    {
+      "name": "3-phenylpropionate (hydrocinnamate)",
+      "gt_hmdb": [
+        "HMDB0000764"
+      ],
+      "returned_hmdb": [
+        "HMDB9999999"
+      ],
+      "expect_category": "NO_OVERLAP",
+      "expect_hit_ranks": []
+    }
+  ]
+}

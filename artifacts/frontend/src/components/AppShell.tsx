@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 import { useRoute, Link, useLocation } from "wouter";
 import { useUser, useClerk } from "@clerk/react";
-import { UploadCloud, BarChart3, List, Flag } from "lucide-react";
+import { UploadCloud, BarChart3, List, Flag, Target } from "lucide-react";
 import { useListJobs, getListJobsQueryKey } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EnvToggle } from "@/components/EnvToggle";
@@ -19,6 +19,12 @@ function SideNav() {
       href: "/",
       icon: <UploadCloud className="w-4 h-4" />,
       active: location === "/" || location === "/upload",
+    },
+    {
+      label: "Benchmark",
+      href: "/benchmark",
+      icon: <Target className="w-4 h-4" />,
+      active: location.startsWith("/benchmark"),
     },
   ];
 

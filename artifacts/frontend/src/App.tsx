@@ -10,6 +10,9 @@ import DashboardPage from "@/pages/dashboard";
 import DemoPage from "@/pages/demo";
 import JobsPage from "@/pages/jobs";
 import FlaggedPage from "@/pages/flagged";
+import BenchmarkPage from "@/pages/benchmark";
+import BenchmarkRunsPage from "@/pages/benchmark-runs";
+import BenchmarkResultsPage from "@/pages/benchmark-results";
 
 import NotFound from "@/pages/not-found";
 import { EnvProvider } from "@/contexts/env-context";
@@ -132,6 +135,17 @@ function Router() {
       {/* /flagged = aggregated flagged annotations page */}
       <Route path="/flagged">
         {() => <ProtectedRoute component={FlaggedPage} />}
+      </Route>
+
+      {/* Benchmark: upload/dispatch, run history, and per-run results */}
+      <Route path="/benchmark/runs/:runId">
+        {() => <ProtectedRoute component={BenchmarkResultsPage} />}
+      </Route>
+      <Route path="/benchmark/runs">
+        {() => <ProtectedRoute component={BenchmarkRunsPage} />}
+      </Route>
+      <Route path="/benchmark">
+        {() => <ProtectedRoute component={BenchmarkPage} />}
       </Route>
 
       {/* /job/:jobId = canonical dashboard route; demo mode bypasses auth */}

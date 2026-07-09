@@ -455,7 +455,16 @@ export default function UploadPage() {
       <div className="max-w-3xl w-full mx-auto">
 
         <div className="flex items-center gap-2 mb-6">
-          <Tabs value={mode} onValueChange={(v) => setMode(v as 'link' | 'benchmark')}>
+          <Tabs
+            value={mode}
+            onValueChange={(v) => {
+              if (v === 'benchmark') {
+                setLocation('/benchmark');
+              } else {
+                setMode('link');
+              }
+            }}
+          >
             <TabsList>
               <TabsTrigger value="link">Entity Linking</TabsTrigger>
               <TabsTrigger value="benchmark">Benchmark</TabsTrigger>
@@ -463,7 +472,7 @@ export default function UploadPage() {
           </Tabs>
           <div className="ml-auto">
             <FieldTooltip label="Help: Mode">
-              Entity Linking maps your compound names to standardized identifiers. Benchmark mode (coming soon) lets you evaluate mapping accuracy against known-correct data.
+              Entity Linking maps your compound names to standardized identifiers. Benchmark lets you evaluate mapping accuracy against known-correct data.
             </FieldTooltip>
           </div>
         </div>

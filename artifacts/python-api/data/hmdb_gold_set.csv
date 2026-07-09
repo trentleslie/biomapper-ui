@@ -1,0 +1,28 @@
+name,gt_hmdb,match_level
+2-O-methylascorbic acid,HMDB0240294,CURATION
+3-aminoisobutyrate,HMDB0003911,CURATION
+3-phenylpropionate (hydrocinnamate),HMDB0000764,CURATION
+aspartylvaline,HMDB0028766,CURATION
+beta-hydroxyisovalerate,HMDB02362,CURATION
+dimethyl sulfone,HMDB04983,CURATION
+gamma-CEHC,HMDB03332,CURATION
+gamma-glutamylglutamate,HMDB0011737,CURATION
+glycocholate,HMDB0000138,CURATION
+leucylleucine,HMDB0028933,CURATION
+N-acetylleucine,HMDB0011756,CURATION
+N-acetyltaurine,HMDB0240253,CURATION
+succinate,HMDB0000254,CURATION
+tryptophan,HMDB0000929,CURATION
+urea,HMDB0000294,CURATION
+1-Hexadecanol,HMDB0003424,MS2
+"2,3-Butanediol",HMDB0003156,MS2
+3-Hydroxysuberic acid,HMDB0000325,MS2
+3-METHYLGLUTARIC ACID,HMDB0000752,MS2
+D-Ribose,HMDB0000283,MS2
+Estrone,HMDB0000145,MS2
+Maltitol,HMDB0002928,MS2
+Massbank:PR308164 Gallic acid,HMDB0039326,MS2
+MUCIC ACID,HMDB0000639,MS2
+Spectral Match to 1-(9Z-Octadecenoyl)-2-tetradecanoyl-sn-glycero-3-phosphocholine from NIST14,HMDB0008097,MS2
+Spectral Match to 1-Hexadecanoyl-2-(9Z-octadecenoyl)-sn-glycero-3-phosphocholine from NIST14,HMDB0007972,MS2
+SUBERYL GLYCINE,HMDB0000953,MS2
