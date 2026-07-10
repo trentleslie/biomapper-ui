@@ -938,7 +938,13 @@ export default function DashboardPage() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-xs text-neutral-500">
-                              {!row.resolved ? "No match found" : row.needsReview ? "Flagged by system" : "Low confidence"}
+                              {!row.resolved
+                                ? "No match found"
+                                : row.chosenKgIdReview === "divergent_refmet"
+                                ? "RefMet ChEBI conflict (structure differs)"
+                                : row.chosenKgIdReview === "conflict_no_structure"
+                                ? "RefMet ChEBI conflict (no structure to adjudicate)"
+                                : "Low confidence"}
                             </TableCell>
                             {!isDemo && (
                             <TableCell className="text-right">

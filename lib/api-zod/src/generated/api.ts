@@ -136,6 +136,12 @@ export const GetMappingResultResponse = zod.object({
       confidenceScore: zod.number().nullish(),
       confidenceTier: zod.enum(["high", "medium", "low", "unknown"]).nullish(),
       needsReview: zod.boolean().optional(),
+      chosenKgIdReview: zod
+        .enum(["divergent_refmet", "conflict_no_structure"])
+        .nullish()
+        .describe(
+          'Review flag set when the resolver source-weighted a small-molecule ChEBI\nconflict toward the RefMet annotator: \"divergent_refmet\" (RefMet node chosen\nacross an InChIKey-connectivity difference) or \"conflict_no_structure\"\n(majority kept because no InChIKey was available to adjudicate). null when no\nreview is warranted.\n',
+        ),
       identifiers: zod
         .record(zod.string(), zod.array(zod.string()))
         .optional()
@@ -271,6 +277,12 @@ export const GetJobResponse = zod
               .enum(["high", "medium", "low", "unknown"])
               .nullish(),
             needsReview: zod.boolean().optional(),
+            chosenKgIdReview: zod
+              .enum(["divergent_refmet", "conflict_no_structure"])
+              .nullish()
+              .describe(
+                'Review flag set when the resolver source-weighted a small-molecule ChEBI\nconflict toward the RefMet annotator: \"divergent_refmet\" (RefMet node chosen\nacross an InChIKey-connectivity difference) or \"conflict_no_structure\"\n(majority kept because no InChIKey was available to adjudicate). null when no\nreview is warranted.\n',
+              ),
             identifiers: zod
               .record(zod.string(), zod.array(zod.string()))
               .optional()
@@ -376,6 +388,12 @@ export const UpdateJobResponse = zod
               .enum(["high", "medium", "low", "unknown"])
               .nullish(),
             needsReview: zod.boolean().optional(),
+            chosenKgIdReview: zod
+              .enum(["divergent_refmet", "conflict_no_structure"])
+              .nullish()
+              .describe(
+                'Review flag set when the resolver source-weighted a small-molecule ChEBI\nconflict toward the RefMet annotator: \"divergent_refmet\" (RefMet node chosen\nacross an InChIKey-connectivity difference) or \"conflict_no_structure\"\n(majority kept because no InChIKey was available to adjudicate). null when no\nreview is warranted.\n',
+              ),
             identifiers: zod
               .record(zod.string(), zod.array(zod.string()))
               .optional()
