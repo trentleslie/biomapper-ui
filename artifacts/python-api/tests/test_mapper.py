@@ -14,6 +14,7 @@ def _make_mock_result(**overrides):
     result.confidence_tier = overrides.get("confidence_tier", "high")
     result.ids_for = MagicMock(return_value=[])
     result.kg_equivalent_ids = overrides.get("kg_equivalent_ids", {})
+    result.chosen_kg_id_review = overrides.get("chosen_kg_id_review", None)
     return result
 
 
@@ -102,6 +103,24 @@ class TestProcessResult:
         assert processed["confidenceTier"] == "high"
         assert processed["needsReview"] is False
         assert "identifiers" in processed
+
+    def test_chosen_kg_id_review_surfaced_and_flags_needs_review(self):
+        """A resolver review flag is surfaced and marks the row for review, even at high confidence."""
+        result = _make_mock_result(confidence_tier="high", chosen_kg_id_review="divergent_refmet")
+
+        processed = MapperService._process_result("citrate", result)
+
+        assert processed["chosenKgIdReview"] == "divergent_refmet"
+        assert processed["needsReview"] is True
+
+    def test_no_review_flag_keeps_needs_review_false(self):
+        """High-confidence result with no review flag is not flagged for review."""
+        result = _make_mock_result(confidence_tier="high", chosen_kg_id_review=None)
+
+        processed = MapperService._process_result("glucose", result)
+
+        assert processed["chosenKgIdReview"] is None
+        assert processed["needsReview"] is False
 
 
 class TestProvidedIds:
