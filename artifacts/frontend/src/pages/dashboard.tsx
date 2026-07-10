@@ -335,6 +335,7 @@ export default function DashboardPage() {
       r.confidenceTier || "",
       r.confidenceScore?.toString() || "",
       r.needsReview ? "true" : "false",
+      r.chosenKgIdReview || "",
     ];
     const idMap: Record<string, string[] | undefined> = {};
     if (r.identifiers) {
@@ -379,7 +380,7 @@ export default function DashboardPage() {
       const originalColSet = new Set(columns);
 
       // Build biomapper column headers with _biomapper suffix.
-      const coreHeaders = ["resolved_biomapper", "primary_curie_biomapper", "confidence_tier_biomapper", "confidence_score_biomapper", "needs_review_biomapper"];
+      const coreHeaders = ["resolved_biomapper", "primary_curie_biomapper", "confidence_tier_biomapper", "confidence_score_biomapper", "needs_review_biomapper", "review_reason_biomapper"];
       const vocabHeaders = vocabCols.map(v => `${v}_biomapper`);
       const equivHeaders = equivCols.map(p => `equiv_${p}_biomapper`);
       const allBiomapperHeaders = [...coreHeaders, ...vocabHeaders, ...equivHeaders, "flagged_biomapper"];
@@ -429,7 +430,7 @@ export default function DashboardPage() {
     const hasProvidedIds = sortedProvidedIdCols.length > 0;
 
     const headers = [
-      "Original Name", "Resolved", "Primary Curie", "Confidence Tier", "Confidence Score", "Needs Review",
+      "Original Name", "Resolved", "Primary Curie", "Confidence Tier", "Confidence Score", "Needs Review", "Review Reason",
       ...sortedProvidedIdCols,
       ...vocabCols.map(v => hasProvidedIds ? `${v}_biomapper` : v),
       ...equivCols.map(p => hasProvidedIds ? `equiv_${p}_biomapper` : `equiv_${p}`),
@@ -443,6 +444,7 @@ export default function DashboardPage() {
         r.confidenceTier || "",
         r.confidenceScore?.toString() || "",
         r.needsReview ? "true" : "false",
+        r.chosenKgIdReview || "",
       ];
       sortedProvidedIdCols.forEach(col => {
         const val = r.providedIds?.[col];
@@ -938,7 +940,13 @@ export default function DashboardPage() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-xs text-neutral-500">
-                              {!row.resolved ? "No match found" : row.needsReview ? "Flagged by system" : "Low confidence"}
+                              {!row.resolved
+                                ? "No match found"
+                                : row.chosenKgIdReview === "divergent_refmet"
+                                ? "RefMet ChEBI conflict (structure differs)"
+                                : row.chosenKgIdReview === "conflict_no_structure"
+                                ? "RefMet ChEBI conflict (no structure to adjudicate)"
+                                : "Low confidence"}
                             </TableCell>
                             {!isDemo && (
                             <TableCell className="text-right">

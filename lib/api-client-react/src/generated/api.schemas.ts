@@ -81,6 +81,23 @@ export const MappingResultItemConfidenceTier = {
 } as const;
 
 /**
+ * Review flag set when the resolver source-weighted a small-molecule ChEBI
+conflict toward the RefMet annotator: "divergent_refmet" (RefMet node chosen
+across an InChIKey-connectivity difference) or "conflict_no_structure"
+(majority kept because no InChIKey was available to adjudicate). null when no
+review is warranted.
+
+ */
+export type MappingResultItemChosenKgIdReview =
+  | (typeof MappingResultItemChosenKgIdReview)[keyof typeof MappingResultItemChosenKgIdReview]
+  | null;
+
+export const MappingResultItemChosenKgIdReview = {
+  divergent_refmet: "divergent_refmet",
+  conflict_no_structure: "conflict_no_structure",
+} as const;
+
+/**
  * Map of vocabulary key → list of CURIEs/identifiers found for this entity.
 Keys are vocabulary identifiers (e.g. "hmdb", "chebi", "uniprot").
 Open record — backend may emit any vocabulary key the underlying
@@ -110,6 +127,13 @@ export interface MappingResultItem {
   confidenceScore?: number | null;
   confidenceTier?: MappingResultItemConfidenceTier;
   needsReview?: boolean;
+  /** Review flag set when the resolver source-weighted a small-molecule ChEBI
+conflict toward the RefMet annotator: "divergent_refmet" (RefMet node chosen
+across an InChIKey-connectivity difference) or "conflict_no_structure"
+(majority kept because no InChIKey was available to adjudicate). null when no
+review is warranted.
+ */
+  chosenKgIdReview?: MappingResultItemChosenKgIdReview;
   /** Map of vocabulary key → list of CURIEs/identifiers found for this entity.
 Keys are vocabulary identifiers (e.g. "hmdb", "chebi", "uniprot").
 Open record — backend may emit any vocabulary key the underlying

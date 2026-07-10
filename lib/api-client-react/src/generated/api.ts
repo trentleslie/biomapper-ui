@@ -680,7 +680,19 @@ export function useListFlags<
  * @summary Flag a metabolite name for the authenticated user
  */
 export const getCreateFlagUrl = (params: CreateFlagParams) => {
-  return `/api/flags?name=${encodeURIComponent(params.name)}`;
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/flags?${stringifiedParams}`
+    : `/api/flags`;
 };
 
 export const createFlag = async (
@@ -764,7 +776,19 @@ export const useCreateFlag = <
  * @summary Unflag a metabolite name for the authenticated user
  */
 export const getDeleteFlagUrl = (params: DeleteFlagParams) => {
-  return `/api/flags?name=${encodeURIComponent(params.name)}`;
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/flags?${stringifiedParams}`
+    : `/api/flags`;
 };
 
 export const deleteFlag = async (

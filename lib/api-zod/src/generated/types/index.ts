@@ -27,6 +27,7 @@ export * from "./mappingConfigAnnotationMode";
 export * from "./mappingConfigHintColumns";
 export * from "./mappingConfigHints";
 export * from "./mappingResultItem";
+export * from "./mappingResultItemChosenKgIdReview";
 export * from "./mappingResultItemConfidenceTier";
 export * from "./mappingResultItemIdentifiers";
 export * from "./mappingResultItemKgEquivalentIds";
