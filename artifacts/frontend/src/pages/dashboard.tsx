@@ -9,7 +9,7 @@ import { SankeyChart } from "@/components/SankeyChart";
 import { EquivalentIds } from "@/components/EquivalentIds";
 import { DemoGuide } from "@/components/DemoGuide";
 import { FieldTooltip } from "@/components/field-tooltip";
-import { EXPLAINERS, reviewReason } from "@/lib/result-explainers";
+import { EXPLAINERS, reviewReason, rowNeedsReview } from "@/lib/result-explainers";
 import { useEnv } from "@/contexts/env-context";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
@@ -218,7 +218,7 @@ export default function DashboardPage() {
   const totalPages = Math.max(1, Math.ceil(filteredResults.length / PAGE_SIZE));
   const pagedResults = filteredResults.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const needsReview = results.filter(r =>
-    (r.needsReview || !r.resolved || r.confidenceTier === "unknown" || r.confidenceTier === "low") &&
+    rowNeedsReview(r) &&
     !dismissedNames.has(r.name)
   );
 
@@ -338,7 +338,7 @@ export default function DashboardPage() {
       r.confidenceTier || "",
       r.confidenceScore?.toString() || "",
       r.needsReview ? "true" : "false",
-      r.chosenKgIdReview || "",
+      rowNeedsReview(r) ? reviewReason(r) : "",
     ];
     const idMap: Record<string, string[] | undefined> = {};
     if (r.identifiers) {
@@ -447,7 +447,7 @@ export default function DashboardPage() {
         r.confidenceTier || "",
         r.confidenceScore?.toString() || "",
         r.needsReview ? "true" : "false",
-        r.chosenKgIdReview || "",
+        rowNeedsReview(r) ? reviewReason(r) : "",
       ];
       sortedProvidedIdCols.forEach(col => {
         const val = r.providedIds?.[col];

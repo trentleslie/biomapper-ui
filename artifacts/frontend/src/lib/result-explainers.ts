@@ -30,6 +30,15 @@ export const REVIEW_REASONS = {
   low: "Low search score",
 } as const;
 
+// Same rule as the Needs Review table, so downloads and the page agree on which rows are flagged.
+export function rowNeedsReview(row: {
+  needsReview?: boolean;
+  resolved: boolean;
+  confidenceTier?: string | null;
+}): boolean {
+  return !!row.needsReview || !row.resolved || row.confidenceTier === "unknown" || row.confidenceTier === "low";
+}
+
 export function reviewReason(row: {
   resolved: boolean;
   confidenceTier?: string | null;
