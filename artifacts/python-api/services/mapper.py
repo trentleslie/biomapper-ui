@@ -185,13 +185,19 @@ class MapperService:
 
     @staticmethod
     def _process_result(name: str, result: Any) -> dict[str, Any]:
+        # Source-weighted small-molecule ChEBI conflict flag (biomapper >= 1.3.0):
+        # "divergent_refmet" / "conflict_no_structure" / None. getattr keeps this
+        # safe if an older client without the field is installed.
+        chosen_kg_id_review = getattr(result, "chosen_kg_id_review", None)
         processed: dict[str, Any] = {
             "name": name,
             "resolved": result.resolved,
             "primaryCurie": result.primary_curie,
             "confidenceScore": result.confidence_score,
             "confidenceTier": result.confidence_tier,
-            "needsReview": result.confidence_tier in ("low", "unknown"),
+            "chosenKgIdReview": chosen_kg_id_review,
+            # A resolver review flag is a review signal in its own right, alongside low confidence.
+            "needsReview": result.confidence_tier in ("low", "unknown") or chosen_kg_id_review is not None,
             "identifiers": {
                 "hmdb": result.ids_for("HMDB"),
                 "chebi": result.ids_for("CHEBI"),

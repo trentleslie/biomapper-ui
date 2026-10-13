@@ -7,6 +7,9 @@ import { useGetMappingResult, getGetMappingResultQueryKey, JobResult, useGetJob,
 import type { JobDetail } from "@workspace/api-client-react";
 import { SankeyChart } from "@/components/SankeyChart";
 import { EquivalentIds } from "@/components/EquivalentIds";
+import { DemoGuide } from "@/components/DemoGuide";
+import { FieldTooltip } from "@/components/field-tooltip";
+import { EXPLAINERS, reviewReason, rowNeedsReview } from "@/lib/result-explainers";
 import { useEnv } from "@/contexts/env-context";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
@@ -215,7 +218,7 @@ export default function DashboardPage() {
   const totalPages = Math.max(1, Math.ceil(filteredResults.length / PAGE_SIZE));
   const pagedResults = filteredResults.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const needsReview = results.filter(r =>
-    (r.needsReview || !r.resolved || r.confidenceTier === "unknown" || r.confidenceTier === "low") &&
+    rowNeedsReview(r) &&
     !dismissedNames.has(r.name)
   );
 
@@ -335,6 +338,7 @@ export default function DashboardPage() {
       r.confidenceTier || "",
       r.confidenceScore?.toString() || "",
       r.needsReview ? "true" : "false",
+      rowNeedsReview(r) ? reviewReason(r) : "",
     ];
     const idMap: Record<string, string[] | undefined> = {};
     if (r.identifiers) {
@@ -379,7 +383,7 @@ export default function DashboardPage() {
       const originalColSet = new Set(columns);
 
       // Build biomapper column headers with _biomapper suffix.
-      const coreHeaders = ["resolved_biomapper", "primary_curie_biomapper", "confidence_tier_biomapper", "confidence_score_biomapper", "needs_review_biomapper"];
+      const coreHeaders = ["resolved_biomapper", "primary_curie_biomapper", "confidence_tier_biomapper", "confidence_score_biomapper", "needs_review_biomapper", "review_reason_biomapper"];
       const vocabHeaders = vocabCols.map(v => `${v}_biomapper`);
       const equivHeaders = equivCols.map(p => `equiv_${p}_biomapper`);
       const allBiomapperHeaders = [...coreHeaders, ...vocabHeaders, ...equivHeaders, "flagged_biomapper"];
@@ -429,7 +433,7 @@ export default function DashboardPage() {
     const hasProvidedIds = sortedProvidedIdCols.length > 0;
 
     const headers = [
-      "Original Name", "Resolved", "Primary Curie", "Confidence Tier", "Confidence Score", "Needs Review",
+      "Original Name", "Resolved", "Primary Curie", "Confidence Tier", "Confidence Score", "Needs Review", "Review Reason",
       ...sortedProvidedIdCols,
       ...vocabCols.map(v => hasProvidedIds ? `${v}_biomapper` : v),
       ...equivCols.map(p => hasProvidedIds ? `equiv_${p}_biomapper` : `equiv_${p}`),
@@ -443,6 +447,7 @@ export default function DashboardPage() {
         r.confidenceTier || "",
         r.confidenceScore?.toString() || "",
         r.needsReview ? "true" : "false",
+        rowNeedsReview(r) ? reviewReason(r) : "",
       ];
       sortedProvidedIdCols.forEach(col => {
         const val = r.providedIds?.[col];
@@ -703,6 +708,8 @@ export default function DashboardPage() {
 
       <div className="space-y-6">
 
+        {isDemo && <DemoGuide />}
+
         {isProcessing && (
           <Card>
             <CardContent className="pt-6">
@@ -739,7 +746,7 @@ export default function DashboardPage() {
               </Card>
               <Card>
                 <CardContent className="pt-6">
-                  <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider">High Quality</p>
+                  <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider flex items-center">High Quality<FieldTooltip label="What High Quality means">{EXPLAINERS.highQuality}</FieldTooltip></p>
                   <div className="text-2xl font-semibold text-neutral-900 tabular-nums" data-testid="stat-hq-rate">{(summary.highQualityRate * 100).toFixed(1)}%</div>
                 </CardContent>
               </Card>
@@ -896,8 +903,8 @@ export default function DashboardPage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between py-4">
                   <div>
-                    <CardTitle>Needs Review <Badge variant="secondary" className="ml-2">{needsReview.length}</Badge></CardTitle>
-                    <CardDescription>Unresolved or low-confidence records. Flag items for follow-up or dismiss once reviewed.</CardDescription>
+                    <CardTitle className="flex items-center">Needs Review <Badge variant="secondary" className="ml-2">{needsReview.length}</Badge><FieldTooltip label="What Needs Review means">{EXPLAINERS.needsReview}</FieldTooltip></CardTitle>
+                    <CardDescription>Unresolved, low-score, unscored, or conflicting records. Flag items for follow-up or dismiss once reviewed.</CardDescription>
                   </div>
                   {flaggedNames.size > 0 && (
                     <div className="flex items-center gap-2">
@@ -938,7 +945,7 @@ export default function DashboardPage() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-xs text-neutral-500">
-                              {!row.resolved ? "No match found" : row.needsReview ? "Flagged by system" : "Low confidence"}
+                              {reviewReason(row)}
                             </TableCell>
                             {!isDemo && (
                             <TableCell className="text-right">
@@ -1043,20 +1050,20 @@ export default function DashboardPage() {
                         >
                           Name <SortIcon field="name" />
                         </TableHead>
-                        <TableHead>Primary Curie</TableHead>
+                        <TableHead>Primary Curie<FieldTooltip label="What Primary Curie means">{EXPLAINERS.primaryCurie}</FieldTooltip></TableHead>
                         <TableHead
                           className="cursor-pointer select-none hover:text-neutral-900"
                           onClick={() => toggleSort("confidenceTier")}
                           data-testid="th-sort-tier"
                         >
-                          Tier <SortIcon field="confidenceTier" />
+                          Tier <SortIcon field="confidenceTier" /><span onClick={e => e.stopPropagation()}><FieldTooltip label="What Tier means">{EXPLAINERS.tier}</FieldTooltip></span>
                         </TableHead>
                         <TableHead
                           className="cursor-pointer select-none hover:text-neutral-900"
                           onClick={() => toggleSort("confidenceScore")}
                           data-testid="th-sort-score"
                         >
-                          Score <SortIcon field="confidenceScore" />
+                          Score <SortIcon field="confidenceScore" /><span onClick={e => e.stopPropagation()}><FieldTooltip label="What Score means">{EXPLAINERS.score}</FieldTooltip></span>
                         </TableHead>
                         {providedIdColsForTable.map(col => (
                           <TableHead key={`provided-${col}`} className="text-xs">{col}</TableHead>
