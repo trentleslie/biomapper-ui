@@ -16,14 +16,23 @@ def _client() -> TestClient:
 def test_demo_info_matches_bundled_csv():
     with open(demo.DEMO_CSV_PATH, newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
-    unique_names = {r["compound_name"].strip() for r in rows if r["compound_name"].strip()}
+    # Same rule as the loader: first occurrence of each non-empty name decides its category.
+    expected_categories: dict[str, int] = {}
+    seen: set[str] = set()
+    for r in rows:
+        name = r["compound_name"].strip()
+        if name and name not in seen:
+            seen.add(name)
+            category = r["issue_category"].strip() or "Uncategorized"
+            expected_categories[category] = expected_categories.get(category, 0) + 1
 
     res = _client().get("/map/demo")
 
     assert res.status_code == 200
     body = res.json()
-    assert body["count"] == len(unique_names)
-    assert sum(body["categories"].values()) == body["count"]
+    assert body["count"] == len(seen)
+    assert body["categories"] == expected_categories
+    assert "Uncategorized" not in body["categories"]
     assert body["entity_type"] == "biolink:SmallMolecule"
 
 
