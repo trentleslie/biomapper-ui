@@ -7,6 +7,9 @@ import { useGetMappingResult, getGetMappingResultQueryKey, JobResult, useGetJob,
 import type { JobDetail } from "@workspace/api-client-react";
 import { SankeyChart } from "@/components/SankeyChart";
 import { EquivalentIds } from "@/components/EquivalentIds";
+import { DemoGuide } from "@/components/DemoGuide";
+import { FieldTooltip } from "@/components/field-tooltip";
+import { EXPLAINERS, reviewReason } from "@/lib/result-explainers";
 import { useEnv } from "@/contexts/env-context";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
@@ -705,6 +708,8 @@ export default function DashboardPage() {
 
       <div className="space-y-6">
 
+        {isDemo && <DemoGuide />}
+
         {isProcessing && (
           <Card>
             <CardContent className="pt-6">
@@ -741,7 +746,7 @@ export default function DashboardPage() {
               </Card>
               <Card>
                 <CardContent className="pt-6">
-                  <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider">High Quality</p>
+                  <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider flex items-center">High Quality<FieldTooltip label="What High Quality means">{EXPLAINERS.highQuality}</FieldTooltip></p>
                   <div className="text-2xl font-semibold text-neutral-900 tabular-nums" data-testid="stat-hq-rate">{(summary.highQualityRate * 100).toFixed(1)}%</div>
                 </CardContent>
               </Card>
@@ -898,8 +903,8 @@ export default function DashboardPage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between py-4">
                   <div>
-                    <CardTitle>Needs Review <Badge variant="secondary" className="ml-2">{needsReview.length}</Badge></CardTitle>
-                    <CardDescription>Unresolved or low-confidence records. Flag items for follow-up or dismiss once reviewed.</CardDescription>
+                    <CardTitle className="flex items-center">Needs Review <Badge variant="secondary" className="ml-2">{needsReview.length}</Badge><FieldTooltip label="What Needs Review means">{EXPLAINERS.needsReview}</FieldTooltip></CardTitle>
+                    <CardDescription>Unresolved, low-score, unscored, or conflicting records. Flag items for follow-up or dismiss once reviewed.</CardDescription>
                   </div>
                   {flaggedNames.size > 0 && (
                     <div className="flex items-center gap-2">
@@ -940,13 +945,7 @@ export default function DashboardPage() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-xs text-neutral-500">
-                              {!row.resolved
-                                ? "No match found"
-                                : row.chosenKgIdReview === "divergent_refmet"
-                                ? "RefMet ChEBI conflict (structure differs)"
-                                : row.chosenKgIdReview === "conflict_no_structure"
-                                ? "RefMet ChEBI conflict (no structure to adjudicate)"
-                                : "Low confidence"}
+                              {reviewReason(row)}
                             </TableCell>
                             {!isDemo && (
                             <TableCell className="text-right">
@@ -1051,20 +1050,20 @@ export default function DashboardPage() {
                         >
                           Name <SortIcon field="name" />
                         </TableHead>
-                        <TableHead>Primary Curie</TableHead>
+                        <TableHead>Primary Curie<FieldTooltip label="What Primary Curie means">{EXPLAINERS.primaryCurie}</FieldTooltip></TableHead>
                         <TableHead
                           className="cursor-pointer select-none hover:text-neutral-900"
                           onClick={() => toggleSort("confidenceTier")}
                           data-testid="th-sort-tier"
                         >
-                          Tier <SortIcon field="confidenceTier" />
+                          Tier <SortIcon field="confidenceTier" /><span onClick={e => e.stopPropagation()}><FieldTooltip label="What Tier means">{EXPLAINERS.tier}</FieldTooltip></span>
                         </TableHead>
                         <TableHead
                           className="cursor-pointer select-none hover:text-neutral-900"
                           onClick={() => toggleSort("confidenceScore")}
                           data-testid="th-sort-score"
                         >
-                          Score <SortIcon field="confidenceScore" />
+                          Score <SortIcon field="confidenceScore" /><span onClick={e => e.stopPropagation()}><FieldTooltip label="What Score means">{EXPLAINERS.score}</FieldTooltip></span>
                         </TableHead>
                         {providedIdColsForTable.map(col => (
                           <TableHead key={`provided-${col}`} className="text-xs">{col}</TableHead>
