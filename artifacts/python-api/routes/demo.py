@@ -22,7 +22,10 @@ DEMO_NAME_COLUMN = "compound_name"
 DEMO_CSV_PATH = Path(__file__).resolve().parent.parent / "data" / "demo_dataset.csv"
 DEMO_TTL_SECONDS = 600  # 10 minutes
 
+DEMO_CATEGORY_COLUMN = "issue_category"
+
 _demo_names: list[str] = []
+_demo_categories: dict[str, int] = {}
 _demo_error: str | None = None
 
 try:
@@ -41,6 +44,8 @@ try:
                 if name and name not in seen:
                     _demo_names.append(name)
                     seen.add(name)
+                    category = (row.get(DEMO_CATEGORY_COLUMN) or "").strip() or "Uncategorized"
+                    _demo_categories[category] = _demo_categories.get(category, 0) + 1
             if not _demo_names:
                 _demo_error = "Demo dataset contains no valid names."
                 logger.error(_demo_error)
@@ -64,6 +69,21 @@ def _get_semaphore() -> asyncio.Semaphore:
     if _demo_semaphore is None:
         _demo_semaphore = asyncio.Semaphore(MAX_ACTIVE_DEMO_JOBS)
     return _demo_semaphore
+
+
+@router.get("/demo", response_model=None)
+async def demo_info():
+    """Describe the bundled demo dataset so the demo page never quotes a stale count."""
+    if _demo_error or not _demo_names:
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "Demo is temporarily unavailable."},
+        )
+    return {
+        "count": len(_demo_names),
+        "categories": dict(sorted(_demo_categories.items(), key=lambda kv: (-kv[1], kv[0]))),
+        "entity_type": MappingConfig().entity_type,
+    }
 
 
 @router.post("/demo", response_model=None)
