@@ -1,15 +1,32 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { DemoShell } from "@/components/DemoShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, Beaker, Database, BarChart3, Loader2 } from "lucide-react";
+import { AlertCircle, Beaker, Database, BarChart3, Loader2, Info } from "lucide-react";
+
+interface DemoInfo {
+  count: number;
+  categories: Record<string, number>;
+  entity_type: string;
+}
 
 export default function DemoPage() {
   const [, setLocation] = useLocation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<DemoInfo | null>(null);
+
+  useEffect(() => {
+    // Describes the bundled dataset; the page still works (with generic copy) if this fails.
+    fetch("/api/map/demo")
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => setInfo(data))
+      .catch(() => setInfo(null));
+  }, []);
+
+  const countLabel = info ? `${info.count}` : "About 100";
 
   const handleStartDemo = async () => {
     setLoading(true);
@@ -48,7 +65,7 @@ export default function DemoPage() {
           <p className="text-lg text-neutral-600 max-w-2xl mx-auto">
             BioMapper links raw compound names to standardized biological identifiers
             across databases like HMDB, ChEBI, PubChem, and more. Watch it process
-            a real dataset in real-time.
+            a sample dataset in real time.
           </p>
         </div>
 
@@ -66,9 +83,9 @@ export default function DemoPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="flex flex-col items-center text-center p-4 rounded-lg bg-neutral-50">
                 <Database className="w-8 h-8 text-ph-navy mb-2" />
-                <p className="text-sm font-medium text-neutral-900">100 Metabolites</p>
+                <p className="text-sm font-medium text-neutral-900">{countLabel} Metabolite Names</p>
                 <p className="text-xs text-neutral-500 mt-1">
-                  Sample dataset with amino acids, lipids, vitamins, and more
+                  Illustrative names: common metabolites, lipids, vitamins, bile acids, and a few deliberately hard cases
                 </p>
               </div>
               <div className="flex flex-col items-center text-center p-4 rounded-lg bg-neutral-50">
@@ -95,11 +112,50 @@ export default function DemoPage() {
               <div>
                 <p className="text-sm font-medium text-neutral-900">Preloaded Dataset</p>
                 <p className="text-xs text-neutral-500 mt-0.5">
-                  ~100 metabolite names &middot; Entity type: <Badge variant="outline" className="text-xs ml-1">biolink:SmallMolecule</Badge>
+                  {info ? info.count : "~100"} metabolite names &middot; Entity type: <Badge variant="outline" className="text-xs ml-1">{info?.entity_type ?? "biolink:SmallMolecule"}</Badge>
                 </p>
               </div>
               <Badge variant="secondary">Ready</Badge>
             </div>
+            {info && Object.keys(info.categories).length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-1.5" data-testid="demo-categories">
+                {Object.entries(info.categories).map(([category, n]) => (
+                  <Badge key={category} variant="outline" className="text-xs font-normal">
+                    {category} <span className="ml-1 text-neutral-400">{n}</span>
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="mb-6">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Info className="w-5 h-5 text-ph-navy" />
+              About This Dataset
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="list-disc ml-5 space-y-1.5 text-sm text-neutral-600">
+              <li>
+                A hand-picked set of metabolite names chosen to show the range BioMapper handles: textbook
+                compounds such as glucose and alanine, lipids, vitamins, steroids, bile acids, gut-derived
+                metabolites, and two vendor catalog codes (AKOS...) that are hard to resolve on purpose.
+              </li>
+              <li>
+                Only the names are sent. No identifiers or hints are supplied, so BioMapper starts from the
+                same raw text a researcher would have.
+              </li>
+              <li>
+                It is a walkthrough of the workflow, not an accuracy benchmark. BioMapper's accuracy is
+                measured separately against curated reference sets.
+              </li>
+              <li>
+                Every name goes to the live production BioMapper service, the same one used for real
+                datasets.
+              </li>
+            </ul>
           </CardContent>
         </Card>
 
@@ -127,7 +183,7 @@ export default function DemoPage() {
             )}
           </Button>
           <p className="text-xs text-neutral-500 mt-3">
-            Takes about 30-60 seconds to map all compounds
+            Usually finishes in under a minute (longer if the service is busy). Results stream in as each name resolves, and the results page explains how to read them.
           </p>
         </div>
       </div>
