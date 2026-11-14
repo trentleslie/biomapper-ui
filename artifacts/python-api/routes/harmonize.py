@@ -1,4 +1,5 @@
-"""Cohort harmonization runs: uploads, submit, run status, report and review items.
+"""Cohort harmonization runs: uploads, submit, run status, report, review items, and the
+reviewable items with the organizer's flags.
 
 Every route takes the ``x-clerk-user-id`` header (400 when missing). A run belongs to the user
 who started it; any other user gets 404 for it, on every route.
@@ -42,6 +43,7 @@ from pydantic.alias_generators import to_camel
 from services import harmonize_storage
 from services.database import database
 from services.harmonize_backend import HarmonizeBackend, get_backend
+from services.harmonize_items import FlaggedItem, Item, items_from_report, with_flags
 from services.harmonize_storage import (
     MAX_COHORT_BYTES,
     CohortFileError,
@@ -175,7 +177,8 @@ def _job_error(exc: JobError) -> HTTPException:
 _SNAKE_PART = re.compile(r"_([a-z0-9])")
 # Values under these keys are maps keyed by data (cohort labels, arm names, vocabularies,
 # certificate states, item kinds), not by field names, so their keys are kept as written.
-_DATA_KEYED = frozenset({"summary", "counts", "identifiers", "certificate_states", "vocabularies"})
+_DATA_KEYED = frozenset({"summary", "counts", "identifiers", "certificate_states", "vocabularies",
+                         "rows_per_cohort"})
 
 
 def _camel_key(key: str) -> str:
@@ -505,3 +508,162 @@ async def get_review_item(
     except JobError as exc:
         raise await _finished_or_409(backend, job_id, exc) from None
     return scrub(camelize(detail.model_dump(mode="json")))
+
+
+# ---------------------------------------------------------------------------
+# Routes: reviewable items and the organizer's flags
+# ---------------------------------------------------------------------------
+#
+# Items come from the finished run's report.json (services.harmonize_items). An item is flagged
+# when biomapper suggested it, unless the organizer stored an override; only overrides are
+# stored, and setting an item back to its suggested value deletes its override. flaggedTotal is
+# always over every item of the run, whatever the filters.
+
+ItemKind = Literal["link", "group", "review", "unresolved"]
+ItemArm = Literal["names_only", "identifier"]
+ITEMS_PAGE_DEFAULT = 100
+ITEMS_PAGE_MAX = 1000
+
+
+class FlagsRequest(_CamelModel):
+    refs: list[str]
+    flagged: bool
+
+
+class FlagFilter(_CamelModel):
+    kind: ItemKind | None = None
+    arm: ItemArm | None = None
+    basis: str | None = None
+    ambiguous: bool | None = None
+
+    def matches(self, item: Item) -> bool:
+        # A detail filter matches only items whose detail carries that field.
+        return ((self.kind is None or item.kind == self.kind)
+                and (self.arm is None or item.arm == self.arm)
+                and (self.basis is None or item.detail.get("basis") == self.basis)
+                and (self.ambiguous is None or item.detail.get("ambiguous") is self.ambiguous))
+
+
+class BulkFlagsRequest(_CamelModel):
+    filter: FlagFilter
+    flagged: bool
+
+
+class ResetFlagsRequest(_CamelModel):
+    refs: list[str] | None = None
+
+
+async def _run_items(job_id: str) -> list[Item]:
+    backend = get_backend()
+    try:
+        report = backend.load_report(job_id)
+    except JobError as exc:
+        raise await _finished_or_409(backend, job_id, exc) from None
+    try:
+        return items_from_report(report)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=_message(exc)) from None
+
+
+async def _flagged_items(job_id: str, user_id: str, items: list[Item]) -> list[FlaggedItem]:
+    return with_flags(items, await database.list_harmonize_flags(job_id, user_id))
+
+
+def _flagged_total(flagged: list[FlaggedItem]) -> int:
+    return sum(f.flagged for f in flagged)
+
+
+def _item_json(f: FlaggedItem) -> dict[str, Any]:
+    item = f.item
+    return scrub({"ref": item.ref, "kind": item.kind, "arm": item.arm,
+                  "members": [dict(m) for m in item.members], "detail": camelize(item.detail),
+                  "suggested": item.suggested, "flagged": f.flagged, "source": f.source})
+
+
+def _known_refs(items: list[Item], refs: list[str]) -> list[str]:
+    """``refs`` without repeats, or 400 naming every ref that matches no item of the run."""
+    known = {i.ref for i in items}
+    wanted = list(dict.fromkeys(refs))
+    unknown = [r for r in wanted if r not in known]
+    if unknown:
+        raise HTTPException(status_code=400,
+                            detail=f"No item in this run has ref {', '.join(unknown)}.")
+    return wanted
+
+
+async def _set_flags(job_id: str, user_id: str, items: list[Item], chosen: list[Item],
+                     flagged: bool) -> dict[str, Any]:
+    """Set ``chosen`` to ``flagged``: an override where it differs from the suggestion, none
+    where it matches."""
+    await database.write_harmonize_flags(
+        job_id, user_id,
+        upsert={i.ref: flagged for i in chosen if i.suggested != flagged},
+        delete=[i.ref for i in chosen if i.suggested == flagged],
+    )
+    total = _flagged_total(await _flagged_items(job_id, user_id, items))
+    return {"updated": len(chosen), "flaggedTotal": total}
+
+
+@router.get("/runs/{job_id}/items")
+async def list_items(
+    job_id: str,
+    kind: ItemKind | None = Query(None),
+    arm: ItemArm | None = Query(None),
+    flagged: bool | None = Query(None),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(ITEMS_PAGE_DEFAULT, ge=1, le=ITEMS_PAGE_MAX),
+    x_clerk_user_id: str | None = Header(None),
+) -> dict[str, Any]:
+    """The run's reviewable items with their effective flags, in report order.
+
+    ``total`` counts the items matching the filters; ``flaggedTotal`` counts every flagged item
+    of the run.
+    """
+    user_id = _require_user(x_clerk_user_id)
+    await _owned_run(job_id, user_id)
+    every = await _flagged_items(job_id, user_id, await _run_items(job_id))
+    chosen = [f for f in every
+              if (kind is None or f.item.kind == kind) and (arm is None or f.item.arm == arm)
+              and (flagged is None or f.flagged == flagged)]
+    return {"total": len(chosen), "flaggedTotal": _flagged_total(every),
+            "items": [_item_json(f) for f in chosen[offset: offset + limit]]}
+
+
+@router.put("/runs/{job_id}/flags")
+async def set_flags(
+    job_id: str, body: FlagsRequest, x_clerk_user_id: str | None = Header(None),
+) -> dict[str, Any]:
+    """Flag or de-flag the items named by ``refs``; a ref that matches no item is a 400."""
+    user_id = _require_user(x_clerk_user_id)
+    await _owned_run(job_id, user_id)
+    items = await _run_items(job_id)
+    wanted = set(_known_refs(items, body.refs))
+    return await _set_flags(job_id, user_id, items, [i for i in items if i.ref in wanted],
+                            body.flagged)
+
+
+@router.post("/runs/{job_id}/flags/bulk")
+async def bulk_flags(
+    job_id: str, body: BulkFlagsRequest, x_clerk_user_id: str | None = Header(None),
+) -> dict[str, Any]:
+    """Flag or de-flag every item matching the filter; ``updated`` counts the matches."""
+    user_id = _require_user(x_clerk_user_id)
+    await _owned_run(job_id, user_id)
+    items = await _run_items(job_id)
+    return await _set_flags(job_id, user_id, items, [i for i in items if body.filter.matches(i)],
+                            body.flagged)
+
+
+@router.post("/runs/{job_id}/flags/reset")
+async def reset_flags(
+    job_id: str, body: ResetFlagsRequest | None = None,
+    x_clerk_user_id: str | None = Header(None),
+) -> dict[str, Any]:
+    """Drop the organizer's overrides (all of them when ``refs`` is omitted), so those items
+    return to biomapper's suggestion."""
+    user_id = _require_user(x_clerk_user_id)
+    await _owned_run(job_id, user_id)
+    items = await _run_items(job_id)
+    refs = None if body is None or body.refs is None else _known_refs(items, body.refs)
+    await database.reset_harmonize_flags(job_id, user_id, refs)
+    return {"flaggedTotal": _flagged_total(await _flagged_items(job_id, user_id, items))}

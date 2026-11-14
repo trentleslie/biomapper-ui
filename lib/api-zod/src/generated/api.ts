@@ -1302,3 +1302,131 @@ export const GetHarmonizeReviewItemResponse = zod.object({
   nextStep: zod.string(),
   note: zod.string().optional(),
 });
+
+/**
+ * @summary A finished run's reviewable items with their effective flags, in report order
+ */
+export const ListHarmonizeItemsParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const listHarmonizeItemsQueryOffsetDefault = 0;
+export const listHarmonizeItemsQueryOffsetMin = 0;
+
+export const listHarmonizeItemsQueryLimitDefault = 100;
+export const listHarmonizeItemsQueryLimitMax = 1000;
+
+export const ListHarmonizeItemsQueryParams = zod.object({
+  kind: zod.enum(["link", "group", "review", "unresolved"]).optional(),
+  arm: zod.enum(["names_only", "identifier"]).optional(),
+  flagged: zod.coerce.boolean().optional(),
+  offset: zod.coerce
+    .number()
+    .min(listHarmonizeItemsQueryOffsetMin)
+    .default(listHarmonizeItemsQueryOffsetDefault),
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(listHarmonizeItemsQueryLimitMax)
+    .default(listHarmonizeItemsQueryLimitDefault)
+    .describe("Page size, 1 to 1000 (default 100)"),
+});
+
+export const ListHarmonizeItemsResponse = zod.object({
+  total: zod.number(),
+  flaggedTotal: zod.number(),
+  items: zod.array(
+    zod.object({
+      ref: zod
+        .string()
+        .describe("Stable across reloads, kind:arm:digest of the member rows"),
+      kind: zod.enum(["link", "group", "review", "unresolved"]),
+      arm: zod.enum(["names_only", "identifier"]),
+      members: zod.array(
+        zod.object({
+          cohort: zod.string(),
+          key: zod.string(),
+          name: zod
+            .string()
+            .nullable()
+            .describe("Untrusted text from the cohort file"),
+          chosenKgId: zod.string().nullable(),
+        }),
+      ),
+      detail: zod
+        .record(zod.string(), zod.unknown())
+        .describe(
+          "What the report gives for the item, camelCased (for example basis, ambiguous, oneToOne for a link; multiplicity, rowsPerCohort for a group; status for a review entry; bucket for an unresolved row), plus origin, the report list it came from",
+        ),
+      suggested: zod.boolean().describe("Biomapper's own flag"),
+      flagged: zod
+        .boolean()
+        .describe(
+          "The effective flag, the organizer's override if any, else suggested",
+        ),
+      source: zod.enum(["biomapper", "organizer"]),
+    }),
+  ),
+});
+
+/**
+ * Setting an item to the value biomapper suggested removes the organizer's override, so its source returns to biomapper.
+ * @summary Flag or de-flag items by ref
+ */
+export const SetHarmonizeFlagsParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const SetHarmonizeFlagsBody = zod.object({
+  refs: zod.array(zod.string()),
+  flagged: zod.boolean(),
+});
+
+export const SetHarmonizeFlagsResponse = zod.object({
+  updated: zod.number(),
+  flaggedTotal: zod.number(),
+});
+
+/**
+ * @summary Flag or de-flag every item matching a filter
+ */
+export const BulkHarmonizeFlagsParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const BulkHarmonizeFlagsBody = zod.object({
+  filter: zod
+    .object({
+      kind: zod.enum(["link", "group", "review", "unresolved"]).optional(),
+      arm: zod.enum(["names_only", "identifier"]).optional(),
+      basis: zod.string().optional(),
+      ambiguous: zod.boolean().optional(),
+    })
+    .describe(
+      "Every given field must match; a detail field matches only items that carry it",
+    ),
+  flagged: zod.boolean(),
+});
+
+export const BulkHarmonizeFlagsResponse = zod.object({
+  updated: zod.number(),
+  flaggedTotal: zod.number(),
+});
+
+/**
+ * @summary Drop the organizer's overrides, all of them or those named
+ */
+export const ResetHarmonizeFlagsParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const ResetHarmonizeFlagsBody = zod.object({
+  refs: zod
+    .array(zod.string())
+    .optional()
+    .describe("The items to reset; omitted means every item"),
+});
+
+export const ResetHarmonizeFlagsResponse = zod.object({
+  flaggedTotal: zod.number(),
+});

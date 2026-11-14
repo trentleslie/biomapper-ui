@@ -776,6 +776,208 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /harmonize/runs/{jobId}/items:
+    get:
+      operationId: listHarmonizeItems
+      tags: [harmonize]
+      summary: A finished run's reviewable items with their effective flags, in report order
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: kind
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/HarmonizeItemKind"
+        - name: arm
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/HarmonizeArm"
+        - name: flagged
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: limit
+          in: query
+          required: false
+          description: Page size, 1 to 1000 (default 100)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+      responses:
+        "200":
+          description: >-
+            One page of items. total counts the items matching the filters; flaggedTotal counts
+            every flagged item of the run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HarmonizeItemsPage"
+        "400":
+          description: Missing user ID header
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No such run for this user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: The run has not finished yet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /harmonize/runs/{jobId}/flags:
+    put:
+      operationId: setHarmonizeFlags
+      tags: [harmonize]
+      summary: Flag or de-flag items by ref
+      description: >-
+        Setting an item to the value biomapper suggested removes the organizer's override, so
+        its source returns to biomapper.
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HarmonizeFlagsRequest"
+      responses:
+        "200":
+          description: How many items were set, and the run's flagged total
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HarmonizeFlagsResult"
+        "400":
+          description: Missing user ID header, or a ref that matches no item (named)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No such run for this user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: The run has not finished yet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /harmonize/runs/{jobId}/flags/bulk:
+    post:
+      operationId: bulkHarmonizeFlags
+      tags: [harmonize]
+      summary: Flag or de-flag every item matching a filter
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HarmonizeBulkFlagsRequest"
+      responses:
+        "200":
+          description: How many items matched, and the run's flagged total
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HarmonizeFlagsResult"
+        "400":
+          description: Missing user ID header
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No such run for this user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: The run has not finished yet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /harmonize/runs/{jobId}/flags/reset:
+    post:
+      operationId: resetHarmonizeFlags
+      tags: [harmonize]
+      summary: Drop the organizer's overrides, all of them or those named
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HarmonizeResetFlagsRequest"
+      responses:
+        "200":
+          description: The run's flagged total after the reset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HarmonizeResetFlagsResult"
+        "400":
+          description: Missing user ID header, or a ref that matches no item (named)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No such run for this user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: The run has not finished yet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -1369,6 +1571,155 @@ components:
         - schema_version
         - kind
       additionalProperties: true
+
+    HarmonizeItemKind:
+      type: string
+      enum: [link, group, review, unresolved]
+
+    HarmonizeArm:
+      type: string
+      enum: [names_only, identifier]
+
+    HarmonizeItemMember:
+      type: object
+      properties:
+        cohort:
+          type: string
+        key:
+          type: string
+        name:
+          type: string
+          nullable: true
+          description: Untrusted text from the cohort file
+        chosenKgId:
+          type: string
+          nullable: true
+      required:
+        - cohort
+        - key
+        - name
+        - chosenKgId
+
+    HarmonizeItem:
+      type: object
+      properties:
+        ref:
+          type: string
+          description: Stable across reloads, kind:arm:digest of the member rows
+        kind:
+          $ref: "#/components/schemas/HarmonizeItemKind"
+        arm:
+          $ref: "#/components/schemas/HarmonizeArm"
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/HarmonizeItemMember"
+        detail:
+          type: object
+          description: >-
+            What the report gives for the item, camelCased (for example basis, ambiguous,
+            oneToOne for a link; multiplicity, rowsPerCohort for a group; status for a review
+            entry; bucket for an unresolved row), plus origin, the report list it came from
+          additionalProperties: true
+        suggested:
+          type: boolean
+          description: Biomapper's own flag
+        flagged:
+          type: boolean
+          description: The effective flag, the organizer's override if any, else suggested
+        source:
+          type: string
+          enum: [biomapper, organizer]
+      required:
+        - ref
+        - kind
+        - arm
+        - members
+        - detail
+        - suggested
+        - flagged
+        - source
+
+    HarmonizeItemsPage:
+      type: object
+      properties:
+        total:
+          type: integer
+        flaggedTotal:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/HarmonizeItem"
+      required:
+        - total
+        - flaggedTotal
+        - items
+
+    HarmonizeFlagsRequest:
+      type: object
+      properties:
+        refs:
+          type: array
+          items:
+            type: string
+        flagged:
+          type: boolean
+      required:
+        - refs
+        - flagged
+
+    HarmonizeFlagFilter:
+      type: object
+      description: Every given field must match; a detail field matches only items that carry it
+      properties:
+        kind:
+          $ref: "#/components/schemas/HarmonizeItemKind"
+        arm:
+          $ref: "#/components/schemas/HarmonizeArm"
+        basis:
+          type: string
+        ambiguous:
+          type: boolean
+
+    HarmonizeBulkFlagsRequest:
+      type: object
+      properties:
+        filter:
+          $ref: "#/components/schemas/HarmonizeFlagFilter"
+        flagged:
+          type: boolean
+      required:
+        - filter
+        - flagged
+
+    HarmonizeFlagsResult:
+      type: object
+      properties:
+        updated:
+          type: integer
+        flaggedTotal:
+          type: integer
+      required:
+        - updated
+        - flaggedTotal
+
+    HarmonizeResetFlagsRequest:
+      type: object
+      properties:
+        refs:
+          type: array
+          description: The items to reset; omitted means every item
+          items:
+            type: string
+
+    HarmonizeResetFlagsResult:
+      type: object
+      properties:
+        flaggedTotal:
+          type: integer
+      required:
+        - flaggedTotal
 
     HarmonizeReviewItemSummary:
       type: object

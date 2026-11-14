@@ -106,6 +106,18 @@ CREATE INDEX IF NOT EXISTS idx_harmonize_user_created
 ON harmonize_runs (user_id, created_at DESC)
 """
 
+# Organizer overrides of biomapper's suggested flag, per run and user. An item with no row is
+# flagged exactly when biomapper suggested it.
+_CREATE_HARMONIZE_FLAGS_TABLE = """
+CREATE TABLE IF NOT EXISTS harmonize_flags (
+    job_id   TEXT,
+    user_id  TEXT,
+    item_ref TEXT,
+    flagged  INTEGER NOT NULL,
+    PRIMARY KEY (job_id, user_id, item_ref)
+)
+"""
+
 
 class Database:
     """Async SQLite persistence layer for job history."""
@@ -132,6 +144,7 @@ class Database:
         await self._conn.execute(_CREATE_BENCHMARK_ROW_LOGS_INDEX)
         await self._conn.execute(_CREATE_HARMONIZE_RUNS_TABLE)
         await self._conn.execute(_CREATE_HARMONIZE_RUNS_INDEX)
+        await self._conn.execute(_CREATE_HARMONIZE_FLAGS_TABLE)
         await self._conn.commit()
 
         if existed:
@@ -547,6 +560,52 @@ class Database:
         d: dict[str, Any] = dict(row)
         d["labels"] = json.loads(d["labels"])
         return d
+
+    # ------------------------------------------------------------------
+    # Harmonize flags (organizer overrides of biomapper's suggestions)
+    # ------------------------------------------------------------------
+
+    async def list_harmonize_flags(self, job_id: str, user_id: str) -> dict[str, bool]:
+        """``{item_ref: flagged}`` for every override the user stored on the run."""
+        cursor = await self._conn.execute(
+            "SELECT item_ref, flagged FROM harmonize_flags WHERE job_id = ? AND user_id = ?",
+            (job_id, user_id),
+        )
+        return {row[0]: bool(row[1]) for row in await cursor.fetchall()}
+
+    async def write_harmonize_flags(
+        self, job_id: str, user_id: str, *, upsert: dict[str, bool], delete: list[str],
+    ) -> None:
+        """Store the ``upsert`` overrides and drop the ``delete`` ones, in one transaction."""
+        try:
+            if upsert:
+                await self._conn.executemany(
+                    """INSERT INTO harmonize_flags (job_id, user_id, item_ref, flagged)
+                       VALUES (?, ?, ?, ?)
+                       ON CONFLICT (job_id, user_id, item_ref)
+                       DO UPDATE SET flagged = excluded.flagged""",
+                    [(job_id, user_id, ref, int(flag)) for ref, flag in upsert.items()],
+                )
+            if delete:
+                await self._conn.executemany(
+                    "DELETE FROM harmonize_flags WHERE job_id = ? AND user_id = ? AND item_ref = ?",
+                    [(job_id, user_id, ref) for ref in delete],
+                )
+            await self._conn.commit()
+        except Exception:
+            await self._conn.rollback()
+            raise
+
+    async def reset_harmonize_flags(
+        self, job_id: str, user_id: str, refs: list[str] | None = None,
+    ) -> None:
+        """Drop the user's overrides on the run: all of them, or those for ``refs``."""
+        if refs is None:
+            await self._conn.execute(
+                "DELETE FROM harmonize_flags WHERE job_id = ? AND user_id = ?", (job_id, user_id))
+            await self._conn.commit()
+        else:
+            await self.write_harmonize_flags(job_id, user_id, upsert={}, delete=refs)
 
     # ------------------------------------------------------------------
     # Helpers

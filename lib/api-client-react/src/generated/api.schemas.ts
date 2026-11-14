@@ -432,6 +432,99 @@ export interface HarmonizeReport {
   [key: string]: unknown;
 }
 
+export type HarmonizeItemKind =
+  (typeof HarmonizeItemKind)[keyof typeof HarmonizeItemKind];
+
+export const HarmonizeItemKind = {
+  link: "link",
+  group: "group",
+  review: "review",
+  unresolved: "unresolved",
+} as const;
+
+export type HarmonizeArm = (typeof HarmonizeArm)[keyof typeof HarmonizeArm];
+
+export const HarmonizeArm = {
+  names_only: "names_only",
+  identifier: "identifier",
+} as const;
+
+export interface HarmonizeItemMember {
+  cohort: string;
+  key: string;
+  /** Untrusted text from the cohort file */
+  name: string | null;
+  chosenKgId: string | null;
+}
+
+/**
+ * What the report gives for the item, camelCased (for example basis, ambiguous, oneToOne for a link; multiplicity, rowsPerCohort for a group; status for a review entry; bucket for an unresolved row), plus origin, the report list it came from
+ */
+export type HarmonizeItemDetail = { [key: string]: unknown };
+
+export type HarmonizeItemSource =
+  (typeof HarmonizeItemSource)[keyof typeof HarmonizeItemSource];
+
+export const HarmonizeItemSource = {
+  biomapper: "biomapper",
+  organizer: "organizer",
+} as const;
+
+export interface HarmonizeItem {
+  /** Stable across reloads, kind:arm:digest of the member rows */
+  ref: string;
+  kind: HarmonizeItemKind;
+  arm: HarmonizeArm;
+  members: HarmonizeItemMember[];
+  /** What the report gives for the item, camelCased (for example basis, ambiguous, oneToOne for a link; multiplicity, rowsPerCohort for a group; status for a review entry; bucket for an unresolved row), plus origin, the report list it came from */
+  detail: HarmonizeItemDetail;
+  /** Biomapper's own flag */
+  suggested: boolean;
+  /** The effective flag, the organizer's override if any, else suggested */
+  flagged: boolean;
+  source: HarmonizeItemSource;
+}
+
+export interface HarmonizeItemsPage {
+  total: number;
+  flaggedTotal: number;
+  items: HarmonizeItem[];
+}
+
+export interface HarmonizeFlagsRequest {
+  refs: string[];
+  flagged: boolean;
+}
+
+/**
+ * Every given field must match; a detail field matches only items that carry it
+ */
+export interface HarmonizeFlagFilter {
+  kind?: HarmonizeItemKind;
+  arm?: HarmonizeArm;
+  basis?: string;
+  ambiguous?: boolean;
+}
+
+export interface HarmonizeBulkFlagsRequest {
+  filter: HarmonizeFlagFilter;
+  flagged: boolean;
+}
+
+export interface HarmonizeFlagsResult {
+  updated: number;
+  flaggedTotal: number;
+}
+
+export interface HarmonizeResetFlagsRequest {
+  /** The items to reset; omitted means every item */
+  refs?: string[];
+}
+
+export interface HarmonizeResetFlagsResult {
+  flaggedTotal: number;
+}
+
 export type HarmonizeReviewItemSummaryKind =
   (typeof HarmonizeReviewItemSummaryKind)[keyof typeof HarmonizeReviewItemSummaryKind];
 
@@ -586,3 +679,19 @@ export const ListHarmonizeReviewItemsKind = {
   row: "row",
   link: "link",
 } as const;
+
+export type ListHarmonizeItemsParams = {
+  kind?: HarmonizeItemKind;
+  arm?: HarmonizeArm;
+  flagged?: boolean;
+  /**
+   * @minimum 0
+   */
+  offset?: number;
+  /**
+   * Page size, 1 to 1000 (default 100)
+   * @minimum 1
+   * @maximum 1000
+   */
+  limit?: number;
+};

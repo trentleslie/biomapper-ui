@@ -13,6 +13,7 @@ import asyncio
 import json
 import threading
 import time
+import warnings
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -98,8 +99,153 @@ def _review(labels: list[str]) -> dict[str, Any]:
     }
 
 
-def write_recording(root: Path) -> Path:
-    """Write a synthetic recordings directory under ``root`` and return it."""
+# ---------------------------------------------------------------------------
+# Real report.json dicts, generated offline by the package with a fake mapper
+# ---------------------------------------------------------------------------
+
+# What the fake mapper answers, by name: (chosen_kg_id, kg_equivalent_ids). A name not listed
+# resolves to nothing (an unresolved row). Synthetic panel metadata only.
+_GLUCOSE = ("CHEBI:4167", {"HMDB": ["HMDB0000122"]})
+_LEUCINE = ("CHEBI:25017", {"HMDB": ["HMDB0000687"]})
+_ANSWERS: dict[str, tuple[str, dict[str, list[str]]]] = {
+    "Glucose": _GLUCOSE,
+    "D-Glucose": _GLUCOSE,
+    "Leucine": _LEUCINE,
+    "Isoleucine": _LEUCINE,  # two rows on one node: the ambiguous link / multiplicity group
+    "Leucine/Isoleucine": _LEUCINE,
+    # Same HMDB on two different chosen nodes: an identifier link across nodes (cross-node).
+    "Lactate": ("CHEBI:24996", {"HMDB": ["HMDB0000190"]}),
+    "L-Lactic acid": ("CHEBI:422", {"HMDB": ["HMDB0000190"]}),
+}
+# What a one-sided code resolves to on its own (the two-cohort review pass): a different node.
+_CODE_ANSWERS: dict[str, tuple[str, dict[str, list[str]]]] = {
+    "C00031": ("CHEBI:17634", {"KEGG": ["C00031"]}),
+}
+
+
+def fake_mapper(records: list[dict[str, Any]], *, entity_type: str,
+                annotation_mode: str) -> list[Any]:
+    """A ``biomapper`` mapper callable that answers from fixed tables, with no network."""
+    from biomapper import MappingResult
+
+    out = []
+    for rec in records:
+        name = rec["name"]
+        codes = [c for cs in (rec.get("identifiers") or {}).values() for c in cs]
+        hit = None
+        if annotation_mode == "none" and codes:
+            hit = _CODE_ANSWERS.get(codes[0])
+        if hit is None:
+            hit = _ANSWERS.get(name)
+        if hit is None:
+            out.append(MappingResult(query_name=name))
+        else:
+            node, equivalents = hit
+            out.append(MappingResult(query_name=name, resolved=True, primary_curie=node,
+                                     chosen_kg_id=node, kg_equivalent_ids=equivalents))
+    return out
+
+
+def _json_round_trip(value: dict[str, Any]) -> dict[str, Any]:
+    """The report exactly as ``report.json`` holds it."""
+    return json.loads(json.dumps(value))
+
+
+def make_two_cohort_report(*, shared_vocabulary: bool = True) -> dict[str, Any]:
+    """A real ``harmonize_cohorts`` report.
+
+    Cohort ``a`` declares HMDB and KEGG, cohort ``b`` HMDB (or nothing when
+    ``shared_vocabulary`` is False, which skips the identifier arm: ``arms.identifier`` is
+    ``None``). It holds a one-to-one link (Glucose), two ambiguous links (Leucine and
+    Isoleucine both to Leucine/Isoleucine), a review-queue item (a's KEGG code disagrees with
+    its name) and one unresolved row per cohort.
+    """
+    from biomapper import harmonize_cohorts
+
+    a = [
+        {"id": "a1", "name": "Glucose", "hmdb": "HMDB0000122", "kegg": "C00031"},
+        {"id": "a2", "name": "Leucine", "hmdb": "HMDB0000687", "kegg": ""},
+        {"id": "a3", "name": "Isoleucine", "hmdb": "", "kegg": ""},
+        {"id": "a4", "name": "Mystery peak 12", "hmdb": "", "kegg": ""},
+    ]
+    b = [
+        {"id": "b1", "name": "D-Glucose", "hmdb": "HMDB0000122"},
+        {"id": "b2", "name": "Leucine/Isoleucine", "hmdb": ""},
+        {"id": "b3", "name": "Unknown 7", "hmdb": ""},
+    ]
+    with warnings.catch_warnings():
+        # The package warns about every one-sided vocabulary; that is the point of this input.
+        warnings.simplefilter("ignore", UserWarning)
+        report = harmonize_cohorts(
+            a, b, entity="metabolites", a_key_column="id", b_key_column="id",
+            a_vocabularies={"HMDB": "hmdb", "KEGG": "kegg"},
+            b_vocabularies={"HMDB": "hmdb"} if shared_vocabulary else None,
+            mapper=fake_mapper, probe_pins=False, save=False,
+        )
+    return _json_round_trip(report.to_dict())
+
+
+def make_many_cohort_report() -> dict[str, Any]:
+    """A real ``harmonize_many`` report over cohorts ``a``, ``b`` and ``c``.
+
+    Every cohort declares HMDB, so both arms run. It holds a plain group (Glucose in all
+    three), a group with multiplicity (Leucine and Isoleucine in ``a``), a cross-node entry
+    (Lactate in ``a`` and L-Lactic acid in ``b`` share an HMDB on different nodes), an
+    identifier check that does not confirm (``c``'s Glucose declares the wrong HMDB) and a
+    row that is not grouped (``c``'s unresolved name).
+    """
+    from biomapper import harmonize_many
+
+    cohorts = {
+        "a": [{"id": "a1", "name": "Glucose", "hmdb": "HMDB0000122"},
+              {"id": "a2", "name": "Leucine", "hmdb": ""},
+              {"id": "a3", "name": "Isoleucine", "hmdb": ""},
+              {"id": "a4", "name": "Lactate", "hmdb": "HMDB0000190"}],
+        "b": [{"id": "b1", "name": "D-Glucose", "hmdb": "HMDB0000122"},
+              {"id": "b2", "name": "Leucine", "hmdb": ""},
+              {"id": "b3", "name": "L-Lactic acid", "hmdb": "HMDB0000190"}],
+        "c": [{"id": "c1", "name": "Glucose", "hmdb": "HMDB0000999"},
+              {"id": "c2", "name": "Mystery peak 12", "hmdb": ""}],
+    }
+    report = harmonize_many(
+        cohorts, entity="metabolites", key_columns={k: "id" for k in cohorts},
+        vocabularies={k: {"HMDB": "hmdb"} for k in cohorts},
+        mapper=fake_mapper, probe_pins=False, save=False,
+    )
+    return _json_round_trip(report.to_dict())
+
+
+def make_results_report() -> dict[str, Any]:
+    """The ``harmonize_results`` report shape (offline harmonize of two finished mapping jobs).
+
+    ``arms.names_only`` is ``biomapper.harmonize.harmonize(...).to_dict()`` (no row names, no
+    ``unresolved_rows``; ``unresolved`` lists keys), ``arms.identifier`` is ``None`` and there is
+    no ``review_queue``.
+    """
+    from biomapper.cohorts import name_linking_info, resolve_category
+    from biomapper.harmonize import harmonize
+
+    a = fake_mapper([{"name": n} for n in ("Glucose", "Leucine", "Isoleucine", "Mystery peak 12")],
+                    entity_type="", annotation_mode="missing")
+    b = fake_mapper([{"name": n} for n in ("D-Glucose", "Leucine/Isoleucine", "Unknown 7")],
+                    entity_type="", annotation_mode="missing")
+    result = harmonize(a, b, a_label="a", b_label="b", link_by_name=True)
+    return _json_round_trip({
+        "schema_version": 1,
+        "kind": "harmonize_results",
+        "labels": ["a", "b"],
+        "name_linking": name_linking_info(resolve_category("metabolites", None)),
+        "arms": {"names_only": result.to_dict(), "identifier": None},
+    })
+
+
+def write_recording(root: Path, *, two_cohort_report: dict[str, Any] | None = None,
+                    many_cohort_report: dict[str, Any] | None = None) -> Path:
+    """Write a synthetic recordings directory under ``root`` and return it.
+
+    ``report.json`` is a minimal stub unless a real report is given for that kind.
+    """
+    reports = {"two_cohort": two_cohort_report, "many_cohort": many_cohort_report}
     for sub, kind, labels in (("two_cohort", "harmonize_cohorts", ["a", "b"]),
                               ("many_cohort", "harmonize_many", ["a", "b", "c"])):
         d = root / sub
@@ -109,9 +255,9 @@ def write_recording(root: Path) -> Path:
         (d / "status.json").write_text(json.dumps(status), encoding="utf-8")
         (d / "progress.jsonl").write_text(
             "".join(json.dumps(p) + "\n" for p in _progress(kind, labels)), encoding="utf-8")
-        (d / "report.json").write_text(
-            json.dumps({"schema_version": 1, "kind": kind, "cohorts": labels, "links": []}),
-            encoding="utf-8")
+        report = reports[sub] or {"schema_version": 1, "kind": kind, "cohorts": labels,
+                                  "links": []}
+        (d / "report.json").write_text(json.dumps(report), encoding="utf-8")
         (d / "review_items.json").write_text(json.dumps(_review(labels)), encoding="utf-8")
     return root
 

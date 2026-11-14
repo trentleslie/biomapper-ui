@@ -51,6 +51,47 @@ def recording_dir(tmp_path):
 
 
 @pytest.fixture
+def two_cohort_report():
+    """A real ``harmonize_cohorts`` report.json dict (both arms), generated offline."""
+    from tests.harmonize_fixtures import make_two_cohort_report
+
+    return make_two_cohort_report()
+
+
+@pytest.fixture
+def two_cohort_report_names_only():
+    """A real ``harmonize_cohorts`` report whose identifier arm was skipped (``None``)."""
+    from tests.harmonize_fixtures import make_two_cohort_report
+
+    return make_two_cohort_report(shared_vocabulary=False)
+
+
+@pytest.fixture
+def many_cohort_report():
+    """A real ``harmonize_many`` report.json dict over three cohorts, generated offline."""
+    from tests.harmonize_fixtures import make_many_cohort_report
+
+    return make_many_cohort_report()
+
+
+@pytest.fixture
+def results_report():
+    """The ``harmonize_results`` report shape, built with the package's ``harmonize()``."""
+    from tests.harmonize_fixtures import make_results_report
+
+    return make_results_report()
+
+
+@pytest.fixture
+def real_recording_dir(tmp_path, two_cohort_report, many_cohort_report):
+    """A ReplayBackend recordings dir whose report.json files are the real reports above."""
+    from tests.harmonize_fixtures import write_recording
+
+    return write_recording(tmp_path / "real_recordings", two_cohort_report=two_cohort_report,
+                           many_cohort_report=many_cohort_report)
+
+
+@pytest.fixture
 def stub_api():
     """A local HTTP stub of the mapping API that answers /map/batch slowly."""
     from tests.harmonize_fixtures import start_stub_api
