@@ -9,7 +9,7 @@ Conventions the checker needs:
 - Routes are under `/harmonize`. Every route takes the `x-clerk-user-id` header (400 when missing); a run owned by another user is a 404.
 - Report fields are written as they appear in `GET /harmonize/runs/{jobId}/report` (snake_case). Run status and items are camelCase.
 - A "run" is two-cohort (`POST /harmonize/cohorts`, report `kind` `harmonize_cohorts`) or many-cohort (`POST /harmonize/many`, report `kind` `harmonize_many`).
-- Inputs are panel metadata only (names and identifier columns). No recorded example run or example files are committed yet (see P-02 and P-03). Today the checker supplies its own two small panel-metadata cohort files (and its own 3 to 12 for many-cohort) against a live backend; the replay backend can be used once a recording is committed.
+- Inputs are panel metadata only (names and identifier columns). Data rule, stated once and referenced elsewhere: when a recorded run for that kind (two-cohort or many-cohort) is installed, the checker may use the replay backend; until then the checker supplies its own panel-metadata files (2 for two-cohort, 3 to 12 for many-cohort) against a live backend. No recorded run is committed yet (see P-02 and P-03).
 
 ## Start a run
 
@@ -17,7 +17,7 @@ Conventions the checker needs:
 |---|---|---|
 | H-01 | Pick two cohort files and start a two-cohort run. The screen then shows the new run as queued or running. | `POST /harmonize/cohorts` (`fileA`, `fileB`, `spec`) |
 | H-02 | Pick 2 to 12 cohort files and start a many-cohort run. The screen then shows the new run. | `POST /harmonize/many` (`files`, `spec`) |
-| H-03 | Choose the entity type (for example metabolites) and, optionally, the category for the run, before starting. The run's entity is shown afterwards. | choices listed by `GET /discovery/entity-types` (the app's discovery route, `routes/discovery.py`); sent as `spec.entity`, `spec.category`; status `entity`; report `entity`, `category` |
+| H-03 | Choose the entity type (for example metabolites) from the list the app offers, and optionally type a category override (free text, left blank by default). The chosen entity is shown on the run afterwards. The API offers no category list, so the category control is a plain optional text field passed through as written. | entity types from `GET /discovery/entity-types` (items carry `type`, `aliases`, `defaultPrefixes`, no categories); sent as `spec.entity` and optional `spec.category`; status `entity`; report `entity`, `category` |
 | H-04 | For each cohort, set its label. Two cohorts cannot share a label: starting such a run shows "Cohort labels must be distinct (got a, a)." | `spec.a.label`, `spec.b.label`, `spec.cohorts[].label`; 400 from `/cohorts` and `/many` |
 | H-05 | For each cohort, pick the name column from a list filled from that file's own header (not typed free, not a fixed list). | `POST /harmonize/inspect` returns `columns` and `rowCount`; `spec.*.nameColumn` |
 | H-06 | For each cohort, optionally pick a key column from the same header list. | `inspect`; `spec.*.keyColumn` |
@@ -46,7 +46,7 @@ How to check H-10: the checker only confirms that the option exists and that the
 
 How to check H-15: start a run, navigate to another page of the app, return to the harmonization screen, and open the run from the list.
 
-How to check H-16 and H-17: use a paced run (the replay with `BIOMAPPER_HARMONIZE_REPLAY_PACE`) so the run is still going.
+How to check H-16 and H-17: the run must still be going. With a recording installed, use the replay with the `BIOMAPPER_HARMONIZE_REPLAY_PACE` setting. Without one, start a live run with enough rows to observe progress (about 30 per cohort, at roughly 4 to 5 seconds per entity).
 
 ## Results
 
@@ -72,7 +72,7 @@ Results are available only after the state is complete or partial. Before that, 
 
 How to check H-22: run a two-cohort set where the cohorts share no identifier vocabulary. The arm shows as skipped with the reason from the report.
 
-How to check H-23: the replay's two-cohort run has both one-to-one and ambiguous links.
+How to check H-23: the run must contain both one-to-one and ambiguous links. With a recording installed, the two-cohort recording has both. Without one, supply cohort files with a name that appears twice in one cohort (so it links to two rows) and names that appear once, about 30 rows per cohort, on a live run.
 
 ## Review and flags
 
@@ -151,7 +151,7 @@ These are not gate lines. They have no backing yet. They join the gate only when
 |---|---|---|
 | P-01 | Harmonize two finished mapping jobs, with a link-by-name control. | No route exists. Stored mapping results lack fields the package needs. |
 | P-02 | Load the built-in example from the screen. | `POST /harmonize/example` exists but answers 400 "The example dataset is not installed." No example data is committed yet. |
-| P-03 | Any many-cohort check that needs a recorded many-cohort run on real panel metadata. | The many-cohort routes exist and H-02, H-10 and the many-cohort lines are gate lines, but test data for them is not yet available. Until it is, they are checked against the replay backend's synthetic three-cohort run. |
+| P-03 | Any many-cohort check that needs a recorded many-cohort run on real panel metadata. | The many-cohort routes exist and H-02, H-10 and the many-cohort lines are gate lines, but no many-cohort test data or recording is available yet. Until one is installed, the checker follows the data rule in Conventions: its own 3 to 12 files against a live backend. |
 | P-04 | Many-cohort "remap all" having an observable effect. | Each run has its own store, so remap all has no earlier mappings to reuse and its effect cannot be seen. Whether runs should share a per-user store is an owner decision. H-10 stays as "the option exists and the run starts". |
 
 ## Gaps found
