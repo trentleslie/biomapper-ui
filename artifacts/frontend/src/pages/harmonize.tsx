@@ -1,14 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useRoute } from "wouter";
-import { useListHarmonizeRuns, getListHarmonizeRunsQueryKey, type HarmonizeRunStatus } from "@workspace/api-client-react";
-import { Workflow } from "lucide-react";
+import {
+  useListHarmonizeRuns,
+  getListHarmonizeRunsQueryKey,
+  useGetHarmonizeRun,
+  getGetHarmonizeRunQueryKey,
+  type HarmonizeRunStatus,
+} from "@workspace/api-client-react";
+import { ArrowDown, Workflow } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { HarmonizeSetup, type SetupMode } from "@/components/harmonize/HarmonizeSetup";
 import { RunsList } from "@/components/harmonize/RunsList";
 import { RunPanel } from "@/components/harmonize/RunPanel";
-import { EmptyState, Notice } from "@/components/harmonize/common";
-import { isWaiting } from "@/lib/harmonize";
+import { EmptyState, Notice, StateBadge } from "@/components/harmonize/common";
+import { armLabel, armProgress, isWaiting, pollInterval } from "@/lib/harmonize";
 
 const LAST_RUN_KEY = "biomapper.harmonize.lastRun";
 
@@ -67,15 +73,46 @@ export default function HarmonizePage() {
   const onStarted = (run: HarmonizeRunStatus) => openRun(run.jobId);
 
   const active = (runs.data ?? []).find((r) => isWaiting(r.state) && r.jobId !== jobId);
+  // The same query (and cache entry) the run panel polls, so the two never disagree.
+  const shownRun = useGetHarmonizeRun(jobId ?? "", {
+    query: {
+      queryKey: getGetHarmonizeRunQueryKey(jobId ?? ""),
+      enabled: !!jobId,
+      retry: false,
+      refetchInterval: (q) => pollInterval(q.state.data?.state),
+    },
+  }).data;
+  const pillProgress = armProgress(shownRun?.progress);
 
   return (
     <>
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Harmonize cohorts</h1>
-        <p className="mt-1 max-w-3xl text-sm text-neutral-500">
-          Find which rows in two or more datasets are the same entity, flag what an expert should check, and download
-          the result for expert review.
-        </p>
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Harmonize cohorts</h1>
+          <p className="mt-1 max-w-3xl text-sm text-neutral-500">
+            Find which rows in two or more datasets are the same entity, flag what an expert should check, and download
+            the result for expert review.
+          </p>
+        </div>
+        {jobId && shownRun && (
+          <div className="flex items-center gap-3 rounded border border-neutral-200 bg-white px-3 py-2" data-testid="open-run-pill">
+            <div className="min-w-0 text-sm">
+              <p className="text-xs text-neutral-500">Open run</p>
+              <p className="max-w-[22rem] truncate font-medium text-neutral-900" title={(shownRun.labels ?? []).join(", ")}>
+                {(shownRun.labels ?? []).join(", ") || "Unlabelled cohorts"}
+              </p>
+            </div>
+            <StateBadge state={shownRun.state} />
+            {isWaiting(shownRun.state) && pillProgress && (
+              <span className="text-xs tabular-nums text-neutral-600" data-testid="open-run-progress">
+                {armLabel(pillProgress.arm)}: {pillProgress.done} of {pillProgress.total}
+              </span>
+            )}
+            <Button size="sm" variant="secondary" onClick={() => runSection.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+              <ArrowDown /> Go to run
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
@@ -85,7 +122,8 @@ export default function HarmonizePage() {
         </aside>
       </div>
 
-      <section ref={runSection} aria-labelledby="run-heading" className="mt-10 scroll-mt-6" data-testid="run-section">
+      {/* At least a window tall, so bringing the run into view always works, even before its results load. */}
+      <section ref={runSection} aria-labelledby="run-heading" className="mt-10 min-h-[85dvh] scroll-mt-6" data-testid="run-section">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 id="run-heading" className="text-lg font-semibold tracking-tight text-neutral-900">Run and results</h2>
           {jobId && (
