@@ -138,13 +138,14 @@ def test_run_status_is_camel_case_with_run_fields(client, finished_job):
     assert st["labels"] == ["a", "b"]
     assert st["entity"] == "metabolites"
     assert st["createdAt"].endswith("Z")
-    for key in ("entitiesTotal", "entitiesMapped", "rowsErrored", "outputDir", "createdUtc",
+    for key in ("entitiesTotal", "entitiesMapped", "rowsErrored", "createdUtc",
                 "updatedUtc", "kgBuild", "kgVerified", "reviewItems"):
         assert key in st, key
     assert not [k for k in st if "_" in k]
     assert set(st["progress"]) >= {"entitiesDone", "entitiesTotal", "function", "arm"}
     assert st["reviewItems"]["skippedNoNode"] == 0
-    assert set(st["cohorts"][0]) == {"label", "path", "rows"}
+    assert set(st["cohorts"][0]) == {"label", "rows"}
+    assert "outputDir" not in st and "storeDir" not in st
     # summary is the package's free-form block and passes through as written
     assert st["summary"] == {"links": 2, "warnings": []}
 
@@ -154,9 +155,76 @@ def test_run_dirs_are_per_run(client, finished_job):
     assert len(dirs) == 1
     run_dir = dirs[0]
     assert sorted(p.name for p in (run_dir / "inputs").iterdir()) == ["a.tsv", "b.tsv"]
-    st = client.get(f"/harmonize/runs/{finished_job}", headers=U1).json()
-    assert Path(st["outputDir"]) == run_dir / "out"
+    # the run's own out/ holds its report (checked on disk; the API never shows the path)
     assert (run_dir / "out" / "report.json").is_file()
+    assert (run_dir / "store").is_dir()
+
+
+def _server_paths():
+    from services import harmonize_storage
+
+    home = harmonize_storage.HARMONIZE_HOME
+    return {str(p) for root in (runs_root(), harmonize_storage.jobs_home(), home)
+            for p in (root, root.resolve())}
+
+
+def test_no_server_path_in_status_report_or_review_bodies(client, finished_job):
+    bodies = [
+        client.get(f"/harmonize/runs/{finished_job}", headers=U1).text,
+        client.get("/harmonize/runs", headers=U1).text,
+        client.get(f"/harmonize/runs/{finished_job}/report", headers=U1).text,
+        client.get(f"/harmonize/runs/{finished_job}/review-items", headers=U1).text,
+        client.get(f"/harmonize/runs/{finished_job}/review-items/l-lactate", headers=U1).text,
+        client.post(f"/harmonize/runs/{finished_job}/cancel", headers=U1).text,
+    ]
+    for body in bodies:
+        for path in _server_paths():
+            assert path not in body
+
+
+def test_job_error_message_has_home_prefix_removed(client, two_files, spec_two, monkeypatch):
+    import routes.harmonize as harmonize_routes
+
+    leaked = runs_root() / "abc" / "inputs" / "a.tsv"
+    monkeypatch.setattr(harmonize_routes, "get_backend",
+                        lambda: _CapBackend(f"{leaked} has no rows with a value in 'name'."))
+    r = client.post("/harmonize/cohorts", files=two_files, data={"spec": json.dumps(spec_two)}, headers=U1)
+    assert r.status_code == 400
+    assert r.json()["detail"] == "runs/abc/inputs/a.tsv has no rows with a value in 'name'."
+
+
+class _SpyBackend:
+    """Delegates to the real backend and records cancel calls."""
+
+    def __init__(self, inner):
+        self.inner = inner
+        self.cancelled = []
+
+    def __getattr__(self, name):
+        return getattr(self.inner, name)
+
+    async def cancel(self, job_id):
+        self.cancelled.append(job_id)
+        return await self.inner.cancel(job_id)
+
+
+def test_insert_failure_cancels_job_and_cleans_up(slow_client, two_files, spec_two, monkeypatch):
+    import routes.harmonize as harmonize_routes
+    from services import harmonize_backend
+    from services.database import database
+
+    spy = _SpyBackend(harmonize_backend.get_backend())
+    monkeypatch.setattr(harmonize_routes, "get_backend", lambda: spy)
+
+    async def broken_insert(**kwargs):
+        raise RuntimeError("database is locked")
+
+    monkeypatch.setattr(database, "insert_harmonize_run", broken_insert)
+    with pytest.raises(RuntimeError, match="database is locked"):
+        slow_client.post("/harmonize/cohorts", files=two_files,
+                         data={"spec": json.dumps(spec_two)}, headers=U1)
+    assert len(spy.cancelled) == 1
+    assert list(runs_root().iterdir()) == []
 
 
 def test_many_submit_runs(client, spec_many):

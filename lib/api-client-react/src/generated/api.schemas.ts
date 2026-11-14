@@ -319,7 +319,6 @@ export interface HarmonizeExampleRequest {
 
 export interface HarmonizeCohortStatus {
   label: string;
-  path: string;
   rows: number;
 }
 
@@ -389,7 +388,7 @@ export const HarmonizeRunStatusStage = {
 export type HarmonizeRunStatusSummary = { [key: string]: unknown } | null;
 
 /**
- * The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. A listed run the job runner no longer knows carries only jobId, state "unknown", reason, kind, labels, entity and createdAt.
+ * The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state "unknown", reason, kind, labels, entity and createdAt.
  */
 export interface HarmonizeRunStatus {
   jobId: string;
@@ -402,8 +401,6 @@ export interface HarmonizeRunStatus {
   createdAt: string;
   stage?: HarmonizeRunStatusStage;
   cohorts?: HarmonizeCohortStatus[];
-  outputDir?: string;
-  storeDir?: string | null;
   entitiesTotal?: number;
   entitiesMapped?: number;
   rowsErrored?: number;

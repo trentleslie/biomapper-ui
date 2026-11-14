@@ -13,6 +13,10 @@ JSON is camelCase like the rest of the API. Run status is the package's
 ``entity`` and ``createdAt``. ``summary`` is the package's free-form block and passes through
 as written, because its keys include cohort labels and arm names.
 
+No absolute server path reaches the client: run status drops ``output_dir``, ``store_dir`` and
+each cohort's ``path``, and every response body and error message has the harmonize-home
+prefix removed from its strings (see :func:`scrub`).
+
 ``JobError`` messages are written for end users and are passed through: 400, except the
 runner's unfinished-jobs cap (409) and results asked for before the run finished (409).
 """
@@ -22,6 +26,7 @@ import csv
 import dataclasses
 import json
 import logging
+import os
 import re
 import tempfile
 from datetime import datetime, timezone
@@ -34,6 +39,7 @@ from fastapi import APIRouter, File, Form, Header, HTTPException, Query, UploadF
 from pydantic import BaseModel, ConfigDict, ValidationError
 from pydantic.alias_generators import to_camel
 
+from services import harmonize_storage
 from services.database import database
 from services.harmonize_backend import HarmonizeBackend, get_backend
 from services.harmonize_storage import (
@@ -133,8 +139,37 @@ def _is_queue_full(exc: JobError) -> bool:
     return _QUEUE_FULL.search(str(exc)) is not None
 
 
+def _home_prefixes() -> list[str]:
+    """The harmonize home as written and as resolved, longest first."""
+    home = harmonize_storage.HARMONIZE_HOME
+    found = {str(home), str(Path(home).resolve())}
+    return sorted(found, key=len, reverse=True)
+
+
+def scrub(value: Any) -> Any:
+    """Remove the server's harmonize-home prefix from every string in ``value``.
+
+    No absolute path under the harmonize home may reach the client: a path such as
+    ``<home>/runs/<id>/inputs/a.tsv`` becomes ``runs/<id>/inputs/a.tsv``; the rest of the text
+    is kept.
+    """
+    if isinstance(value, str):
+        for prefix in _home_prefixes():
+            value = value.replace(prefix + os.sep, "").replace(prefix, "")
+        return value
+    if isinstance(value, dict):
+        return {k: scrub(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [scrub(v) for v in value]
+    return value
+
+
+def _message(exc: BaseException) -> str:
+    return scrub(str(exc))
+
+
 def _job_error(exc: JobError) -> HTTPException:
-    return HTTPException(status_code=409 if _is_queue_full(exc) else 400, detail=str(exc))
+    return HTTPException(status_code=409 if _is_queue_full(exc) else 400, detail=_message(exc))
 
 
 _SNAKE_PART = re.compile(r"_([a-z0-9])")
@@ -156,8 +191,17 @@ def camelize(value: Any) -> Any:
     return value
 
 
+# Server paths the package reports. They never reach the client.
+_SERVER_PATH_FIELDS = ("output_dir", "store_dir")
+
+
 def _run_json(status: HarmonizeStatus, run: dict[str, Any]) -> dict[str, Any]:
-    out = camelize(status.model_dump(mode="json"))
+    dumped = status.model_dump(mode="json")
+    for field in _SERVER_PATH_FIELDS:
+        dumped.pop(field, None)
+    for cohort in dumped.get("cohorts") or []:
+        cohort.pop("path", None)
+    out = scrub(camelize(dumped))
     out.update(kind=run["kind"], labels=run["labels"], entity=run["entity"],
                createdAt=run["created_at"])
     return out
@@ -178,7 +222,7 @@ async def _finished_or_409(backend: HarmonizeBackend, job_id: str, exc: JobError
     except JobError:
         return _job_error(exc)
     if status.state not in FINISHED_STATES:
-        return HTTPException(status_code=409, detail=str(exc))
+        return HTTPException(status_code=409, detail=_message(exc))
     return _job_error(exc)
 
 
@@ -237,7 +281,8 @@ async def _start_run(
 ) -> dict[str, Any]:
     """Save the files into a new run directory, submit, and record ownership.
 
-    Any failure before the job is accepted removes the run directory and inserts no row.
+    Any failure removes the run directory and leaves no row; if recording ownership fails
+    after the job was accepted, the job is cancelled first.
     """
     upload_id, run_dir = new_run_dir()
     try:
@@ -254,21 +299,34 @@ async def _start_run(
             status = await backend.submit_many(
                 specs, entity=entity, category=category, output_dir=run_dir / "out",
                 store_dir=run_dir / "store", remap_all=remap_all)
-    except BaseException as exc:
-        try:
-            remove_run_dir(run_dir)
-        except OSError:
-            logger.exception("Could not remove run directory %s", run_dir)
+    except Exception as exc:
+        _remove_quietly(run_dir)
         if isinstance(exc, CohortFileError):
-            raise HTTPException(status_code=400, detail=str(exc)) from None
+            raise HTTPException(status_code=400, detail=_message(exc)) from None
         if isinstance(exc, JobError):
             raise _job_error(exc) from None
         raise
     run = {"job_id": status.job_id, "user_id": user_id, "kind": kind,
            "labels": [c.label for c, _, _ in cohorts], "entity": entity,
            "upload_id": upload_id, "created_at": _now_utc()}
-    await database.insert_harmonize_run(**run)
+    try:
+        await database.insert_harmonize_run(**run)
+    except Exception:
+        # The job was accepted but has no owner: stop it and drop its files, best effort.
+        try:
+            await backend.cancel(status.job_id)
+        except Exception:
+            logger.exception("Could not cancel unowned harmonize job %s", status.job_id)
+        _remove_quietly(run_dir)
+        raise
     return _run_json(status, run)
+
+
+def _remove_quietly(run_dir: Path) -> None:
+    try:
+        remove_run_dir(run_dir)
+    except OSError:
+        logger.exception("Could not remove run directory %s", run_dir)
 
 
 # ---------------------------------------------------------------------------
@@ -288,7 +346,7 @@ async def inspect_file(
         try:
             path = save_cohort_file(Path(tmp), "inspect", filename, data)
         except CohortFileError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from None
+            raise HTTPException(status_code=400, detail=_message(exc)) from None
         columns = read_header(path)
         delimiter = "\t" if path.suffix == ".tsv" else ","
         with path.open(newline="", encoding="utf-8-sig") as fh:
@@ -376,7 +434,7 @@ async def list_runs(x_clerk_user_id: str | None = Header(None)) -> list[dict[str
         try:
             out.append(_run_json(await backend.status(run["job_id"]), run))
         except JobError as exc:
-            out.append({"jobId": run["job_id"], "state": "unknown", "reason": str(exc),
+            out.append({"jobId": run["job_id"], "state": "unknown", "reason": _message(exc),
                         "kind": run["kind"], "labels": run["labels"], "entity": run["entity"],
                         "createdAt": run["created_at"]})
     return out
@@ -414,7 +472,7 @@ async def get_report(job_id: str, x_clerk_user_id: str | None = Header(None)) ->
     await _owned_run(job_id, _require_user(x_clerk_user_id))
     backend = get_backend()
     try:
-        return backend.load_report(job_id)
+        return scrub(backend.load_report(job_id))
     except JobError as exc:
         raise await _finished_or_409(backend, job_id, exc) from None
 
@@ -433,7 +491,7 @@ async def list_review_items(
         page = backend.review_items(job_id, kind=kind, offset=offset, limit=limit)
     except JobError as exc:
         raise await _finished_or_409(backend, job_id, exc) from None
-    return camelize(page.model_dump(mode="json"))
+    return scrub(camelize(page.model_dump(mode="json")))
 
 
 @router.get("/runs/{job_id}/review-items/{ref}")
@@ -446,4 +504,4 @@ async def get_review_item(
         detail = backend.review_item(job_id, ref)
     except JobError as exc:
         raise await _finished_or_409(backend, job_id, exc) from None
-    return camelize(detail.model_dump(mode="json"))
+    return scrub(camelize(detail.model_dump(mode="json")))

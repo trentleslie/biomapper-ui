@@ -8,6 +8,5 @@
 
 export interface HarmonizeCohortStatus {
   label: string;
-  path: string;
   rows: number;
 }

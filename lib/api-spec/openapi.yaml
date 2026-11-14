@@ -1218,13 +1218,10 @@ components:
       properties:
         label:
           type: string
-        path:
-          type: string
         rows:
           type: integer
       required:
         - label
-        - path
         - rows
 
     HarmonizeJobOwner:
@@ -1288,7 +1285,8 @@ components:
       description: >-
         The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity
         and createdAt. summary is the package's compact summary, passed through with its own
-        (snake_case and data) keys. A listed run the job runner no longer knows carries only
+        (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each
+        cohort's path) are never included. A listed run the job runner no longer knows carries only
         jobId, state "unknown", reason, kind, labels, entity and createdAt.
       properties:
         jobId:
@@ -1319,11 +1317,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/HarmonizeCohortStatus"
-        outputDir:
-          type: string
-        storeDir:
-          type: string
-          nullable: true
         entitiesTotal:
           type: integer
         entitiesMapped:

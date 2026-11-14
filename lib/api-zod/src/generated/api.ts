@@ -567,13 +567,10 @@ export const SubmitHarmonizeCohortsResponse = zod
       .array(
         zod.object({
           label: zod.string(),
-          path: zod.string(),
           rows: zod.number(),
         }),
       )
       .optional(),
-    outputDir: zod.string().optional(),
-    storeDir: zod.string().nullish(),
     entitiesTotal: zod.number().optional(),
     entitiesMapped: zod.number().optional(),
     rowsErrored: zod.number().optional(),
@@ -615,7 +612,7 @@ export const SubmitHarmonizeCohortsResponse = zod
       ),
   })
   .describe(
-    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
+    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
   );
 
 /**
@@ -662,13 +659,10 @@ export const SubmitHarmonizeManyResponse = zod
       .array(
         zod.object({
           label: zod.string(),
-          path: zod.string(),
           rows: zod.number(),
         }),
       )
       .optional(),
-    outputDir: zod.string().optional(),
-    storeDir: zod.string().nullish(),
     entitiesTotal: zod.number().optional(),
     entitiesMapped: zod.number().optional(),
     rowsErrored: zod.number().optional(),
@@ -710,7 +704,7 @@ export const SubmitHarmonizeManyResponse = zod
       ),
   })
   .describe(
-    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
+    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
   );
 
 /**
@@ -750,13 +744,10 @@ export const SubmitHarmonizeExampleResponse = zod
       .array(
         zod.object({
           label: zod.string(),
-          path: zod.string(),
           rows: zod.number(),
         }),
       )
       .optional(),
-    outputDir: zod.string().optional(),
-    storeDir: zod.string().nullish(),
     entitiesTotal: zod.number().optional(),
     entitiesMapped: zod.number().optional(),
     rowsErrored: zod.number().optional(),
@@ -798,7 +789,7 @@ export const SubmitHarmonizeExampleResponse = zod
       ),
   })
   .describe(
-    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
+    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
   );
 
 /**
@@ -834,13 +825,10 @@ export const ListHarmonizeRunsResponseItem = zod
       .array(
         zod.object({
           label: zod.string(),
-          path: zod.string(),
           rows: zod.number(),
         }),
       )
       .optional(),
-    outputDir: zod.string().optional(),
-    storeDir: zod.string().nullish(),
     entitiesTotal: zod.number().optional(),
     entitiesMapped: zod.number().optional(),
     rowsErrored: zod.number().optional(),
@@ -882,7 +870,7 @@ export const ListHarmonizeRunsResponseItem = zod
       ),
   })
   .describe(
-    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
+    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
   );
 export const ListHarmonizeRunsResponse = zod.array(
   ListHarmonizeRunsResponseItem,
@@ -925,13 +913,10 @@ export const GetHarmonizeRunResponse = zod
       .array(
         zod.object({
           label: zod.string(),
-          path: zod.string(),
           rows: zod.number(),
         }),
       )
       .optional(),
-    outputDir: zod.string().optional(),
-    storeDir: zod.string().nullish(),
     entitiesTotal: zod.number().optional(),
     entitiesMapped: zod.number().optional(),
     rowsErrored: zod.number().optional(),
@@ -973,7 +958,7 @@ export const GetHarmonizeRunResponse = zod
       ),
   })
   .describe(
-    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
+    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
   );
 
 /**
@@ -1013,13 +998,10 @@ export const ResumeHarmonizeRunResponse = zod
       .array(
         zod.object({
           label: zod.string(),
-          path: zod.string(),
           rows: zod.number(),
         }),
       )
       .optional(),
-    outputDir: zod.string().optional(),
-    storeDir: zod.string().nullish(),
     entitiesTotal: zod.number().optional(),
     entitiesMapped: zod.number().optional(),
     rowsErrored: zod.number().optional(),
@@ -1061,7 +1043,7 @@ export const ResumeHarmonizeRunResponse = zod
       ),
   })
   .describe(
-    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
+    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
   );
 
 /**
@@ -1101,13 +1083,10 @@ export const CancelHarmonizeRunResponse = zod
       .array(
         zod.object({
           label: zod.string(),
-          path: zod.string(),
           rows: zod.number(),
         }),
       )
       .optional(),
-    outputDir: zod.string().optional(),
-    storeDir: zod.string().nullish(),
     entitiesTotal: zod.number().optional(),
     entitiesMapped: zod.number().optional(),
     rowsErrored: zod.number().optional(),
@@ -1149,7 +1128,7 @@ export const CancelHarmonizeRunResponse = zod
       ),
   })
   .describe(
-    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
+    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
   );
 
 /**
