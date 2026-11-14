@@ -153,7 +153,7 @@ export function ExportsPanel({ jobId, kind }: { jobId: string; kind: string }) {
           </p>
         </section>
 
-        {result && <Notice tone={result.tone} testId="export-result">{result.text}</Notice>}
+        {result && <Notice live tone={result.tone} testId="export-result">{result.text}</Notice>}
       </CardContent>
     </Card>
   );

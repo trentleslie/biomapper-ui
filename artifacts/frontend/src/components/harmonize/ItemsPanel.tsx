@@ -198,7 +198,7 @@ export function ItemsPanel({ jobId, kind }: { jobId: string; kind: string }) {
           {busy && <Loader2 aria-label="Saving flags" className="h-4 w-4 animate-spin text-neutral-500" />}
         </div>
 
-        {message && <Notice tone={message.tone} testId="flag-message">{message.text}</Notice>}
+        {message && <Notice live tone={message.tone} testId="flag-message">{message.text}</Notice>}
 
         {items.isLoading ? (
           <SkeletonLines lines={6} label="Loading items" />

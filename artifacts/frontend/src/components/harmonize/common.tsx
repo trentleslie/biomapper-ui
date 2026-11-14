@@ -35,7 +35,8 @@ const NOTICE_TONES = {
 
 /**
  * An inline message (the design system's Alert recipe). Danger notices are role=alert so a screen reader hears a
- * refusal at once; the others are polite.
+ * refusal at once. Others are plain content unless `live` (the result of something the user just did), which
+ * makes them a polite status message.
  */
 export function Notice({
   tone = "info",
@@ -44,7 +45,9 @@ export function Notice({
   action,
   className,
   testId,
+  live = false,
 }: {
+  live?: boolean;
   tone?: keyof typeof NOTICE_TONES;
   title?: ReactNode;
   children?: ReactNode;
@@ -55,8 +58,7 @@ export function Notice({
   const { box, Icon } = NOTICE_TONES[tone];
   return (
     <div
-      role={tone === "danger" ? "alert" : "status"}
-      aria-live={tone === "danger" ? "assertive" : "polite"}
+      role={tone === "danger" ? "alert" : live ? "status" : undefined}
       className={cn("flex gap-3 rounded border p-3", box, className)}
       data-testid={testId}
     >

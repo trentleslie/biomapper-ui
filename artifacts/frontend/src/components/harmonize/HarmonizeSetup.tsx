@@ -182,8 +182,12 @@ export function HarmonizeSetup({
     setDrafts((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
   };
 
-  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
-    onDrop: addFiles,
+  const { getRootProps, getInputProps, isDragActive, open, inputRef } = useDropzone({
+    // Clear the input after each pick, so choosing the same file again (after removing it) still counts.
+    onDrop: (files: File[]) => {
+      addFiles(files);
+      if (inputRef.current) inputRef.current.value = "";
+    },
     accept: { "text/csv": [".csv"], "text/tab-separated-values": [".tsv"], "text/plain": [".txt", ".tsv", ".csv"] },
     multiple: true,
     noClick: true,
