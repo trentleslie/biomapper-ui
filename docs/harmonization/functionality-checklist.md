@@ -9,7 +9,7 @@ Conventions the checker needs:
 - Routes are under `/harmonize`. Every route takes the `x-clerk-user-id` header (400 when missing); a run owned by another user is a 404.
 - Report fields are written as they appear in `GET /harmonize/runs/{jobId}/report` (snake_case). Run status and items are camelCase.
 - A "run" is two-cohort (`POST /harmonize/cohorts`, report `kind` `harmonize_cohorts`) or many-cohort (`POST /harmonize/many`, report `kind` `harmonize_many`).
-- Inputs are panel metadata only (names and identifier columns). Use the recorded two-cohort files and, once available, the many-cohort set (see P-03).
+- Inputs are panel metadata only (names and identifier columns). No recorded example run or example files are committed yet (see P-02 and P-03). Today the checker supplies its own two small panel-metadata cohort files (and its own 3 to 12 for many-cohort) against a live backend; the replay backend can be used once a recording is committed.
 
 ## Start a run
 
@@ -17,7 +17,7 @@ Conventions the checker needs:
 |---|---|---|
 | H-01 | Pick two cohort files and start a two-cohort run. The screen then shows the new run as queued or running. | `POST /harmonize/cohorts` (`fileA`, `fileB`, `spec`) |
 | H-02 | Pick 2 to 12 cohort files and start a many-cohort run. The screen then shows the new run. | `POST /harmonize/many` (`files`, `spec`) |
-| H-03 | Choose the entity type (for example metabolites) and, optionally, the category for the run, before starting. The run's entity is shown afterwards. | `spec.entity`, `spec.category`; status `entity`; report `entity`, `category` |
+| H-03 | Choose the entity type (for example metabolites) and, optionally, the category for the run, before starting. The run's entity is shown afterwards. | choices listed by `GET /discovery/entity-types` (the app's discovery route, `routes/discovery.py`); sent as `spec.entity`, `spec.category`; status `entity`; report `entity`, `category` |
 | H-04 | For each cohort, set its label. Two cohorts cannot share a label: starting such a run shows "Cohort labels must be distinct (got a, a)." | `spec.a.label`, `spec.b.label`, `spec.cohorts[].label`; 400 from `/cohorts` and `/many` |
 | H-05 | For each cohort, pick the name column from a list filled from that file's own header (not typed free, not a fixed list). | `POST /harmonize/inspect` returns `columns` and `rowCount`; `spec.*.nameColumn` |
 | H-06 | For each cohort, optionally pick a key column from the same header list. | `inspect`; `spec.*.keyColumn` |
@@ -35,7 +35,7 @@ How to check H-10: the checker only confirms that the option exists and that the
 
 | Id | The user can | Backing |
 |---|---|---|
-| H-12 | See a run's state in words for every state the package can report: queued, running, complete, partial, stalled, paused, expired, cancelled, failed, owned_elsewhere. No state shows as blank or "undefined". | `GET /harmonize/runs/{jobId}` `state`, `reason`, `stage` |
+| H-12 | See a run's state in words for every state the package can report: queued, running, complete, partial, stalled, paused, expired, cancelled, failed, owned_elsewhere. No state shows as blank or "undefined". A run the package no longer knows reads "unknown" (see H-19). | `GET /harmonize/runs/{jobId}` `state`, `reason`, `stage` |
 | H-13 | See progress while running: entities mapped out of total for the run, and the current arm (names_only, identifier, or review). | status `entitiesMapped`, `entitiesTotal`, `progress.arm`, `progress.entitiesDone`, `progress.entitiesTotal` |
 | H-14 | On a two-cohort run, see which cohort is being mapped now (per-cohort progress). On a many-cohort run, see the cohorts mapped together with the arm's progress. | status `progress.cohort` (two-cohort), `progress.cohorts` (both) |
 | H-15 | Leave the screen while a run is going, come back, and find the run again (listed with its state), still progressing or finished. | `GET /harmonize/runs`, `GET /harmonize/runs/{jobId}` |
@@ -69,7 +69,6 @@ Results are available only after the state is complete or partial. Before that, 
 | H-32 | On many-cohort runs, see the cross-node review entries (rows linked across different nodes) and the grouped rows whose declared identifiers did not confirm their node. | report `arms.<arm>.cross_node`, `arms.<arm>.id_check_review` |
 | H-33 | On two-cohort runs, see the one-sided identifier checks (the review queue). | report `review_queue`, `review` |
 | H-34 | Open a review item to see its detail: for a row, the engine's choice, the certificate state and the candidates status with its reason; for a link, both sides with node, node name, identifiers and certificate states, and the question to ask. | `GET /harmonize/runs/{jobId}/review-items`, `GET /harmonize/runs/{jobId}/review-items/{ref}` |
-| H-35 | See a Sankey of the results, if the screen shows one, drawn with the branch's own Sankey and vocabulary selection unchanged. | screen (team) |
 
 How to check H-22: run a two-cohort set where the cohorts share no identifier vocabulary. The arm shows as skipped with the reason from the report.
 
@@ -83,7 +82,7 @@ biomapper's suggested flags are: every review entry, every ambiguous link, and e
 
 | Id | The user can | Backing |
 |---|---|---|
-| H-36 | See every item of a run in a list, each with its kind, arm, members and its current flag state, and the total of items and of flagged items. | `GET /harmonize/runs/{jobId}/items` (`total`, `flaggedTotal`, `items[].kind`, `arm`, `flagged`) |
+| H-36 | See every item of a run in a list, each with its kind, arm, members and its current flag state, and the total of items and of flagged items. The list lets the user reach every item (paging or scrolling; the route pages at 100 by default, 1000 at most), and the visible total equals the route's `total`. | `GET /harmonize/runs/{jobId}/items` (`total`, `flaggedTotal`, `items[].kind`, `arm`, `flagged`) |
 | H-37 | Filter the list by kind, by arm, and by flagged or not flagged. | `GET .../items?kind=&arm=&flagged=` |
 | H-38 | See that biomapper's suggestion is already applied on a fresh run: every review entry, every ambiguous link and every group with multiplicity starts flagged. | `items[].suggested`, `items[].flagged` |
 | H-39 | See for each item whether its flag state came from biomapper or from the organizer. | `items[].source` (`biomapper` or `organizer`) |
@@ -132,8 +131,17 @@ How to check H-55 and H-56: these messages come from the package against the liv
 
 | Id | The user can | Backing |
 |---|---|---|
-| H-58 | Reach the harmonization screen from the app navigation, beside entity resolution. The entry is added through the exported `NAV_ITEMS` in `artifacts/frontend/src/components/AppShell.tsx`. | screen (team) |
-| H-59 | See the shell, scroll bars and Sankey of this branch used unchanged: no edits to `AppShell.tsx` other than the added `NAV_ITEMS` entry, the scroll utilities and `ScrollArea`, or `lib/sankey.ts`. Any list or table on the screen that can overflow shows a scroll bar. | screen (team); `docs/harmonization/scroll-audit.md` |
+| H-58 | See a navigation entry for harmonization next to entity resolution in the app's left rail, reachable by its accessible name, and open the screen from it. | screen (team) |
+| H-59 | Find a visible scroll bar on every list or table of the screen whose content overflows its box (checked by shrinking the window or loading a long list). | screen (team); `docs/harmonization/scroll-audit.md` |
+
+## Verified at review (not checked by the browser walk)
+
+Reviewers check these in the diff, not the checker:
+
+- H-58 is implemented by adding an entry to the exported `NAV_ITEMS` in `artifacts/frontend/src/components/AppShell.tsx`.
+- The shell (`AppShell.tsx`), the scroll utilities and `ScrollArea`, and `lib/sankey.ts` are used unchanged from this branch.
+- A harmonization screen is not required to show a Sankey. If a team's screen includes one, it must use the shared Sankey component with the user's selected vocabularies.
+- Id H-35 is unused (withdrawn); ids were not renumbered.
 
 ## Pending owner decision (not part of the gate until resolved)
 
@@ -144,6 +152,7 @@ These are not gate lines. They have no backing yet. They join the gate only when
 | P-01 | Harmonize two finished mapping jobs, with a link-by-name control. | No route exists. Stored mapping results lack fields the package needs. |
 | P-02 | Load the built-in example from the screen. | `POST /harmonize/example` exists but answers 400 "The example dataset is not installed." No example data is committed yet. |
 | P-03 | Any many-cohort check that needs a recorded many-cohort run on real panel metadata. | The many-cohort routes exist and H-02, H-10 and the many-cohort lines are gate lines, but test data for them is not yet available. Until it is, they are checked against the replay backend's synthetic three-cohort run. |
+| P-04 | Many-cohort "remap all" having an observable effect. | Each run has its own store, so remap all has no earlier mappings to reuse and its effect cannot be seen. Whether runs should share a per-user store is an owner decision. H-10 stays as "the option exists and the run starts". |
 
 ## Gaps found
 
