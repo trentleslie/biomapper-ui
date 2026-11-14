@@ -18,6 +18,8 @@ import {
   guessKeyColumn,
   guessNameColumn,
   guessVocabulary,
+  headerColumns,
+  headerProblems,
   hasResults,
   identifierSkippedReason,
   itemSummary,
@@ -243,5 +245,17 @@ describe("items and exports", () => {
     expect(tableApplies("links", "harmonize_many")).toBe(false);
     expect(tableApplies("review", "harmonize_many")).toBe(true);
     expect(tableApplies("links", "harmonize_results")).toBe(true);
+  });
+
+  it("offers only header columns the server can address: no blank names, and a repeated name once (its last column)", () => {
+    const cols = headerColumns(["", "name", "id", "id"]);
+    expect(cols.map((c) => c.display)).toEqual(["(unnamed column 1)", "name", "id (column 3)", "id"]);
+    expect(cols.filter((c) => c.usable).map((c) => c.name)).toEqual(["name", "id"]);
+    expect(cols[3].index).toBe(3);
+    expect(headerProblems(["", "name", "id", "id"])).toEqual([
+      "Column 1 has no name, so it cannot be chosen.",
+      "'id' names 2 columns. biomapper reads only the last of them (column 4).",
+    ]);
+    expect(headerProblems(["name", "hmdb"])).toEqual([]);
   });
 });

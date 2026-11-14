@@ -6,13 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import type { CohortDraft } from "@/lib/harmonize";
-import { plural } from "@/lib/harmonize";
+import type { CohortDraft, HeaderColumn } from "@/lib/harmonize";
+import { headerColumns, headerProblems, plural } from "@/lib/harmonize";
 
 const NONE = "__none__";
 
 export interface InspectState {
   status: "idle" | "loading" | "ok" | "error";
+  /** The header as the file has it, blanks and repeats included. */
+  header: string[];
+  /** The columns that can be chosen: named, and for a repeated name only its last column. */
   columns: string[];
   rowCount: number | null;
   error: string | null;
@@ -26,7 +29,13 @@ export interface CohortSlot {
   labelTouched: boolean;
 }
 
-export const EMPTY_INSPECT: InspectState = { status: "idle", columns: [], rowCount: null, error: null };
+export const EMPTY_INSPECT: InspectState = { status: "idle", header: [], columns: [], rowCount: null, error: null };
+
+/** An inspect answer as the editor keeps it: the raw header, and the columns that can be chosen. */
+export function inspectOk(header: string[], rowCount: number): InspectState {
+  const columns = headerColumns(header).filter((c) => c.usable).map((c) => c.name);
+  return { status: "ok", header, columns, rowCount, error: null };
+}
 
 /** A file chooser that also takes a dropped file. Any file type is passed on; the server says what it accepts. */
 export function FilePick({
@@ -74,6 +83,7 @@ function ColumnSelect({
   id,
   value,
   columns,
+  unusable = [],
   onChange,
   optional,
   placeholder,
@@ -82,6 +92,7 @@ function ColumnSelect({
   id: string;
   value: string;
   columns: string[];
+  unusable?: HeaderColumn[];
   onChange: (v: string) => void;
   optional?: boolean;
   placeholder: string;
@@ -98,6 +109,11 @@ function ColumnSelect({
         {columns.map((c) => (
           <SelectItem key={c} value={c}>
             {c}
+          </SelectItem>
+        ))}
+        {unusable.map((c) => (
+          <SelectItem key={`unusable-${c.index}`} value={`__unusable_${c.index}__`} disabled>
+            {c.display}: {c.reason}
           </SelectItem>
         ))}
         {missing && (
@@ -135,6 +151,8 @@ export function CohortEditor({
   const uid = useId();
   const { inspect, draft } = slot;
   const columns = inspect.columns;
+  const unusable = headerColumns(inspect.header).filter((c) => !c.usable);
+  const problems = headerProblems(inspect.header);
   const identifierColumns = columns.filter((c) => c !== draft.nameColumn);
   const missingVocabColumns = Object.keys(draft.vocabByColumn).filter((c) => draft.vocabByColumn[c] && !columns.includes(c));
   const listId = `${uid}-vocabs`;
@@ -170,8 +188,16 @@ export function CohortEditor({
                 )}
                 {inspect.status === "ok" && (
                   <p className="text-xs text-neutral-500" data-testid="inspect-summary">
-                    {plural(inspect.rowCount ?? 0, "row")}, {plural(columns.length, "column")}: {columns.join(", ")}
+                    {plural(inspect.rowCount ?? 0, "row")}, {plural(inspect.header.length, "column")}:{" "}
+                    {headerColumns(inspect.header).map((c) => c.display).join(", ")}
                   </p>
+                )}
+                {inspect.status === "ok" && problems.length > 0 && (
+                  <ul className="mt-1 space-y-0.5 text-xs text-warning" data-testid="header-problems">
+                    {problems.map((p) => (
+                      <li key={p}>{p}</li>
+                    ))}
+                  </ul>
                 )}
               </div>
             </div>
@@ -205,6 +231,7 @@ export function CohortEditor({
               ariaLabel={`Name column for ${title}`}
               value={draft.nameColumn}
               columns={columns}
+              unusable={unusable}
               placeholder={columns.length ? "Pick a column" : "Choose a file first"}
               onChange={(v) => {
                 const vocab = { ...draft.vocabByColumn };
@@ -223,6 +250,7 @@ export function CohortEditor({
               ariaLabel={`Key column for ${title}`}
               value={draft.keyColumn}
               columns={columns}
+              unusable={unusable}
               optional
               placeholder="No key column"
               onChange={(v) => onChange({ ...draft, keyColumn: v })}

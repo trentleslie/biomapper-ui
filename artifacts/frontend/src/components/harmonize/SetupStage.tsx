@@ -35,7 +35,7 @@ import {
   prefillDraft,
   type CohortDraft,
 } from "@/lib/harmonize";
-import { CohortEditor, EMPTY_INSPECT, FilePick, type CohortSlot } from "./CohortEditor";
+import { CohortEditor, EMPTY_INSPECT, FilePick, inspectOk, type CohortSlot } from "./CohortEditor";
 import { Note, Panel } from "./common";
 import { stageHref } from "./StageRail";
 
@@ -100,19 +100,21 @@ export function SetupStage() {
       draft: s.labelTouched ? s.draft : { ...s.draft, label: distinctLabel(labelFromFilename(file.name), takenLabels) },
     }));
     inspectHarmonizeFile({ file }).then(
-      (res) =>
+      (res) => {
+        const inspect = inspectOk(res.columns, res.rowCount);
         updateSlot(setter, id, (s) =>
           s.file !== file
             ? s
             : {
                 ...s,
-                inspect: { status: "ok", columns: res.columns, rowCount: res.rowCount, error: null },
-                draft: prefillDraft(s.draft, res.columns, vocabSuggestions, s.inspect.columns.length === 0 && !s.draft.nameColumn),
+                inspect,
+                draft: prefillDraft(s.draft, inspect.columns, vocabSuggestions, s.inspect.columns.length === 0 && !s.draft.nameColumn),
               },
-        ),
+        );
+      },
       (err) =>
         updateSlot(setter, id, (s) =>
-          s.file !== file ? s : { ...s, inspect: { status: "error", columns: [], rowCount: null, error: errorMessage(err) } },
+          s.file !== file ? s : { ...s, inspect: { status: "error", header: [], columns: [], rowCount: null, error: errorMessage(err) } },
         ),
     );
   };

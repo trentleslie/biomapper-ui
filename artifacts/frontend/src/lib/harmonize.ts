@@ -198,6 +198,54 @@ export function errorStatus(err: unknown): number | null {
 // Cohort setup
 // ---------------------------------------------------------------------------
 
+export interface HeaderColumn {
+  /** 0-based position in the header. */
+  index: number;
+  name: string;
+  /** What the screen shows for this column. */
+  display: string;
+  /** Whether the column can be chosen: the server can address it by this name. */
+  usable: boolean;
+  reason: string | null;
+}
+
+/**
+ * The header's columns as the screen offers them. The package reads rows with csv.DictReader, so a repeated name
+ * reads only the last column with that name, and the screen uses a blank value to mean "no column". So a blank
+ * name cannot be chosen, and of a repeated name only the last column can be (sent under its own name).
+ */
+export function headerColumns(header: string[]): HeaderColumn[] {
+  const lastIndex = new Map<string, number>();
+  header.forEach((name, i) => lastIndex.set(name, i));
+  return header.map((name, index) => {
+    if (name.trim() === "") {
+      return { index, name, display: `(unnamed column ${index + 1})`, usable: false, reason: "has no name" };
+    }
+    if (lastIndex.get(name) !== index) {
+      return { index, name, display: `${name} (column ${index + 1})`, usable: false, reason: "repeated name, not read" };
+    }
+    return { index, name, display: name, usable: true, reason: null };
+  });
+}
+
+/** Sentences about the header's blank and repeated names, for the inspect summary. Empty when there are none. */
+export function headerProblems(header: string[]): string[] {
+  const out: string[] = [];
+  header.forEach((name, i) => {
+    if (name.trim() === "") out.push(`Column ${i + 1} has no name, so it cannot be chosen.`);
+  });
+  const counts = new Map<string, number[]>();
+  header.forEach((name, i) => {
+    if (name.trim() !== "") counts.set(name, [...(counts.get(name) ?? []), i]);
+  });
+  for (const [name, idx] of counts) {
+    if (idx.length > 1) {
+      out.push(`'${name}' names ${idx.length} columns. biomapper reads only the last of them (column ${idx[idx.length - 1] + 1}).`);
+    }
+  }
+  return out;
+}
+
 /** A label the package accepts: letters, digits, '.', '-' and '_'. */
 export function labelFromFilename(filename: string): string {
   const stem = filename.replace(/\.[^.]+$/, "");

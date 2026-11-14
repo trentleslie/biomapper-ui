@@ -363,4 +363,42 @@ test.describe("harmonize @app", () => {
     await expect(page.getByTestId("submit-error")).toContainText("The two jobs map different entity types (biolink:SmallMolecule and biolink:Protein).");
     expect(fromJobs).toEqual({ jobA: "job-a", jobB: "job-b", aLabel: "Panel_A", bLabel: "Panel_B", linkByName: true });
   });
+
+  test("a header with a blank and a repeated column name: the screen stays up and says which columns cannot be chosen", async ({ page }) => {
+    let submitted = "";
+    await isolate(page, {
+      "/api/harmonize/runs": [],
+      "/api/harmonize/inspect": { columns: ["", "name", "id", "id"], rowCount: 3 },
+      "/api/harmonize/cohorts": async (route: Route) => {
+        submitted = route.request().postDataBuffer()?.toString() ?? "";
+        return route.fulfill({ status: 400, json: { detail: "stop here" } });
+      },
+    });
+    await goto(page, "/harmonize");
+    const csv = (name: string) => ({ name, mimeType: "text/csv", buffer: Buffer.from(",name,id,id\n0,Glucose,1,2\n") });
+    await page.getByLabel("Choose file for Cohort A", { exact: true }).first().setInputFiles(csv("a.csv"));
+    await expect(page.getByRole("heading", { name: "Harmonize cohorts", level: 1 })).toBeVisible();
+    const summary = page.getByTestId("inspect-summary").first();
+    await expect(summary).toContainText("3 rows, 4 columns: (unnamed column 1), name, id (column 3), id");
+    await expect(page.getByTestId("header-problems").first()).toContainText("Column 1 has no name");
+    await expect(page.getByTestId("header-problems").first()).toContainText("'id' names 2 columns");
+    await expect(page.getByRole("combobox", { name: "Name column for Cohort A" })).toHaveText("name");
+    await page.getByRole("combobox", { name: "Key column for Cohort A" }).click();
+    await expect(page.getByRole("option")).toHaveText([
+      "No key column",
+      "name",
+      "id",
+      "(unnamed column 1): has no name",
+      "id (column 3): repeated name, not read",
+    ]);
+    await expect(page.getByRole("option", { name: "(unnamed column 1): has no name" })).toHaveAttribute("aria-disabled", "true");
+    await page.getByRole("option", { name: "id", exact: true }).click();
+    await page.getByLabel("Choose file for Cohort B", { exact: true }).first().setInputFiles(csv("b.csv"));
+    await expect(page.getByTestId("inspect-summary").nth(1)).toBeVisible();
+    await page.getByRole("button", { name: "Start harmonization" }).click();
+    await expect(page.getByTestId("submit-error")).toContainText("stop here");
+    expect(submitted).toContain('"nameColumn":"name"');
+    expect(submitted).toContain('"keyColumn":"id"');
+    expect(submitted).not.toContain('"nameColumn":""');
+  });
 });
