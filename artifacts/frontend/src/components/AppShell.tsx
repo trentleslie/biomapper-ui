@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { useRoute, Link, useLocation } from "wouter";
 import { useUser, useClerk } from "@clerk/react";
-import { UploadCloud, BarChart3, List, Flag, Target, LogOut, type LucideIcon } from "lucide-react";
+import { UploadCloud, BarChart3, List, Flag, Target, LogOut, GitMerge, type LucideIcon } from "lucide-react";
 import { useListJobs, getListJobsQueryKey } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EnvToggle } from "@/components/EnvToggle";
@@ -29,6 +29,12 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/",
     icon: UploadCloud,
     isActive: (location) => location === "/" || location === "/upload",
+  },
+  {
+    label: "Harmonize cohorts",
+    href: "/harmonize",
+    icon: GitMerge,
+    isActive: (location) => location === "/harmonize" || location.startsWith("/harmonize/"),
   },
   {
     label: "Benchmark",
