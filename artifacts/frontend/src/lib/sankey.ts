@@ -37,8 +37,14 @@ const ALL_NODES: SankeyNode[] = [
 export function buildSankeyData(
   summary: MappingSummary,
   results: MappingResult[],
-  includeVocabLayer: boolean = false
+  includeVocabLayer: boolean = false,
+  selectedVocabs?: ReadonlySet<string>
 ): SankeyData {
+  // Compare on the lowercased CURIE prefix. Empty/undefined => every vocabulary present.
+  const wanted =
+    selectedVocabs && selectedVocabs.size > 0
+      ? new Set(Array.from(selectedVocabs, v => v.toLowerCase()))
+      : null;
   const unresolved = summary.uniqueNames - summary.resolved;
   const { high, medium, low, unknown: unknownCount } = summary.confidenceTierDistribution;
 
@@ -78,8 +84,11 @@ export function buildSankeyData(
       const tier = result.confidenceTier || 'unknown';
       if (!result.identifiers) continue;
 
-      for (const [vocab, ids] of Object.entries(result.identifiers)) {
+      for (const [rawVocab, ids] of Object.entries(result.identifiers)) {
         if (!ids || ids.length === 0) continue;
+        // Prefixes differing only by case are one vocabulary.
+        const vocab = rawVocab.toUpperCase();
+        if (wanted && !wanted.has(vocab.toLowerCase())) continue;
         if (!vocabByTier[tier]) vocabByTier[tier] = {};
         vocabByTier[tier][vocab] = (vocabByTier[tier][vocab] || 0) + 1;
       }
@@ -93,7 +102,7 @@ export function buildSankeyData(
     }
 
     for (const vocab of Array.from(allVocabs).sort()) {
-      nodes.push({ id: `vocab_${vocab}`, label: vocab.toUpperCase(), color: '#113682' });
+      nodes.push({ id: `vocab_${vocab}`, label: vocab, color: '#113682' });
     }
     for (const [tier, counts] of Object.entries(vocabByTier)) {
       const tierId = tier === 'unknown' ? 'unknown_tier' : tier;

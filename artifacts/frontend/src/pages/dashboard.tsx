@@ -757,7 +757,7 @@ export default function DashboardPage() {
                   <CardDescription>Resolution flow from input names to confidence tiers</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <SankeyChart summary={summary} results={results} includeVocabLayer={true} />
+                  <SankeyChart summary={summary} results={results} includeVocabLayer={true} selectedVocabs={visibleOntologies} />
                 </CardContent>
               </Card>
 

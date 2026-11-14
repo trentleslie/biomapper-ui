@@ -6,10 +6,12 @@ interface SankeyChartProps {
   summary: MappingSummary;
   results: MappingResult[];
   includeVocabLayer?: boolean;
+  /** Vocabularies selected for output (CURIE prefixes, any case). Empty/undefined shows every vocabulary present. */
+  selectedVocabs?: ReadonlySet<string>;
 }
 
-export function SankeyChart({ summary, results, includeVocabLayer = false }: SankeyChartProps) {
-  const data = buildSankeyData(summary, results, includeVocabLayer);
+export function SankeyChart({ summary, results, includeVocabLayer = false, selectedVocabs }: SankeyChartProps) {
+  const data = buildSankeyData(summary, results, includeVocabLayer, selectedVocabs);
 
   return (
     <div style={{ height: 400 }} data-testid="chart-sankey-funnel">
