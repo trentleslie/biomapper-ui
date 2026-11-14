@@ -18,6 +18,7 @@ import {
   armLabel,
   asArray,
   asObject,
+  certificateGloss,
   cohortCounts,
   errorMessage,
   excludedRows,
@@ -25,6 +26,7 @@ import {
   identifierSkippedReason,
   isMany,
   nameLinking,
+  num,
   pinRows,
   plural,
   reportLabels,
@@ -34,9 +36,23 @@ import {
   type Arm,
   type Json,
 } from "@/lib/harmonize";
-import { DataTable, EmptyState, ErrorPanel, LoadingBlock, Mono, Note, Pager, Panel, Stat, TABLE_PAGE, Untrusted } from "./common";
+import { DataTable, EmptyState, ErrorPanel, Glossary, LoadingBlock, Mono, Note, Pager, Panel, Stat, TABLE_PAGE, Untrusted, type GlossaryKey } from "./common";
+import { FlaggedNow } from "./FlagItems";
 
 const fmt = (v: unknown) => (typeof v === "number" ? v.toLocaleString() : v == null ? "Not reported" : String(v));
+
+/** A count where a literal 0 reads "none" in a quieter tone, so the non-zero facts stand out. Missing stays "Not reported". */
+function Count({ value }: { value: unknown }) {
+  if (value === 0) return <span className="font-normal text-neutral-400">none</span>;
+  return <>{fmt(value)}</>;
+}
+
+// The package's basis order, strongest first (biomapper.harmonize.linking.BASIS_ORDER).
+const BASIS_ORDER = ["node", "identifier", "name_exact", "name_casefold"];
+const basisRank = (b: string) => (BASIS_ORDER.includes(b) ? BASIS_ORDER.indexOf(b) : BASIS_ORDER.length);
+
+const SUMMARY_TERMS_TWO: GlossaryKey[] = ["basis", "ambiguity", "withheld", "possibleMiss"];
+const SUMMARY_TERMS_MANY: GlossaryKey[] = ["multiplicity", "broad", "clean", "crossNode", "idCheck", "withheld", "status", "grade"];
 const yesNo = (v: unknown) => (v === true ? "Yes" : v === false ? "No" : "Not reported");
 
 // ---------------------------------------------------------------------------
@@ -95,20 +111,32 @@ function ArmCard({ report, arm, kind }: { report: Json; arm: Arm; kind: string }
         {kind === "harmonize_results"
           ? "The two jobs' rows as they were mapped in entity resolution."
           : arm === "names_only"
-            ? "Rows mapped by name only."
-            : "Rows mapped with their declared identifiers as hints."}
+            ? "Every row mapped by its name alone."
+            : many
+              ? "Rows that carry a code in a vocabulary every cohort declares, mapped again with it. Other rows keep their names-only result."
+              : "Rows that carry a code in a vocabulary both cohorts declare, mapped again with it. Other rows keep their names-only result."}
       </p>
       <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
         {stats.map(([label, value]) => (
-          <div key={label} className="rounded bg-neutral-50 px-3 py-2">
+          <div key={label} className={cn("rounded px-3 py-2", value === 0 ? "bg-white ring-1 ring-neutral-100" : "bg-neutral-50")}>
             <dt className="text-xs text-neutral-500">{label}</dt>
-            <dd className="text-base font-semibold tabular-nums text-neutral-900">{fmt(value)}</dd>
+            <dd className="text-base font-semibold tabular-nums text-neutral-900">
+              <Count value={value} />
+            </dd>
           </div>
         ))}
       </dl>
       {byBasis && (
-        <p className="mt-2 text-xs text-neutral-600">
-          Links by basis: {Object.entries(byBasis).map(([k, v]) => `${k} ${fmt(v)}`).join(", ")}
+        <p className="mt-2 text-xs text-neutral-600" data-testid="links-by-basis">
+          Links by basis:{" "}
+          {Object.entries(byBasis)
+            .sort(([x], [y]) => basisRank(x) - basisRank(y))
+            .map(([k, v], i) => (
+            <span key={k} className={cn(v === 0 && "text-neutral-400")}>
+              {i > 0 && ", "}
+              {k} {v === 0 ? "none" : fmt(v)}
+            </span>
+          ))}
         </p>
       )}
       <div className="mt-3">
@@ -128,7 +156,19 @@ function ArmCard({ report, arm, kind }: { report: Json; arm: Arm; kind: string }
   );
 }
 
-function DiffList({ title, entries, many }: { title: string; entries: unknown[]; many: boolean }) {
+function DiffList({
+  title,
+  entries,
+  many,
+  names,
+  labels,
+}: {
+  title: string;
+  entries: unknown[];
+  many: boolean;
+  names?: { a: Map<string, string | null>; b: Map<string, string | null> };
+  labels?: [string, string];
+}) {
   const [offset, setOffset] = useState(0);
   const start = offset < entries.length ? offset : 0;
   return (
@@ -156,10 +196,18 @@ function DiffList({ title, entries, many }: { title: string; entries: unknown[];
           <DataTable
             caption={title}
             maxHeight="max-h-48"
-            headers={["A key", "B key"]}
+            noun="links"
+            headers={[`${labels?.[0] ?? "A"} name`, `${labels?.[0] ?? "A"} key`, `${labels?.[1] ?? "B"} name`, `${labels?.[1] ?? "B"} key`]}
             rows={entries.map((e) => {
               const o = asObject(e) ?? {};
-              return [<Mono key="a">{String(o.a_key ?? "")}</Mono>, <Mono key="b">{String(o.b_key ?? "")}</Mono>];
+              const a = String(o.a_key ?? "");
+              const b = String(o.b_key ?? "");
+              return [
+                <Untrusted key="an" value={names?.a.get(a) ?? null} empty="Not in this report" />,
+                <Mono key="a">{a}</Mono>,
+                <Untrusted key="bn" value={names?.b.get(b) ?? null} empty="Not in this report" />,
+                <Mono key="b">{b}</Mono>,
+              ];
             })}
             empty="None."
           />
@@ -167,6 +215,21 @@ function DiffList({ title, entries, many }: { title: string; entries: unknown[];
       </div>
     </details>
   );
+}
+
+/** Each cohort row's name by key, from both arms' links, so lists of key pairs can show names. */
+function linkNames(report: Json): { a: Map<string, string | null>; b: Map<string, string | null> } {
+  const a = new Map<string, string | null>();
+  const b = new Map<string, string | null>();
+  for (const arm of ARMS) {
+    for (const l of asArray(armData(report, arm)?.links)) {
+      const ak = String(l.a_key ?? "");
+      const bk = String(l.b_key ?? "");
+      if (!a.get(ak)) a.set(ak, str(l.a_name));
+      if (!b.get(bk)) b.set(bk, str(l.b_name));
+    }
+  }
+  return { a, b };
 }
 
 export function SummaryView({ report, run }: { report: Json; run: HarmonizeRunStatus }) {
@@ -178,9 +241,17 @@ export function SummaryView({ report, run }: { report: Json; run: HarmonizeRunSt
   const warns = warnings(report);
   const excluded = excludedRows(report);
   const totalExcluded = excluded.reduce((n, e) => n + e.rows.length, 0);
+  const labels = reportLabels(report);
+  const pairNames = linkNames(report);
+  const bothRan = !!armData(report, "names_only") && !!armData(report, "identifier");
+  const agree =
+    diff && bothRan && diffCounts?.names_only_only === 0 && diffCounts?.identifier_only === 0 && (!many || !diffCounts?.membership_changed)
+      ? num(diffCounts?.both)
+      : null;
 
   return (
     <div className="space-y-6">
+      <FlaggedNow jobId={run.jobId} runKind={kind} />
       {many && (
         <div className="grid gap-3 sm:grid-cols-2" data-testid="many-status">
           <Stat label="Run status" value={String(report.status ?? "Not reported")} hint="ok, partial or failed, as the package reports it" />
@@ -192,7 +263,21 @@ export function SummaryView({ report, run }: { report: Json; run: HarmonizeRunSt
         </div>
       )}
 
-      <Panel id="arms" title="The two arms side by side" description={many ? "Groups of rows that share a knowledge graph node, per arm." : "Links between the two cohorts, per arm."}>
+      <Panel
+        id="arms"
+        title="The two arms side by side"
+        description={many ? "Groups of rows that share a knowledge graph node, per arm." : "Links between the two cohorts, per arm."}
+      >
+        <p className="mb-3 text-sm text-neutral-700" data-testid="arms-explained">
+          An arm is one way of mapping the rows. The names-only arm maps every row by its name alone. The identifier arm also
+          gives the mapper the identifier columns {many ? "every cohort declares" : "both cohorts declare"}, for the rows
+          that carry one; the other rows keep their names-only result.
+        </p>
+        {agree !== null && (
+          <p className="mb-3 rounded border border-success-border bg-success-bg px-3 py-2 text-sm text-success" data-testid="arms-agree">
+            Both arms found the same {plural(agree, many ? "group" : "link")}.
+          </p>
+        )}
         <div className="grid gap-4 lg:grid-cols-2">
           {ARMS.map((arm) => (
             <ArmCard key={arm} report={report} arm={arm} kind={kind} />
@@ -204,14 +289,14 @@ export function SummaryView({ report, run }: { report: Json; run: HarmonizeRunSt
         {diff ? (
           <div className="space-y-3" data-testid="arm-diff">
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <Stat label="Names-only arm only" value={fmt(diffCounts?.names_only_only)} />
-              <Stat label="Identifier arm only" value={fmt(diffCounts?.identifier_only)} />
-              <Stat label="Both arms" value={fmt(diffCounts?.both)} />
-              {many && <Stat label="Membership changed" value={fmt(diffCounts?.membership_changed)} />}
+              <Stat label="Names-only arm only" value={<Count value={diffCounts?.names_only_only} />} />
+              <Stat label="Identifier arm only" value={<Count value={diffCounts?.identifier_only} />} />
+              <Stat label="Both arms" value={<Count value={diffCounts?.both} />} />
+              {many && <Stat label="Membership changed" value={<Count value={diffCounts?.membership_changed} />} />}
             </div>
-            <DiffList title="Found only by the names-only arm" entries={asArray(diff.names_only_only)} many={many} />
-            <DiffList title="Found only by the identifier arm" entries={asArray(diff.identifier_only)} many={many} />
-            <DiffList title="Found by both arms" entries={asArray(diff.both)} many={many} />
+            <DiffList title="Found only by the names-only arm" entries={asArray(diff.names_only_only)} many={many} names={pairNames} labels={[labels[0] ?? "A", labels[1] ?? "B"]} />
+            <DiffList title="Found only by the identifier arm" entries={asArray(diff.identifier_only)} many={many} names={pairNames} labels={[labels[0] ?? "A", labels[1] ?? "B"]} />
+            <DiffList title="Found by both arms" entries={asArray(diff.both)} many={many} names={pairNames} labels={[labels[0] ?? "A", labels[1] ?? "B"]} />
             {many && <DiffList title="Groups whose membership changed" entries={asArray(diff.membership_changed)} many />}
           </div>
         ) : (
@@ -276,6 +361,8 @@ export function SummaryView({ report, run }: { report: Json; run: HarmonizeRunSt
         </Panel>
       </div>
 
+      <Glossary terms={many ? SUMMARY_TERMS_MANY : SUMMARY_TERMS_TWO} />
+
       <Panel id="pins" title="Version pins" description="What produced these results.">
         <dl className="grid gap-x-6 gap-y-2 text-sm md:grid-cols-2" data-testid="pins">
           {pinRows(report, run).map((p) => (
@@ -334,12 +421,17 @@ function TwoCohortArm({ data, report, arm }: { data: Json; report: Json; arm: Ar
           testId="links-table"
           noun="links"
           maxHeight="max-h-96"
-          headers={[`${la} key`, `${la} name`, `${lb} key`, `${lb} name`, "Type", "Basis", `${la} partners`, `${lb} partners`, "Node"]}
+          headers={[`${la} with ${lb}`, "Type", "Basis", `${la} partners`, `${lb} partners`, "Node"]}
           rows={links.map((l) => [
-            <Mono key="ak">{String(l.a_key ?? "")}</Mono>,
-            <Untrusted key="an" value={str(l.a_name) ?? str(l.a_key)} />,
-            <Mono key="bk">{String(l.b_key ?? "")}</Mono>,
-            <Untrusted key="bn" value={str(l.b_name) ?? str(l.b_key)} />,
+            <div key="pair">
+              <span className="text-neutral-900">
+                <Untrusted value={str(l.a_name) ?? str(l.a_key)} /> <span className="text-neutral-500">with</span>{" "}
+                <Untrusted value={str(l.b_name) ?? str(l.b_key)} />
+              </span>
+              <span className="block text-xs text-neutral-500">
+                <Mono>{String(l.a_key ?? "")}</Mono> / <Mono>{String(l.b_key ?? "")}</Mono>
+              </span>
+            </div>,
             l.ambiguous === true ? <Badge key="t" variant="warning">Ambiguous</Badge> : l.one_to_one === true ? <Badge key="t" variant="success">One-to-one</Badge> : "Other",
             String(l.basis ?? "Not reported"),
             fmt(l.a_partners),
@@ -510,6 +602,7 @@ export function ArmResultsView({ report, kind }: { report: Json; kind: string })
       ) : (
         <TwoCohortArm data={data} report={report} arm={arm} />
       )}
+      <Glossary terms={isMany(kind) ? SUMMARY_TERMS_MANY.filter((t) => t !== "status" && t !== "grade") : SUMMARY_TERMS_TWO} />
     </div>
   );
 }
@@ -541,7 +634,17 @@ function SideBlock({ title, side }: { title: string; side: HarmonizeSideDetail |
         </div>
         <div>
           <dt className="text-xs text-neutral-500">Certificate states</dt>
-          <dd>{Object.entries(side.certificateStates ?? {}).map(([k, v]) => `${k} ${v}`).join(", ") || "None recorded"}</dd>
+          <dd>
+            {Object.entries(side.certificateStates ?? {}).map(([k, v]) => `${k} ${v}`).join(", ") || "None recorded"}
+            {Array.from(new Set(Object.values(side.certificateStates ?? {})))
+              .map((st) => certificateGloss(String(st)))
+              .filter(Boolean)
+              .map((g) => (
+                <span key={g} className="block text-xs text-neutral-600" data-testid="certificate-gloss">
+                  {g}
+                </span>
+              ))}
+          </dd>
         </div>
         <div>
           <dt className="text-xs text-neutral-500">Identifiers</dt>
@@ -565,7 +668,27 @@ function SideBlock({ title, side }: { title: string; side: HarmonizeSideDetail |
   );
 }
 
-function ReviewItemDetail({ jobId, refId, onClose }: { jobId: string; refId: string | null; onClose: () => void }) {
+function CertificateLine({ state }: { state: string | null | undefined }) {
+  const gloss = certificateGloss(state);
+  return (
+    <>
+      {state ?? "None sent by the engine"}
+      {gloss && <span className="block text-xs text-neutral-600" data-testid="certificate-gloss">{gloss}</span>}
+    </>
+  );
+}
+
+function ReviewItemDetail({
+  jobId,
+  refId,
+  reasons,
+  onClose,
+}: {
+  jobId: string;
+  refId: string | null;
+  reasons: string[];
+  onClose: () => void;
+}) {
   const q = useGetHarmonizeReviewItem(jobId, refId ?? "", {
     query: { queryKey: getGetHarmonizeReviewItemQueryKey(jobId, refId ?? ""), enabled: !!refId },
   });
@@ -588,12 +711,26 @@ function ReviewItemDetail({ jobId, refId, onClose }: { jobId: string; refId: str
                 <Badge variant="neutral">{d.kind === "link" ? "Link" : "Row"}</Badge>
                 <span className="ml-2 text-xs text-neutral-500">Impact {d.impact}</span>
               </p>
+              {(reasons.length > 0 || (d.link?.reviewReasons?.length ?? 0) > 0) && (
+                <div className="rounded border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm" data-testid="review-item-why">
+                  <p className="text-xs text-neutral-500">Why biomapper lists it</p>
+                  <p className="text-neutral-900">
+                    {Array.from(new Set([...reasons, ...(d.link?.reviewReasons ?? [])])).map(humanize).join(", ")}
+                  </p>
+                </div>
+              )}
+              {d.link?.question && (
+                <Note tone="info" quiet title="Question to ask">
+                  {d.link.question}
+                </Note>
+              )}
+              {d.note && <p className="text-sm text-neutral-700">{d.note}</p>}
               {d.row && (
                 <dl className="space-y-2 text-sm">
                   <div><dt className="text-xs text-neutral-500">Name</dt><dd><Untrusted value={d.row.name} /></dd></div>
                   <div><dt className="text-xs text-neutral-500">Why it is here</dt><dd>{d.row.weakTrigger ? humanize(d.row.weakTrigger) : "Not given"}</dd></div>
                   <div><dt className="text-xs text-neutral-500">Engine's choice</dt><dd><Mono>{d.row.engineChoice ?? "None: the engine chose no node"}</Mono></dd></div>
-                  <div><dt className="text-xs text-neutral-500">Certificate state</dt><dd>{d.row.certificateState ?? "None sent by the engine"}</dd></div>
+                  <div><dt className="text-xs text-neutral-500">Certificate state</dt><dd><CertificateLine state={d.row.certificateState} /></dd></div>
                   <div>
                     <dt className="text-xs text-neutral-500">Candidates</dt>
                     <dd>
@@ -606,15 +743,9 @@ function ReviewItemDetail({ jobId, refId, onClose }: { jobId: string; refId: str
               )}
               {d.link && (
                 <div className="space-y-3">
-                  {d.link.question && (
-                    <Note tone="info" title="Question to ask">
-                      {d.link.question}
-                    </Note>
-                  )}
                   <p className="text-sm text-neutral-700">
                     Basis {d.link.basis ?? "not reported"}
                     {d.link.bases?.length ? ` (all bases: ${d.link.bases.join(", ")})` : ""}
-                    {d.link.reviewReasons?.length ? `. Flagged because: ${d.link.reviewReasons.map(humanize).join(", ")}` : ""}
                   </p>
                   <div className="grid gap-3">
                     <SideBlock title="Side A" side={d.link.a} />
@@ -622,7 +753,6 @@ function ReviewItemDetail({ jobId, refId, onClose }: { jobId: string; refId: str
                   </div>
                 </div>
               )}
-              {d.note && <p className="text-xs text-neutral-500">{d.note}</p>}
             </>
           )}
         </div>
@@ -634,6 +764,7 @@ function ReviewItemDetail({ jobId, refId, onClose }: { jobId: string; refId: str
 export function ReviewQueueView({ report, run }: { report: Json; run: HarmonizeRunStatus }) {
   const [offset, setOffset] = useState(0);
   const [openRef, setOpenRef] = useState<string | null>(null);
+  const [openReasons, setOpenReasons] = useState<string[]>([]);
   const params = { offset, limit: REVIEW_PAGE };
   const q = useListHarmonizeReviewItems(run.jobId, params, {
     query: { queryKey: getListHarmonizeReviewItemsQueryKey(run.jobId, params) },
@@ -691,7 +822,7 @@ export function ReviewQueueView({ report, run }: { report: Json; run: HarmonizeR
       <Panel
         id="review-items"
         title="Review items"
-        description="Rows and links biomapper wants a person to look at. Open one to see the engine's choice and evidence."
+        description="The evidence biomapper captured for rows and links a person should look at. This is a separate list from the flag items. Open one to see the engine's choice and why it is here."
       >
         {q.isLoading ? (
           <LoadingBlock label="Loading review items" />
@@ -709,7 +840,7 @@ export function ReviewQueueView({ report, run }: { report: Json; run: HarmonizeR
           />
         ) : (
           <div className="space-y-3">
-            <p className="text-sm text-neutral-600">
+            <p className="text-sm text-neutral-600" data-testid="review-items-total">
               {plural(q.data.total, "review item")}
               {Object.keys(q.data.counts ?? {}).length > 0 &&
                 ` (${Object.entries(q.data.counts).map(([k, v]) => `${v} ${k}${v === 1 ? "" : "s"}`).join(", ")})`}
@@ -734,7 +865,10 @@ export function ReviewQueueView({ report, run }: { report: Json; run: HarmonizeR
                       <td className="px-3 py-2">{it.cohorts.join(", ")}</td>
                       <td className="px-3 py-2 tabular-nums">{it.nRows}</td>
                       <td className="px-3 py-2 text-right">
-                        <Button size="sm" variant="secondary" onClick={() => setOpenRef(it.ref)} aria-label={`Open review item ${it.label}`}>
+                        <Button size="sm" variant="secondary" onClick={() => {
+                            setOpenRef(it.ref);
+                            setOpenReasons(it.reasons);
+                          }} aria-label={`Open review item ${it.label}`}>
                           Open <ChevronRight aria-hidden />
                         </Button>
                       </td>
@@ -747,7 +881,8 @@ export function ReviewQueueView({ report, run }: { report: Json; run: HarmonizeR
           </div>
         )}
       </Panel>
-      <ReviewItemDetail jobId={run.jobId} refId={openRef} onClose={() => setOpenRef(null)} />
+      <Glossary terms={isTwo ? ["oneSided", "certificate"] : ["certificate"]} />
+      <ReviewItemDetail jobId={run.jobId} refId={openRef} reasons={openReasons} onClose={() => setOpenRef(null)} />
     </div>
   );
 }

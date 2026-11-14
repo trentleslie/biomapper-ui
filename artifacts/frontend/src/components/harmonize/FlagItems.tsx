@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { keepPreviousData, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQueries, useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, Loader2, RotateCcw } from "lucide-react";
 import {
   bulkHarmonizeFlags,
   getListHarmonizeItemsQueryKey,
+  listHarmonizeItems,
   resetHarmonizeFlags,
   setHarmonizeFlags,
   useListHarmonizeItems,
@@ -30,8 +31,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-import { ITEM_KIND_LABEL, armLabel, errorMessage, humanize, itemSummary, originLabel, plural } from "@/lib/harmonize";
-import { EmptyState, ErrorPanel, LoadingBlock, Mono, Note, Pager, Panel, Untrusted } from "./common";
+import { ITEM_KIND_LABEL, armLabel, errorMessage, humanize, itemSummary, kindCounts, originLabel, plural, suggestionReason } from "@/lib/harmonize";
+import { EmptyState, ErrorPanel, Glossary, LoadingBlock, Mono, Note, Pager, Panel, Untrusted, type GlossaryKey } from "./common";
 
 const PAGE = 100;
 const ANY = "any";
@@ -43,6 +44,51 @@ export async function invalidateFlagQueries(queryClient: ReturnType<typeof useQu
     queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === itemsKey }),
     queryClient.invalidateQueries({ queryKey: ["harmonize-eitl-preview", jobId] }),
   ]);
+}
+
+/** The item kinds a run of this kind has, in the order the screen lists them. */
+function kindsFor(runKind: string): string[] {
+  return runKind === "harmonize_many" ? ["group", "review", "unresolved"] : ["link", "review", "unresolved"];
+}
+
+/**
+ * Items flagged now, by kind: one items query per kind (flagged=true, limit 1), read for its total. These are the
+ * current flags (biomapper's suggestion plus any organizer change), not biomapper's suggestion alone.
+ */
+export function useFlaggedByKind(jobId: string, runKind: string) {
+  const kinds = kindsFor(runKind);
+  const results = useQueries({
+    queries: kinds.map((k) => {
+      const params: ListHarmonizeItemsParams = { kind: k as HarmonizeItemKind, flagged: true, limit: 1 };
+      return { queryKey: getListHarmonizeItemsQueryKey(jobId, params), queryFn: () => listHarmonizeItems(jobId, params) };
+    }),
+  });
+  const done = results.every((r) => r.data);
+  return {
+    counts: done ? kinds.map((k, i) => [k, results[i].data!.total] as [string, number]) : null,
+    isError: results.some((r) => r.isError && !r.data),
+  };
+}
+
+/** States that biomapper has already set the flags, and what is flagged now, by kind. */
+export function FlaggedNow({ jobId, runKind, className }: { jobId: string; runKind: string; className?: string }) {
+  const { counts, isError } = useFlaggedByKind(jobId, runKind);
+  const listed = counts ? kindCounts(counts) : null;
+  return (
+    <Note tone="info" quiet title="biomapper has already flagged what an expert should check" className={className} testId="flagged-now">
+      {runKind === "harmonize_many"
+        ? "Every review entry and every group with multiplicity starts flagged. "
+        : "Every review entry and every ambiguous link starts flagged. "}
+      {isError
+        ? "The flagged counts did not load. "
+        : !counts
+          ? "Counting the flagged items. "
+          : listed
+            ? `Flagged now: ${listed}. `
+            : "Nothing is flagged now. "}
+      You only need to add or remove flags where you disagree.
+    </Note>
+  );
 }
 
 function FilterSelect({
@@ -103,6 +149,7 @@ function SourceBadge({ source }: { source: string }) {
 }
 
 function ItemDetailSheet({ item, onClose }: { item: HarmonizeItem | null; onClose: () => void }) {
+  const shared = item && Array.isArray(item.detail.sharedIdentifiers) ? (item.detail.sharedIdentifiers as string[]) : [];
   return (
     <Sheet open={!!item} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="w-full overflow-y-auto scroll-visible sm:max-w-xl">
@@ -118,9 +165,20 @@ function ItemDetailSheet({ item, onClose }: { item: HarmonizeItem | null; onClos
               <p>
                 {item.flagged ? <Badge variant="warning">Flagged</Badge> : <Badge variant="neutral">Not flagged</Badge>}{" "}
                 <span className="ml-1 text-xs text-neutral-500">
-                  Flag state from <SourceBadge source={item.source} />. biomapper {item.suggested ? "suggests flagging it" : "does not suggest flagging it"}.
+                  Flag state from <SourceBadge source={item.source} />.
                 </span>
               </p>
+              <p className="rounded border border-neutral-200 bg-neutral-50 px-3 py-2 text-neutral-800" data-testid="item-suggestion">
+                {suggestionReason(item.kind, item.suggested, item.detail)}
+              </p>
+              {item.members.length === 2 && (
+                <p className="text-neutral-900" data-testid="item-pair">
+                  <Untrusted value={item.members[0].name} empty={item.members[0].key} />{" "}
+                  <span className="text-neutral-500">({item.members[0].cohort})</span> with{" "}
+                  <Untrusted value={item.members[1].name} empty={item.members[1].key} />{" "}
+                  <span className="text-neutral-500">({item.members[1].cohort})</span>
+                </p>
+              )}
               <section>
                 <h3 className="mb-1 text-xs font-medium uppercase tracking-wider text-neutral-500">Members ({item.members.length})</h3>
                 <div className="scroll-visible max-h-64 rounded border border-neutral-200">
@@ -160,15 +218,13 @@ function ItemDetailSheet({ item, onClose }: { item: HarmonizeItem | null; onClos
                       </div>
                     ))}
                 </dl>
-                {Array.isArray(item.detail.sharedIdentifiers) && item.detail.sharedIdentifiers.length > 0 && (
-                  <details className="mt-2">
-                    <summary className="cursor-pointer text-xs text-neutral-600">
-                      Shared identifiers ({item.detail.sharedIdentifiers.length})
-                    </summary>
+                {shared.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs text-neutral-500">Identifiers both rows share ({shared.length})</p>
                     <div className="scroll-visible mt-1 max-h-40 rounded border border-neutral-100 p-2">
-                      <Mono>{(item.detail.sharedIdentifiers as string[]).join(", ")}</Mono>
+                      <Mono>{shared.join(", ")}</Mono>
                     </div>
-                  </details>
+                  </div>
                 )}
               </section>
             </div>
@@ -272,7 +328,7 @@ export function FlagItemsView({ jobId, kind }: { jobId: string; kind: string }) 
       <Panel
         id="flag-items"
         title="Flag items for expert review"
-        description="biomapper has already flagged every review entry, every ambiguous link and every group with multiplicity. Flag or clear any item; your choice shows as Organizer."
+        description="Flagged links and groups become the pairs file for expert-in-the-loop (EITL), the expert review app. Flag or clear any item; your choice shows as Organizer."
         actions={
           <Button variant="secondary" size="sm" onClick={() => setConfirmReset(true)}>
             <RotateCcw aria-hidden /> Reset all flags
@@ -280,6 +336,7 @@ export function FlagItemsView({ jobId, kind }: { jobId: string; kind: string }) 
         }
       >
         <div className="space-y-4">
+          <FlaggedNow jobId={jobId} runKind={kind} />
           <div className="flex flex-wrap items-end gap-4" role="group" aria-label="Filter items">
             <FilterSelect id="f-kind" label="Kind" value={kindFilter} onChange={setFilter(setKindFilter)} options={KIND_OPTIONS} />
             <FilterSelect id="f-arm" label="Arm" value={armFilter} onChange={setFilter(setArmFilter)} options={ARM_OPTIONS} />
@@ -303,6 +360,11 @@ export function FlagItemsView({ jobId, kind }: { jobId: string; kind: string }) 
               </p>
             )}
           </div>
+          <p className="text-xs text-neutral-500" data-testid="item-totals-help">
+            An item is a {kind === "harmonize_many" ? "group" : "link"} of either arm, a review entry or an unresolved row,
+            so a pair found by both arms counts once per arm. Review items, on the Review queue tab, are a separate list:
+            the evidence biomapper captured for review.
+          </p>
 
           {lastChange && (
             <p role="status" className="rounded border border-success-border bg-success-bg px-3 py-2 text-sm text-success" data-testid="flag-change">
@@ -407,6 +469,8 @@ export function FlagItemsView({ jobId, kind }: { jobId: string; kind: string }) 
           setOffset(0);
         }}
       />
+
+      <Glossary terms={(kind === "harmonize_many" ? ["multiplicity", "broad", "clean", "crossNode", "idCheck", "withheld"] : ["ambiguity", "basis", "oneSided", "possibleMiss", "withheld"]) as GlossaryKey[]} />
 
       <ItemDetailSheet item={openItem} onClose={() => setOpenItem(null)} />
 
