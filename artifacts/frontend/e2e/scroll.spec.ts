@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { goto, isolate, JOBS } from "./helpers";
+import { harmonizeStubs, manyRun, twoRun } from "./harmonize-stubs";
 
 // Every container whose content can overflow must show a scroll bar the reader can see without hovering or
 // scrolling first. docs/harmonization/scroll-audit.md lists each site; these tests fill them past their bounds
@@ -189,6 +190,22 @@ test.describe("scroll bars on the signed-in surface @app", () => {
     await page.setViewportSize({ width: 1440, height: 160 });
     await expect(page.getByRole("alertdialog")).toHaveCSS("max-height", "128px");
     await expectNoViolations(page, ["z-50"]);
+  });
+
+  test("harmonize: runs list, item list, arm diff lists and review evidence on a short window", async ({ page }) => {
+    const run = twoRun("scroll-two");
+    run.states = [{ state: "complete" }];
+    const others = Array.from({ length: 40 }, (_, i) => ({ ...manyRun(`scroll-many-${i}`) }));
+    const { stubs } = harmonizeStubs({ runs: [run], listed: [run, ...others] });
+    await isolate(page, stubs);
+    await page.addLocatorHandler(page.locator("vite-error-overlay"), async () => {
+      await page.evaluate(() => document.querySelectorAll("vite-error-overlay").forEach((el) => el.remove()));
+    });
+    await page.setViewportSize({ width: 1100, height: 600 });
+    await goto(page, "/harmonize/scroll-two");
+    await expect(page.getByTestId("items-total")).toHaveText("60");
+    await expect(page.getByTestId("diff-set-both")).toContainText("Glucose (a01)");
+    await expectNoViolations(page, ["main", "items-scroll", "max-h-[28rem]", "max-h-40"]);
   });
 
   test("flagged annotations list", async ({ page }) => {

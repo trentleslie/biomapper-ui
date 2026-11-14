@@ -28,6 +28,10 @@ Checked by `artifacts/frontend/e2e/scroll.spec.ts` (run with `pnpm --filter @wor
 | Feedback dialog | `components/FeedbackDialog.tsx`, `ui/dialog.tsx` | Short windows | `DialogContent` caps at `100dvh - 2rem` and is `scroll-visible`; the page's own `overflow-y-auto` removed | feedback test |
 | Delete dialogs | `pages/jobs.tsx`, `pages/benchmark-runs.tsx`, `ui/alert-dialog.tsx` | Short windows | `AlertDialogContent` caps at `100dvh - 2rem` and is `scroll-visible` | jobs test |
 | Feedback textareas | `components/FeedbackDialog.tsx` | Long text | `scroll-visible [scrollbar-gutter:auto]!` | covered by the shared class |
+| Harmonize: your runs | `components/harmonize/RunsList.tsx` | Many runs, `max-h-[28rem]` list | `scroll-visible` | harmonize scroll test |
+| Harmonize: item list | `components/harmonize/ItemsPanel.tsx` | Up to 1000 items per page, `max-h-[36rem]`; wide member and detail cells | `scroll-visible` box, table wrapper for the horizontal axis | harmonize scroll test |
+| Harmonize: arm difference lists | `components/harmonize/ResultsOverview.tsx` | Long link or group lists, `max-h-40` | `scroll-visible` | harmonize scroll test |
+| Harmonize: excluded rows, review evidence, column chips, identifier lists | `components/harmonize/*` | Bounded boxes (`max-h-48`, `max-h-[32rem]`, `max-h-24`, `max-h-28`) | `scroll-visible` | covered by the shared class |
 
 ## Select
 

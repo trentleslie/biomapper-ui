@@ -95,6 +95,8 @@ describe("cohort setup", () => {
     expect(guessNameColumn(["CHEM_ID", "BIOCHEMICAL", "HMDB"])).toBe("BIOCHEMICAL");
     expect(guessKeyColumn(["id", "name", "hmdb"], "name")).toBe("id");
     expect(guessKeyColumn(["name", "hmdb"], "name")).toBe("");
+    expect(guessKeyColumn(["sample_key", "Metabolite Label", "hmdb_code"], "Metabolite Label")).toBe("sample_key");
+    expect(guessKeyColumn(["HMDB ID", "name"], "name")).toBe("");
     expect(inferVocabulary("hmdb_id")).toBe("HMDB");
     expect(inferVocabulary("KEGG")).toBe("KEGG");
     expect(inferVocabulary("notes")).toBeNull();

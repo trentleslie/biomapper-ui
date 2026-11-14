@@ -349,6 +349,7 @@ export function HarmonizeSetup({
                 </Label>
                 <Input
                   id="harm-category"
+                  aria-label="Category override (optional)"
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
                   placeholder="e.g. biolink:SmallMolecule"
@@ -368,10 +369,12 @@ export function HarmonizeSetup({
                     onCheckedChange={(v) => setRemapAll(v === true)}
                     data-testid="checkbox-remap-all"
                     className="mt-0.5"
+                    aria-label="Remap all rows"
+                    aria-describedby="harm-remap-all-note"
                   />
                   <Label htmlFor="harm-remap-all" className="cursor-pointer font-normal">
                     Remap all rows
-                    <span className="block text-xs text-neutral-500">
+                    <span id="harm-remap-all-note" className="block text-xs text-neutral-500">
                       Map every row again instead of reusing saved mappings.
                     </span>
                   </Label>
@@ -472,7 +475,7 @@ function EntityPicker({
         </FieldTooltip>
       </Label>
       <Select value={value} onValueChange={onChange} disabled={loading}>
-        <SelectTrigger id={id} className="max-w-md" data-testid="select-entity">
+        <SelectTrigger id={id} className="max-w-md" aria-label="Entity type" data-testid="select-entity">
           <SelectValue placeholder={loading ? "Loading entity types..." : "Choose an entity type"} />
         </SelectTrigger>
         <SelectContent>
@@ -525,8 +528,13 @@ function CohortCard({
   const missing = inspect.state === "ok" ? missingColumns(draft, draft.file.name, columns) : [];
   const labelOk = isValidLabel(draft.label.trim());
   const listId = `vocab-suggestions-${draft.id}`;
-  const otherColumns = columns.filter((c) => c !== draft.nameColumn && c !== draft.keyColumn);
-  const shortName = draft.label || labelFromName(draft.file.name);
+  // Choices kept from a replaced file stay listed (marked) so they can be changed or unticked.
+  const gone = (c: string) => !!c && !columns.includes(c);
+  const otherColumns = [
+    ...columns.filter((c) => c !== draft.nameColumn && c !== draft.keyColumn),
+    ...Object.keys(draft.idColumns).filter(gone),
+  ];
+  const pickable = (extra: string) => (gone(extra) ? [...columns, extra] : columns);
 
   return (
     <section
@@ -609,6 +617,7 @@ function CohortCard({
                 id={`label-${draft.id}`}
                 value={draft.label}
                 onChange={(e) => onChange({ label: e.target.value })}
+                aria-label={`Cohort label for ${title}`}
                 aria-invalid={!labelOk}
                 className="font-mono"
                 data-testid="input-cohort-label"
@@ -624,12 +633,12 @@ function CohortCard({
                 delete idColumns[v];
                 onChange({ nameColumn: v, keyColumn: draft.keyColumn === v ? "" : draft.keyColumn, idColumns });
               }}>
-                <SelectTrigger id={`name-col-${draft.id}`} aria-label={`Name column for ${shortName}`} data-testid="select-name-column">
+                <SelectTrigger id={`name-col-${draft.id}`} aria-label={`Name column for ${title}`} data-testid="select-name-column">
                   <SelectValue placeholder="Choose a column" />
                 </SelectTrigger>
                 <SelectContent>
-                  {columns.map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  {pickable(draft.nameColumn).map((c) => (
+                    <SelectItem key={c} value={c}>{c}{gone(c) ? " (not in this file)" : ""}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -644,13 +653,13 @@ function CohortCard({
                 if (key) delete idColumns[key];
                 onChange({ keyColumn: key, idColumns });
               }}>
-                <SelectTrigger id={`key-col-${draft.id}`} aria-label={`Key column for ${shortName}`} data-testid="select-key-column">
+                <SelectTrigger id={`key-col-${draft.id}`} aria-label={`Key column for ${title}`} data-testid="select-key-column">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NO_KEY}>No key column (row number and name)</SelectItem>
-                  {columns.filter((c) => c !== draft.nameColumn).map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  {pickable(draft.keyColumn).filter((c) => c !== draft.nameColumn).map((c) => (
+                    <SelectItem key={c} value={c}>{c}{gone(c) ? " (not in this file)" : ""}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -688,10 +697,11 @@ function CohortCard({
                           else delete idColumns[c];
                           onChange({ idColumns });
                         }}
-                        aria-label={`Use ${c} as an identifier column in ${shortName}`}
+                        aria-label={`Use ${c} as an identifier column in ${title}`}
                       />
                       <Label htmlFor={`id-${draft.id}-${c}`} className="shrink-0 cursor-pointer font-mono font-normal">
                         {c}
+                        {gone(c) && <span className="ml-1 font-sans text-xs text-warning">(not in this file)</span>}
                       </Label>
                       {on && (
                         <>
@@ -701,7 +711,7 @@ function CohortCard({
                             value={draft.idColumns[c]}
                             onChange={(e) => onChange({ idColumns: { ...draft.idColumns, [c]: e.target.value } })}
                             className="h-7 w-40 px-2 font-mono text-xs"
-                            aria-label={`Vocabulary held by ${c} in ${shortName}`}
+                            aria-label={`Vocabulary held by ${c} in ${title}`}
                             placeholder="e.g. HMDB"
                           />
                         </>
@@ -798,10 +808,11 @@ function FromJobsSetup({ onStarted }: { onStarted: (run: HarmonizeRunStatus) => 
           </div>
         )}
         <div className="flex items-start gap-3">
-          <Switch id="harm-link-by-name" checked={linkByName} onCheckedChange={setLinkByName} data-testid="switch-link-by-name" />
+          <Switch id="harm-link-by-name" checked={linkByName} onCheckedChange={setLinkByName} aria-label="Link by name too"
+            aria-describedby="harm-link-by-name-note" data-testid="switch-link-by-name" />
           <Label htmlFor="harm-link-by-name" className="cursor-pointer font-normal">
             Link by name too
-            <span className="block text-xs text-neutral-500">
+            <span id="harm-link-by-name-note" className="block text-xs text-neutral-500">
               {linkByName
                 ? "On: resolved rows whose names match are also linked, even when they resolved to different nodes."
                 : "Off (default): rows are linked by node and identifier only."}
@@ -848,7 +859,13 @@ function JobSide({
 }) {
   const detail = useGetJob(value, { query: { queryKey: getGetJobQueryKey(value), enabled: !!value, staleTime: 5 * 60 * 1000 } });
   const otherDetail = useGetJob(other, { query: { queryKey: getGetJobQueryKey(other), enabled: !!other, staleTime: 5 * 60 * 1000 } });
-  const entityOf = (d: typeof detail) => d.data?.config?.entityType ?? null;
+  // The API sends the stored config as written (entity_type), though the OpenAPI schema says entityType; read both,
+  // and fall back to the server's own default for a job saved without one.
+  const entityOf = (d: typeof detail) => {
+    if (!d.data) return null;
+    const config = (d.data.config ?? {}) as { entityType?: string; entity_type?: string };
+    return config.entityType ?? config.entity_type ?? DEFAULT_ENTITY;
+  };
   const mine = entityOf(detail);
   const theirs = entityOf(otherDetail);
   const letter = side.toUpperCase();
@@ -858,7 +875,7 @@ function JobSide({
       <div className="space-y-1.5">
         <Label htmlFor={`job-${side}`}>Job {letter}</Label>
         <Select value={value} onValueChange={onPick}>
-          <SelectTrigger id={`job-${side}`} data-testid={`select-job-${side}`}>
+          <SelectTrigger id={`job-${side}`} aria-label={`Job ${letter}`} data-testid={`select-job-${side}`}>
             <SelectValue placeholder="Choose a finished mapping job" />
           </SelectTrigger>
           <SelectContent>

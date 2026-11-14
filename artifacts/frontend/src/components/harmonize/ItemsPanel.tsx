@@ -142,7 +142,7 @@ export function ItemsPanel({ jobId, kind }: { jobId: string; kind: string }) {
         </div>
 
         <div className="mt-4 flex flex-wrap items-end gap-3" data-testid="items-filters">
-          <FilterSelect id="items-kind" label="Kind" value={filters.kind} onChange={(v) => setFilters((f) => ({ ...f, kind: v }))}
+          <FilterSelect id="items-kind" ariaLabel="Show kind" label="Kind" value={filters.kind} onChange={(v) => setFilters((f) => ({ ...f, kind: v }))}
             options={[
               [ANY, "All kinds"],
               many ? ["group", "Groups"] : ["link", "Links"],
@@ -150,11 +150,11 @@ export function ItemsPanel({ jobId, kind }: { jobId: string; kind: string }) {
               ["unresolved", "Unresolved rows"],
               many ? ["link", "Links (none on many-cohort runs)"] : ["group", "Groups (none on two-cohort runs)"],
             ]} />
-          <FilterSelect id="items-arm" label="Arm" value={filters.arm} onChange={(v) => setFilters((f) => ({ ...f, arm: v }))}
+          <FilterSelect id="items-arm" ariaLabel="Show arm" label="Arm" value={filters.arm} onChange={(v) => setFilters((f) => ({ ...f, arm: v }))}
             options={[[ANY, "Both arms"], ["names_only", "Names only"], ["identifier", "Identifier"]]} />
-          <FilterSelect id="items-flagged" label="Flag" value={filters.flagged} onChange={(v) => setFilters((f) => ({ ...f, flagged: v }))}
+          <FilterSelect id="items-flagged" ariaLabel="Show flag state" label="Flag" value={filters.flagged} onChange={(v) => setFilters((f) => ({ ...f, flagged: v }))}
             options={[[ANY, "Flagged and not flagged"], ["yes", "Flagged only"], ["no", "Not flagged only"]]} />
-          <FilterSelect id="items-page-size" label="Per page" value={String(limit)} onChange={(v) => setLimit(Number(v))}
+          <FilterSelect id="items-page-size" ariaLabel="Items per page" label="Per page" value={String(limit)} onChange={(v) => setLimit(Number(v))}
             options={PAGE_SIZES.map((n) => [String(n), String(n)] as [string, string])} />
         </div>
       </CardHeader>
@@ -267,9 +267,10 @@ export function ItemsPanel({ jobId, kind }: { jobId: string; kind: string }) {
   );
 }
 
-function FilterSelect({ id, label, value, onChange, options }: {
+function FilterSelect({ id, label, ariaLabel, value, onChange, options }: {
   id: string;
   label: string;
+  ariaLabel?: string;
   value: string;
   onChange: (v: string) => void;
   options: Array<[string, string]>;
@@ -278,7 +279,7 @@ function FilterSelect({ id, label, value, onChange, options }: {
     <div className="space-y-1">
       <Label htmlFor={id} className="text-xs text-neutral-500">{label}</Label>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger id={id} className="h-8 w-auto min-w-[9rem] text-sm" data-testid={`select-${id}`}>
+        <SelectTrigger id={id} aria-label={ariaLabel ?? label} className="h-8 w-auto min-w-[9rem] text-sm" data-testid={`select-${id}`}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -436,13 +437,13 @@ function BulkFlags({ jobId, many, onDone, onError }: {
         </FieldTooltip>
       </p>
       <div className="flex flex-wrap items-end gap-3">
-        <FilterSelect id="bulk-kind" label="Kind" value={kind} onChange={setKind}
+        <FilterSelect id="bulk-kind" ariaLabel="Bulk kind" label="Kind" value={kind} onChange={setKind}
           options={[[ANY, "Any kind"], ["link", "Links"], ["group", "Groups"], ["review", "Review entries"], ["unresolved", "Unresolved rows"]]} />
-        <FilterSelect id="bulk-arm" label="Arm" value={arm} onChange={setArm}
+        <FilterSelect id="bulk-arm" ariaLabel="Bulk arm" label="Arm" value={arm} onChange={setArm}
           options={[[ANY, "Both arms"], ["names_only", "Names only"], ["identifier", "Identifier"]]} />
-        <FilterSelect id="bulk-basis" label="Basis" value={basis} onChange={setBasis}
+        <FilterSelect id="bulk-basis" ariaLabel="Bulk basis" label="Basis" value={basis} onChange={setBasis}
           options={[[ANY, "Any basis"], ["node", "node"], ["identifier", "identifier"], ["name_exact", "name_exact"], ["name_casefold", "name_casefold"]]} />
-        <FilterSelect id="bulk-ambiguous" label="Ambiguous" value={ambiguous} onChange={setAmbiguous}
+        <FilterSelect id="bulk-ambiguous" ariaLabel="Bulk ambiguous" label="Ambiguous" value={ambiguous} onChange={setAmbiguous}
           options={[[ANY, "Either"], ["yes", "Ambiguous"], ["no", "One-to-one"]]} />
         <div className="flex gap-2">
           <Button size="sm" disabled={bulk.isPending} onClick={() => bulk.mutate({ jobId, data: { filter, flagged: true } })} data-testid="btn-bulk-flag">

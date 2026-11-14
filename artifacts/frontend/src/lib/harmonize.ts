@@ -205,7 +205,12 @@ export function guessNameColumn(columns: string[]): string {
 }
 
 export function guessKeyColumn(columns: string[], nameColumn: string): string {
-  return columns.find((c) => c !== nameColumn && /^(id|key|row_?id|sample_?id|comp_?id|analyte_?id)$/i.test(c.trim())) ?? "";
+  const others = columns.filter((c) => c !== nameColumn && !inferVocabulary(c));
+  return (
+    others.find((c) => /^(id|key|row_?id|sample_?id|comp_?id|analyte_?id)$/i.test(c.trim())) ??
+    others.find((c) => /(^|[\s_.-])(id|key)$/i.test(c.trim())) ??
+    ""
+  );
 }
 
 const VOCAB_HINTS: Array<[RegExp, string]> = [
