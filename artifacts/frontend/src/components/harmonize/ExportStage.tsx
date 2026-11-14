@@ -89,7 +89,9 @@ export function ExportStage({ run, flaggedTotal }: { run: HarmonizeRunStatus; fl
             {preview.isLoading ? (
               <span className="text-neutral-500">Counting the pairs</span>
             ) : preview.isError ? (
-              <span className="text-danger">{errorMessage(preview.error, "The pairs could not be counted.")}</span>
+              <span className="text-danger" data-testid="eitl-preview-error">
+                The preview could not be refreshed, so the pairs are not shown. {errorMessage(preview.error, "")}
+              </span>
             ) : (
               <>
                 <p data-testid="eitl-counts">
@@ -103,15 +105,16 @@ export function ExportStage({ run, flaggedTotal }: { run: HarmonizeRunStatus; fl
                 </p>
                 {flaggedTotal != null && flaggedTotal > 0 && pairs && (
                   <p className="text-xs text-neutral-500" data-testid="eitl-counts-why">
-                    These numbers need not add up. A flagged link gives one pair, and a link found by both arms is
-                    written once. A flagged group gives one pair for each of its rows after the first. Flagged review
-                    entries, unresolved rows and groups of one row have no second side, so they give none.
+                    These numbers need not add up. A flagged link gives one pair, and a flagged group gives one pair for
+                    each of its rows after the first. Any pair that appears twice (for example, found by both arms) is
+                    written once. Flagged review entries, unresolved rows and groups of one row have no second side, so
+                    they give none.
                   </p>
                 )}
               </>
             )}
           </div>
-          {pairs && pairs.length > 0 && (
+          {!preview.isError && pairs && pairs.length > 0 && (
             <div className="space-y-1">
               <p className="text-xs font-medium text-neutral-700">
                 In the file now{pairs.length > PREVIEW_ROWS ? ` (the first ${PREVIEW_ROWS} of ${pairs.length.toLocaleString()})` : ""}

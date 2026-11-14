@@ -234,7 +234,14 @@ function OpenRun({ jobId, requested }: { jobId: string; requested: string | unde
         <RunIdentity run={run} />
         {runQuery.isError && runQuery.data && (
           <p role="status" className="mb-4 text-sm text-warning" data-testid="refresh-failed">
-            Could not refresh the run ({errorMessage(runQuery.error)}). Showing the last state received; it will try again.
+            Could not refresh the run ({errorMessage(runQuery.error)}). Showing the last state received.{" "}
+            {isActive(run.state) ? (
+              "It will try again."
+            ) : (
+              <Button variant="link" size="sm" className="h-auto p-0" onClick={() => runQuery.refetch()}>
+                Refresh
+              </Button>
+            )}
           </p>
         )}
         {notice}

@@ -263,7 +263,7 @@ test.describe("harmonize @app", () => {
     await expect(page.getByRole("button", { name: "Send to EITL" })).toBeDisabled();
     await expect(page.getByTestId("eitl-skipped")).toContainText("1 flagged item is left out");
     await expect(page.getByTestId("eitl-counts")).toHaveText("2 items flagged in this run. The file holds 1 pair. 1 flagged item gives no pair.");
-    await expect(page.getByTestId("eitl-counts-why")).toContainText("a link found by both arms is written once");
+    await expect(page.getByTestId("eitl-counts-why")).toContainText("Any pair that appears twice (for example, found by both arms) is written once.");
     await expect(page.getByTestId("eitl-pairs-preview")).toContainText("name a13 (example_cohort_a a13) with name b13 (example_cohort_b b13)");
     await expect(page.getByRole("heading", { name: "Pairs file for expert-in-the-loop (EITL), the expert review app" })).toBeVisible();
     await expect(page.getByTestId("matched-pairs")).toContainText("Matched pairs (links table)");
@@ -449,6 +449,9 @@ test.describe("harmonize @app", () => {
     await goto(page, `/harmonize/runs/${JOB}/run`);
     await expect(page.getByRole("progressbar", { name: "Names-only arm progress" })).toBeVisible();
     await expect(page.getByTestId("refresh-failed")).toContainText("Could not refresh the run", { timeout: 20_000 });
+    // The run is still active, so polling carries on by itself and no Refresh is offered.
+    await expect(page.getByTestId("refresh-failed")).toContainText("It will try again.");
+    await expect(page.getByTestId("refresh-failed").getByRole("button", { name: "Refresh" })).toHaveCount(0);
     await expect(page.getByRole("progressbar", { name: "Names-only arm progress" })).toBeVisible();
     await expect(page.getByText("The run did not load")).toHaveCount(0);
   });
@@ -573,5 +576,54 @@ test.describe("harmonize @app", () => {
     await expect(page.getByRole("radio", { name: /Many cohort files/ })).toHaveAttribute("aria-checked", "true");
     await expect(page.getByTestId("cohort-editor")).toHaveCount(3);
     await expect(page.getByRole("textbox", { name: "Label for Cohort 3" })).toHaveValue("c3");
+  });
+
+  test("a finished run whose refresh fails offers Refresh, since nothing polls it", async ({ page }) => {
+    test.setTimeout(60_000);
+    const { stubs } = runStubs([{ state: "complete", progress: null, stage: "done" }]);
+    let failing = false;
+    await isolate(page, {
+      ...stubs,
+      [`/api/harmonize/runs/${JOB}`]: async (route: Route, url: URL) => {
+        if (failing) return route.fulfill({ status: 502, contentType: "text/html", body: "<html><body>502 Bad Gateway</body></html>" });
+        return (stubs[`/api/harmonize/runs/${JOB}`] as (r: Route, u: URL) => Promise<void>)(route, url);
+      },
+    });
+    await goto(page, `/harmonize/runs/${JOB}/run`);
+    await expect(page.getByTestId("run-finished")).toBeVisible();
+    failing = true;
+    // A refocus refetches the run; it fails and the last state stays on screen.
+    await page.evaluate(() => window.dispatchEvent(new Event("visibilitychange")));
+    const note = page.getByTestId("refresh-failed");
+    await expect(note).toContainText("Could not refresh the run", { timeout: 20_000 });
+    await expect(note).not.toContainText("try again");
+    failing = false;
+    await note.getByRole("button", { name: "Refresh" }).click();
+    await expect(note).toHaveCount(0);
+    await expect(page.getByTestId("run-finished")).toBeVisible();
+  });
+
+  test("when the pairs preview cannot be refreshed, old pairs are hidden and the screen says so", async ({ page }) => {
+    test.setTimeout(60_000);
+    const { stubs } = runStubs([{ state: "complete", progress: null, stage: "done" }]);
+    let failing = false;
+    await isolate(page, {
+      ...stubs,
+      [`/api/harmonize/runs/${JOB}/export`]: async (route: Route, url: URL) => {
+        if (failing && url.searchParams.get("table") === "eitl_pairs") {
+          return route.fulfill({ status: 500, json: { detail: "The export failed." } });
+        }
+        return (stubs[`/api/harmonize/runs/${JOB}/export`] as (r: Route, u: URL) => Promise<void>)(route, url);
+      },
+    });
+    await goto(page, `/harmonize/runs/${JOB}/export`);
+    await expect(page.getByTestId("eitl-pairs-preview")).toContainText("name a13");
+    failing = true;
+    // Leave and come back: the preview refetches on mount and fails.
+    await page.getByRole("navigation", { name: "Harmonization steps" }).getByRole("link", { name: /Review and flag/ }).click();
+    await expect(page).toHaveURL(new RegExp(`/harmonize/runs/${JOB}/review$`));
+    await page.getByRole("navigation", { name: "Harmonization steps" }).getByRole("link", { name: /Export/ }).click();
+    await expect(page.getByTestId("eitl-preview-error")).toContainText("The preview could not be refreshed", { timeout: 20_000 });
+    await expect(page.getByTestId("eitl-pairs-preview")).toHaveCount(0);
   });
 });
