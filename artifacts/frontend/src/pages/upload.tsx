@@ -553,7 +553,7 @@ export default function UploadPage() {
                     <SelectTrigger id="column-select" data-testid="select-name-col">
                       <SelectValue placeholder="Select column..." />
                     </SelectTrigger>
-                    <SelectContent className="max-h-72 overflow-y-auto">
+                    <SelectContent>
                       {columns.map(col => (
                         <SelectItem key={col} value={col}>{col}</SelectItem>
                       ))}
@@ -673,7 +673,7 @@ export default function UploadPage() {
                     <SelectTrigger id="entity-type" data-testid="select-entity-type">
                       <SelectValue placeholder={entityTypesQuery.isLoading ? "Loading..." : "Select entity type"} />
                     </SelectTrigger>
-                    <SelectContent className="max-h-72 overflow-y-auto">
+                    <SelectContent>
                       {entityTypes.length === 0 && !entityTypesQuery.isLoading && (
                         <SelectItem value="biolink:SmallMolecule">biolink:SmallMolecule</SelectItem>
                       )}
