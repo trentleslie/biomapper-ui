@@ -145,6 +145,7 @@ export function SetupStage() {
     }
     for (let i = 0; i < slots.length; i += 1) {
       if (!slots[i].file) return setSubmitError(`Choose a file for ${titles[i]}.`);
+      if (slots[i].inspect.status === "error" && slots[i].inspect.error) return setSubmitError(slots[i].inspect.error);
       if (!slots[i].draft.nameColumn) return setSubmitError(`Pick the name column for ${titles[i]}.`);
     }
     const specBase = { entity, category: categoryOrNull(category) };
