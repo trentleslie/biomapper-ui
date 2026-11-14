@@ -227,7 +227,7 @@ test.describe("scroll bars on the signed-in surface @app", () => {
     await expect(page.getByTestId("runs-list")).toContainText("a, b, c");
     await page.getByLabel("Choose file for Cohort A", { exact: true }).first().setInputFiles({ name: "wide.tsv", mimeType: "text/tab-separated-values", buffer: Buffer.from("x\n") });
     await expect(page.getByTestId("vocab-columns").first()).toBeVisible();
-    await expectNoViolations(page, ["main", "ul.scroll-visible.max-h-72", "vocab-columns"]);
+    await expectNoViolations(page, ["main", "ul.scroll-visible.max-h-", "vocab-columns"]);
 
     await goto(page, "/harmonize/runs/run0/review?view=flags");
     await expect(page.getByTestId("items-table")).toBeVisible();

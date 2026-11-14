@@ -231,7 +231,7 @@ function OpenRun({ jobId, requested }: { jobId: string; requested: string | unde
 
 function FlowLayout({ rail, children }: { rail: ReactNode; children: ReactNode }) {
   return (
-    <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
+    <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]">
       <div className="lg:sticky lg:top-0 lg:self-start">{rail}</div>
       <div className="min-w-0">{children}</div>
     </div>
@@ -245,11 +245,15 @@ export default function HarmonizePage() {
   return (
     <>
       <PageHeader run={null} />
-      <FlowLayout rail={<StageRail jobId={null} current="setup" run={null} flaggedTotal={null} />}>
-        <div className="space-y-6">
-          <RunsList />
-          <SetupStage />
-        </div>
+      <FlowLayout
+        rail={
+          <div className="space-y-6">
+            <StageRail jobId={null} current="setup" run={null} flaggedTotal={null} />
+            <RunsList />
+          </div>
+        }
+      >
+        <SetupStage />
       </FlowLayout>
     </>
   );

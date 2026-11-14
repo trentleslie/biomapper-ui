@@ -178,7 +178,7 @@ export function SummaryView({ report, run }: { report: Json; run: HarmonizeRunSt
     <div className="space-y-6">
       {many && (
         <div className="grid gap-3 sm:grid-cols-2" data-testid="many-status">
-          <Stat label="Run status" value={humanize(String(report.status ?? "Not reported"))} hint="ok, partial or failed, as the package reports it" />
+          <Stat label="Run status" value={String(report.status ?? "Not reported")} hint="ok, partial or failed, as the package reports it" />
           <Stat
             label="Grade"
             value={<span className="text-base">{String(report.grade ?? report.publication_grade ?? "Not reported")}</span>}
@@ -186,23 +186,6 @@ export function SummaryView({ report, run }: { report: Json; run: HarmonizeRunSt
           />
         </div>
       )}
-
-      <Panel id="name-linking" title="Name linking" headingLevel={2}>
-        {nl ? (
-          <div className="space-y-2" data-testid="name-linking">
-            <p className="text-sm">
-              <Badge variant={nl.enabled ? "success" : "neutral"}>{nl.enabled ? "On" : "Off"}</Badge>
-              {nl.decidedBy && <span className="ml-2 text-xs text-neutral-500">Decided by: {nl.decidedBy === "user" ? "you, when you started the run" : nl.decidedBy}</span>}
-            </p>
-            <p className="text-sm text-neutral-700">{nl.reason || "The report gives no reason."}</p>
-            {kind !== "harmonize_results" && (
-              <p className="text-xs text-neutral-500">Read only: on cohort runs the category decides this.</p>
-            )}
-          </div>
-        ) : (
-          <p className="text-sm text-neutral-500">This report does not say whether name linking was on.</p>
-        )}
-      </Panel>
 
       <Panel id="arms" title="The two arms side by side" description={many ? "Groups of rows that share a knowledge graph node, per arm." : "Links between the two cohorts, per arm."}>
         <div className="grid gap-4 lg:grid-cols-2">
@@ -232,6 +215,23 @@ export function SummaryView({ report, run }: { report: Json; run: HarmonizeRunSt
               ? "There is no difference to show: only one arm ran."
               : "This report has no arm difference."}
           </p>
+        )}
+      </Panel>
+
+      <Panel id="name-linking" title="Name linking" headingLevel={2}>
+        {nl ? (
+          <div className="space-y-2" data-testid="name-linking">
+            <p className="text-sm">
+              <Badge variant={nl.enabled ? "success" : "neutral"}>{nl.enabled ? "On" : "Off"}</Badge>
+              {nl.decidedBy && <span className="ml-2 text-xs text-neutral-500">Decided by: {nl.decidedBy === "user" ? "you, when you started the run" : nl.decidedBy}</span>}
+            </p>
+            <p className="text-sm text-neutral-700">{nl.reason || "The report gives no reason."}</p>
+            {kind !== "harmonize_results" && (
+              <p className="text-xs text-neutral-500">Read only: on cohort runs the category decides this.</p>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-neutral-500">This report does not say whether name linking was on.</p>
         )}
       </Panel>
 
