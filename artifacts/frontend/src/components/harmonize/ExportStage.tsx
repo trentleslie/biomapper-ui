@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Download, Loader2, Send } from "lucide-react";
 import type { HarmonizeRunStatus } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import {
 } from "@/lib/harmonize";
 import { fetchExport, saveFile } from "@/lib/harmonize-export";
 import { Note, Panel } from "./common";
+import { stageHref } from "./StageRail";
 
 const TABLE_TEXT: Record<(typeof EXPORT_TABLES)[number], { title: string; blurb: string }> = {
   links: { title: "Links", blurb: "Every link between the two cohorts, in both arms." },
@@ -94,7 +96,16 @@ export function ExportStage({ run, flaggedTotal }: { run: HarmonizeRunStatus; fl
               </>
             )}
           </div>
-          {shownSkipped != null && (
+          {flaggedTotal === 0 && (
+            <Note tone="info" title="Nothing is flagged yet" testId="eitl-empty">
+              The pairs file holds only flagged links and groups, so it is empty for now.{" "}
+              <Link href={stageHref(run.jobId, "review") + "?view=flags"} className="font-medium text-ph-navy underline-offset-2 hover:underline">
+                Flag items in Review and flag
+              </Link>
+              .
+            </Note>
+          )}
+          {shownSkipped != null && flaggedTotal !== 0 && (
             <Note tone={shownSkipped > 0 ? "warning" : "info"} title="Left out of the pairs file" testId="eitl-skipped">
               {shownSkipped === 0
                 ? "No flagged item is left out: every flagged item gives a pair."

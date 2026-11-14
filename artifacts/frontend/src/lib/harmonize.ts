@@ -214,7 +214,7 @@ export function distinctLabel(wanted: string, taken: string[]): string {
 }
 
 const NAME_COLUMN_HINTS = [/^name$/i, /^(analyte|metabolite|compound|biochemical|chemical|protein|gene|lab|test)[ _-]?name$/i, /name/i, /^(analyte|metabolite|compound|biochemical)$/i];
-const KEY_COLUMN_HINTS = [/^id$/i, /^key$/i, /^(row|analyte|feature|comp|compound|metabolite|sample)[ _-]?id$/i];
+const KEY_COLUMN_HINTS = [/^id$/i, /^key$/i, /^(row|analyte|feature|comp|compound|metabolite|sample)[ _-]?(id|key)$/i, /[ _-]key$/i];
 
 /** The column most likely to hold the entity names; the first column when nothing looks like one. */
 export function guessNameColumn(columns: string[]): string | undefined {

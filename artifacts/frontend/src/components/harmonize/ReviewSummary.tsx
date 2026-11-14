@@ -338,7 +338,11 @@ function TwoCohortArm({ data, report, arm }: { data: Json; report: Json; arm: Ar
             String(l.basis ?? "Not reported"),
             fmt(l.a_partners),
             fmt(l.b_partners),
-            <Mono key="n">{String(l.a_chosen_kg_id ?? "")}{l.b_chosen_kg_id && l.b_chosen_kg_id !== l.a_chosen_kg_id ? ` / ${l.b_chosen_kg_id}` : ""}</Mono>,
+            l.a_chosen_kg_id || l.b_chosen_kg_id ? (
+              <Mono key="n">{String(l.a_chosen_kg_id ?? "")}{l.b_chosen_kg_id && l.b_chosen_kg_id !== l.a_chosen_kg_id ? ` / ${l.b_chosen_kg_id}` : ""}</Mono>
+            ) : (
+              <span key="n" className="text-neutral-400">Not in this report</span>
+            ),
           ])}
           empty="No links in this arm."
         />

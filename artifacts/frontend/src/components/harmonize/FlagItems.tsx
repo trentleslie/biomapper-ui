@@ -366,7 +366,7 @@ export function FlagItemsView({ jobId, kind }: { jobId: string; kind: string }) 
                           </td>
                           <td className="whitespace-nowrap px-3 py-2 align-top">
                             <SourceBadge source={item.source} />
-                            {item.suggested && <span className="ml-1 text-xs text-neutral-500">(suggested)</span>}
+                            <span className="block pt-0.5 text-xs text-neutral-500">Suggested: {item.suggested ? "flag" : "no flag"}</span>
                           </td>
                           <td className="whitespace-nowrap px-3 py-2 text-right align-top">
                             {item.source === "organizer" && (
