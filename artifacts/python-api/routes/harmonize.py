@@ -14,8 +14,8 @@ JSON is camelCase like the rest of the API. Run status is the package's
 ``entity`` and ``createdAt``. ``summary`` is the package's free-form block and passes through
 as written, because its keys include cohort labels and arm names.
 
-No absolute server path reaches the client: run status drops ``output_dir``, ``store_dir`` and
-each cohort's ``path``, and every response body and error message has the harmonize-home
+No absolute server path reaches the client: run status drops ``output_dir`` and ``store_dir``
+(at the top level and inside ``summary``) and each cohort's ``path``, and every response body and error message has the harmonize-home
 prefix removed from its strings (see :func:`scrub`).
 
 A run of kind ``harmonize_results`` (``POST /from-jobs``: two finished mapping jobs harmonized
@@ -242,6 +242,10 @@ def _run_json(status: HarmonizeStatus, run: dict[str, Any]) -> dict[str, Any]:
     dumped = status.model_dump(mode="json")
     for field in _SERVER_PATH_FIELDS:
         dumped.pop(field, None)
+    if isinstance(dumped.get("summary"), dict):
+        # The package's summary repeats the output (and store) folder.
+        for field in _SERVER_PATH_FIELDS:
+            dumped["summary"].pop(field, None)
     for cohort in dumped.get("cohorts") or []:
         cohort.pop("path", None)
     out = scrub(camelize(dumped))

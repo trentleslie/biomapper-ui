@@ -45,7 +45,9 @@ def _status(kind: str, labels: list[str]) -> dict[str, Any]:
         "owner": None,
         "created_utc": "2026-11-13T00:00:00Z",
         "updated_utc": "2026-11-13T00:01:00Z",
-        "summary": {"links": 2, "warnings": []},
+        # The package's summary also reports the run's output (and, for many cohorts, store) folder.
+        "summary": {"links": 2, "warnings": [], "output_dir": "/recorded/out",
+                    **({"store_dir": "/recorded/store"} if kind == "harmonize_many" else {})},
         "review_items": {"row": 1, "link": 1, "skipped_no_node": 0,
                          "candidates_captured": 1, "candidates_not_captured": 0},
         "progress": {"function": kind, "arm": "names_only", "cohort": None,

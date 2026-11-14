@@ -146,7 +146,7 @@ def test_run_status_is_camel_case_with_run_fields(client, finished_job):
     assert st["reviewItems"]["skippedNoNode"] == 0
     assert set(st["cohorts"][0]) == {"label", "rows"}
     assert "outputDir" not in st and "storeDir" not in st
-    # summary is the package's free-form block and passes through as written
+    # summary is the package's free-form block and passes through as written, minus its paths
     assert st["summary"] == {"links": 2, "warnings": []}
 
 
@@ -180,6 +180,10 @@ def test_no_server_path_in_status_report_or_review_bodies(client, finished_job):
     for body in bodies:
         for path in _server_paths():
             assert path not in body
+    for st in (client.get(f"/harmonize/runs/{finished_job}", headers=U1).json(),
+               *client.get("/harmonize/runs", headers=U1).json()):
+        for key in ("output_dir", "store_dir", "outputDir", "storeDir"):
+            assert key not in st and key not in (st.get("summary") or {}), key
 
 
 def test_job_error_message_has_home_prefix_removed(client, two_files, spec_two, monkeypatch):
@@ -235,6 +239,7 @@ def test_many_submit_runs(client, spec_many):
     st = wait_complete(client, r.json()["jobId"], U1)
     assert st["kind"] == "harmonize_many"
     assert st["labels"] == ["a", "b", "c"]
+    assert "output_dir" not in st["summary"] and "store_dir" not in st["summary"]
     rep = client.get(f"/harmonize/runs/{st['jobId']}/report", headers=U1).json()
     assert rep["kind"] == "harmonize_many"
 
