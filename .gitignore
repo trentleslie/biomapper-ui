@@ -62,5 +62,8 @@ artifacts/python-api/data/*.db
 artifacts/python-api/data/*.db-wal
 artifacts/python-api/data/*.db-shm
 
+# Harmonization job home and run outputs (local only)
+artifacts/python-api/data/harmonize/
+
 # python virtualenv
 .venv/

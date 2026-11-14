@@ -15,3 +15,25 @@ if "biomapper" not in sys.modules:
         mock_biomapper.BioMapperRateLimitError = type("BioMapperRateLimitError", (Exception,), {})
         mock_biomapper.BioMapperError = type("BioMapperError", (Exception,), {})
         sys.modules["biomapper"] = mock_biomapper
+
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture
+def recording_dir(tmp_path):
+    """A synthetic ReplayBackend recordings dir (two_cohort/ and many_cohort/)."""
+    from tests.harmonize_fixtures import write_recording
+
+    return write_recording(tmp_path / "recordings")
+
+
+@pytest.fixture
+def stub_api():
+    """A local HTTP stub of the mapping API that answers /map/batch slowly."""
+    from tests.harmonize_fixtures import start_stub_api
+
+    api, server = start_stub_api()
+    yield api
+    server.shutdown()
+    server.server_close()

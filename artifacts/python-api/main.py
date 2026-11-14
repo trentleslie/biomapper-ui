@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from routes import health, map as map_router, demo as demo_router, discovery as discovery_router, feedback as feedback_router, flags as flags_router, jobs as jobs_router, benchmark as benchmark_router
 from services.database import database
 from services.feedback_store import feedback_store
+from services.harmonize_backend import make_backend
 from services.mapper import MapperService
 
 logger = logging.getLogger("entity-linker")
@@ -36,7 +37,10 @@ async def lifespan(app):
     await database.recover_stale_jobs()
     await database.recover_stale_benchmark_runs()
     await feedback_store.init_db()
-    yield
+    # The harmonization job runner re-queues unfinished jobs on entry and stops its worker on
+    # exit, so it lives inside the database's lifetime.
+    async with make_backend():
+        yield
     await database.close()
 
 
