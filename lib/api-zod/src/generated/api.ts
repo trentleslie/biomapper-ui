@@ -674,10 +674,10 @@ export const SubmitHarmonizeCohortsResponse = zod
         entitiesDone: zod.number(),
         entitiesTotal: zod.number(),
       })
-      .optional()
       .describe(
         "The latest progress update of the running arm (and cohort, on two-cohort runs)",
-      ),
+      )
+      .nullish(),
   })
   .describe(
     "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
@@ -780,10 +780,10 @@ export const SubmitHarmonizeManyResponse = zod
         entitiesDone: zod.number(),
         entitiesTotal: zod.number(),
       })
-      .optional()
       .describe(
         "The latest progress update of the running arm (and cohort, on two-cohort runs)",
-      ),
+      )
+      .nullish(),
   })
   .describe(
     "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
@@ -879,10 +879,10 @@ export const SubmitHarmonizeExampleResponse = zod
         entitiesDone: zod.number(),
         entitiesTotal: zod.number(),
       })
-      .optional()
       .describe(
         "The latest progress update of the running arm (and cohort, on two-cohort runs)",
-      ),
+      )
+      .nullish(),
   })
   .describe(
     "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
@@ -994,10 +994,10 @@ export const SubmitHarmonizeFromJobsResponse = zod
         entitiesDone: zod.number(),
         entitiesTotal: zod.number(),
       })
-      .optional()
       .describe(
         "The latest progress update of the running arm (and cohort, on two-cohort runs)",
-      ),
+      )
+      .nullish(),
   })
   .describe(
     "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
@@ -1089,10 +1089,10 @@ export const ListHarmonizeRunsResponseItem = zod
         entitiesDone: zod.number(),
         entitiesTotal: zod.number(),
       })
-      .optional()
       .describe(
         "The latest progress update of the running arm (and cohort, on two-cohort runs)",
-      ),
+      )
+      .nullish(),
   })
   .describe(
     "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
@@ -1191,10 +1191,10 @@ export const GetHarmonizeRunResponse = zod
         entitiesDone: zod.number(),
         entitiesTotal: zod.number(),
       })
-      .optional()
       .describe(
         "The latest progress update of the running arm (and cohort, on two-cohort runs)",
-      ),
+      )
+      .nullish(),
   })
   .describe(
     "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
@@ -1290,10 +1290,10 @@ export const ResumeHarmonizeRunResponse = zod
         entitiesDone: zod.number(),
         entitiesTotal: zod.number(),
       })
-      .optional()
       .describe(
         "The latest progress update of the running arm (and cohort, on two-cohort runs)",
-      ),
+      )
+      .nullish(),
   })
   .describe(
     "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
@@ -1389,10 +1389,10 @@ export const CancelHarmonizeRunResponse = zod
         entitiesDone: zod.number(),
         entitiesTotal: zod.number(),
       })
-      .optional()
       .describe(
         "The latest progress update of the running arm (and cohort, on two-cohort runs)",
-      ),
+      )
+      .nullish(),
   })
   .describe(
     "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",

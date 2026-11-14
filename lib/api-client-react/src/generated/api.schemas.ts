@@ -459,7 +459,7 @@ export interface HarmonizeRunStatus {
   updatedUtc?: string;
   summary?: HarmonizeRunStatusSummary;
   reviewItems?: HarmonizeReviewCounts | null;
-  progress?: HarmonizeProgress;
+  progress?: HarmonizeProgress | null;
 }
 
 export type HarmonizeReportKind =

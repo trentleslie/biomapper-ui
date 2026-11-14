@@ -1752,7 +1752,9 @@ components:
             - $ref: "#/components/schemas/HarmonizeReviewCounts"
           nullable: true
         progress:
-          $ref: "#/components/schemas/HarmonizeProgress"
+          allOf:
+            - $ref: "#/components/schemas/HarmonizeProgress"
+          nullable: true
       required:
         - jobId
         - state
