@@ -71,3 +71,6 @@ artifacts/python-api/data/harmonize/
 # Playwright output
 artifacts/frontend/test-results/
 artifacts/frontend/playwright-report/
+
+# Task 13 live verification outputs (local only)
+artifacts/python-api/data/harmonize_verification/
