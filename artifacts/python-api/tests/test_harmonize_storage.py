@@ -48,3 +48,10 @@ def test_run_dir_layout_and_removal(tmp_path, monkeypatch):
     assert not run_dir.exists()
     with pytest.raises(ValueError):
         remove_run_dir(tmp_path)
+
+
+def test_remove_run_dir_propagates_os_errors(tmp_path, monkeypatch):
+    monkeypatch.setattr(harmonize_storage, "HARMONIZE_HOME", tmp_path)
+    (tmp_path / "runs").mkdir()
+    with pytest.raises(FileNotFoundError):
+        remove_run_dir(tmp_path / "runs" / "gone")

@@ -66,6 +66,18 @@ class _Recording:
             raise JobError(
                 f"The replay recording in {directory} cannot be read ({type(exc).__name__})."
             ) from None
+        problem = None
+        if finished.state not in FINISHED_STATES:
+            problem = f"status.json is {finished.state!r}, not a finished status"
+        elif not all(isinstance(p, dict) for p in progress):
+            problem = "progress.jsonl must hold one JSON object per line"
+        elif not (isinstance(review, dict) and isinstance(review.get("items"), list)
+                  and isinstance(review.get("details"), dict)):
+            problem = "review_items.json must be an object with an 'items' list and a 'details' object"
+        elif not (directory / REPORT_FILENAME).is_file():
+            problem = f"{REPORT_FILENAME} is missing"
+        if problem is not None:
+            raise JobError(f"The replay recording in {directory} is not usable: {problem}.")
         return cls(directory, finished, progress, review)
 
 

@@ -112,4 +112,4 @@ def remove_run_dir(run_dir: Path) -> None:
     target = Path(run_dir).resolve()
     if target.parent != root:
         raise ValueError(f"{run_dir} is not a run directory under {root}")
-    shutil.rmtree(target, ignore_errors=True)
+    shutil.rmtree(target)

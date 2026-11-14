@@ -123,6 +123,7 @@ async def test_make_backend_uses_replay_when_env_set(recording_dir, monkeypatch)
         get_backend()
 
 
+@pytest.mark.real_harmonize
 async def test_make_backend_real_uses_mapper_url_and_key(tmp_path, monkeypatch):
     seen = {}
 
@@ -136,7 +137,6 @@ async def test_make_backend_real_uses_mapper_url_and_key(tmp_path, monkeypatch):
         async def __aexit__(self, *exc):
             return None
 
-    monkeypatch.delenv("BIOMAPPER_HARMONIZE_REPLAY_DIR", raising=False)
     monkeypatch.setenv("BIOMAPPER_BASE_URL", "http://mapper.example/api/v1")
     monkeypatch.setenv("BIOMAPPER_API_KEY", "k-123")
     monkeypatch.setattr(harmonize_backend.harmonize_storage, "HARMONIZE_HOME", tmp_path)
@@ -150,6 +150,7 @@ async def test_make_backend_real_uses_mapper_url_and_key(tmp_path, monkeypatch):
     assert (tmp_path / "home").is_dir() and (tmp_path / "runs").is_dir()
 
 
+@pytest.mark.real_harmonize
 async def test_real_backend_requeues_unfinished_job_on_reentry(tmp_path, stub_api):
     # Review Focus 1. stub_api is a local HTTP stub of the mapping API that answers slowly.
     async with real(tmp_path, base_url=stub_api.url, kestrel_url=stub_api.kestrel_url) as b:
@@ -170,3 +171,25 @@ async def test_real_backend_requeues_unfinished_job_on_reentry(tmp_path, stub_ap
         # The second runner did the rest of the mapping: the first one stopped part way.
         assert len(stub_api.batch_calls) > calls_before_restart
         assert b2.load_report(st.job_id)["kind"] == "harmonize_cohorts"
+
+
+async def test_replay_rejects_malformed_recording(recording_dir):
+    (recording_dir / "two_cohort" / "review_items.json").write_text("[]")
+    async with replay(recording_dir) as b:
+        with pytest.raises(JobError, match="not usable"):
+            await b.submit_cohorts(spec("a"), spec("b"), entity="metabolites")
+
+
+async def test_default_fixture_isolates_app_lifespan(tmp_path, monkeypatch):
+    # Pins the autouse conftest fixture: entering the app lifespan uses a temp home and replay.
+    from main import app
+    from services import harmonize_storage
+    from services.database import database
+
+    monkeypatch.setattr(database, "_path", tmp_path / "lifespan.db")
+    async with app.router.lifespan_context(app):
+        assert isinstance(get_backend(), ReplayBackend)
+        assert harmonize_storage.jobs_home().is_relative_to(tmp_path)
+        assert harmonize_storage.runs_root().is_relative_to(tmp_path)
+    with pytest.raises(RuntimeError):
+        get_backend()
