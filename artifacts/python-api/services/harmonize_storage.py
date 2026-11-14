@@ -64,7 +64,19 @@ def new_run_dir() -> tuple[str, Path]:
 
 
 def _delimiter(first_line: str, suffix: str) -> str:
-    tabs, commas = first_line.count("\t"), first_line.count(",")
+    # Count separators outside double-quoted fields only: a quoted column name such as
+    # "Description, notes" must not vote for comma. Each '"' flips the quoted state, so an
+    # escaped quote ("") flips it twice and leaves it unchanged.
+    tabs = commas = 0
+    quoted = False
+    for ch in first_line:
+        if ch == '"':
+            quoted = not quoted
+        elif not quoted:
+            if ch == "\t":
+                tabs += 1
+            elif ch == ",":
+                commas += 1
     if tabs != commas:
         return "\t" if tabs > commas else ","
     return "," if suffix == ".csv" else "\t"

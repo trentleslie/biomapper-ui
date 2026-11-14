@@ -40,6 +40,29 @@ def test_txt_saved_with_suffix_matching_its_delimiter(tmp_path):
     assert p.name == "d.tsv"
 
 
+@pytest.mark.parametrize(
+    "filename,data,saved,header",
+    [
+        # A tab file whose quoted column name holds more commas than the header has tabs.
+        ("a.tsv", b'name\t"Description, notes, comments"\nGlucose\tx\n', "q.tsv",
+         ["name", "Description, notes, comments"]),
+        ("a.txt", b'name\t"Description, notes, comments"\nGlucose\tx\n', "q.tsv",
+         ["name", "Description, notes, comments"]),
+        # A comma file whose quoted column name holds more tabs than the header has commas.
+        ("a.csv", b'name,"tab\there\tand\there"\nGlucose,x\n', "q.csv", ["name", "tab\there\tand\there"]),
+        ("a.txt", b'name,"tab\there\tand\there"\nGlucose,x\n', "q.csv", ["name", "tab\there\tand\there"]),
+        # An escaped quote inside a quoted name does not end the field.
+        ("a.tsv", b'name\t"say ""a, b, c"""\nGlucose\tx\n', "q.tsv", ["name", 'say "a, b, c"']),
+        # The BOM is still stripped.
+        ("a.tsv", b'\xef\xbb\xbf"name, full"\thmdb\nGlucose\tx\n', "q.tsv", ["name, full", "hmdb"]),
+    ],
+)
+def test_separators_inside_quoted_header_fields_are_not_counted(tmp_path, filename, data, saved, header):
+    p = save_cohort_file(tmp_path, "q", filename, data)
+    assert p.name == saved
+    assert read_header(p) == header
+
+
 def test_run_dir_layout_and_removal(tmp_path, monkeypatch):
     monkeypatch.setattr(harmonize_storage, "HARMONIZE_HOME", tmp_path)
     upload_id, run_dir = new_run_dir()
