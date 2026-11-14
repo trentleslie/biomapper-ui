@@ -338,7 +338,7 @@ test.describe("harmonize @app", () => {
         { jobId: "job-b", displayName: "Panel B", status: "complete", total: 5, completed: 5, errorCount: 0, env: "production", createdAt: 1, updatedAt: 1 },
         { jobId: "job-c", displayName: "Panel C", status: "processing", total: 5, completed: 2, errorCount: 0, env: "production", createdAt: 1, updatedAt: 1 },
       ],
-      "/api/jobs/job-a": { jobId: "job-a", status: "complete", config: { entity_type: "biolink:SmallMolecule" } },
+      "/api/jobs/job-a": { jobId: "job-a", status: "complete", config: { entityType: "biolink:SmallMolecule" } },
       "/api/jobs/job-b": { jobId: "job-b", status: "complete", config: { entityType: "biolink:Protein" } },
       "/api/harmonize/from-jobs": async (route: Route) => {
         fromJobs = route.request().postDataJSON();
@@ -367,6 +367,7 @@ test.describe("harmonize @app", () => {
     await page.getByRole("combobox", { name: "Mapping job for Job B" }).click();
     await page.getByRole("option", { name: /Panel B/ }).click();
     await expect(page.getByTestId("fj-b-entity")).toHaveText("Entity type: biolink:Protein");
+    await expect(page.getByTestId("fj-entity-mismatch")).toContainText("Job A is biolink:SmallMolecule and Job B is biolink:Protein.");
     await expect(page.getByRole("switch", { name: "Link by name" })).not.toBeChecked();
     await page.getByRole("switch", { name: "Link by name" }).click();
     await page.getByRole("button", { name: "Harmonize these jobs" }).click();

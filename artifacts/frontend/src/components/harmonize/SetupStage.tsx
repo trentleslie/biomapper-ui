@@ -425,11 +425,11 @@ function ExampleCard({ onStarted }: { onStarted: (run: HarmonizeRunStatus) => vo
   );
 }
 
+const JOB_DEFAULT_ENTITY = "biolink:SmallMolecule";
+
+/** The job's entity type as GET /jobs/{id} reports it (config.entityType), or null when the job has no config. */
 function jobEntityType(job: JobDetail | undefined): string | null {
-  const config = (job?.config ?? null) as Record<string, unknown> | null;
-  if (!config) return null;
-  const v = config.entityType ?? config.entity_type;
-  return typeof v === "string" ? v : null;
+  return job?.config?.entityType ?? null;
 }
 
 const JOB_STATUS_WORD: Record<string, string> = {
@@ -484,6 +484,10 @@ function FromJobsForm({ onStarted }: { onStarted: (run: HarmonizeRunStatus) => v
   };
 
   const finished = jobs.filter((j) => j.status === "complete");
+  // Both entity types known and different: the server will refuse the pair, so say so before submit.
+  const entityA = detailA.data ? (jobEntityType(detailA.data) ?? JOB_DEFAULT_ENTITY) : null;
+  const entityB = detailB.data ? (jobEntityType(detailB.data) ?? JOB_DEFAULT_ENTITY) : null;
+  const entityMismatch = !!jobA && !!jobB && entityA !== null && entityB !== null && entityA !== entityB;
 
   const side = (key: "a" | "b") => {
     const value = key === "a" ? jobA : jobB;
@@ -518,7 +522,7 @@ function FromJobsForm({ onStarted }: { onStarted: (run: HarmonizeRunStatus) => v
                 ? "Reading the job's entity type"
                 : detail.isError
                   ? `Could not read the job: ${errorMessage(detail.error)}`
-                  : `Entity type: ${entity ?? "biolink:SmallMolecule (the default)"}`}
+                  : `Entity type: ${entity ?? `${JOB_DEFAULT_ENTITY} (the default)`}`}
             </p>
           )}
         </div>
@@ -563,6 +567,12 @@ function FromJobsForm({ onStarted }: { onStarted: (run: HarmonizeRunStatus) => v
               {side("a")}
               {side("b")}
             </div>
+            {entityMismatch && (
+              <Note tone="warning" title="These two jobs map different entity types" testId="fj-entity-mismatch">
+                Job A is {entityA} and Job B is {entityB}. A run takes two jobs of the same entity type, so this pair will
+                be refused. Choose another job for one side.
+              </Note>
+            )}
             <div className="flex items-start gap-3 rounded border border-neutral-200 bg-neutral-50 px-4 py-3">
               <Switch id="fj-link-by-name" aria-label="Link by name" checked={linkByName} onCheckedChange={setLinkByName} aria-describedby="fj-link-by-name-help" />
               <div>
