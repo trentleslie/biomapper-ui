@@ -49,11 +49,11 @@ export function ArmStrip({ report, onOpenDetails }: { report: Report; onOpenDeta
   const diff = diffView(report);
   const sg = statusAndGrade(report);
   return (
-    <div className="grid grid-cols-1 gap-2 lg:grid-cols-[1fr_1fr_auto]" data-testid="arm-strip">
+    <div className="grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,18rem)]" data-testid="arm-strip">
       {ARMS.map((arm) => {
         const s = armSummary(report, arm);
         return (
-          <section key={arm} aria-label={`${arm === "names_only" ? "Names-only" : "Identifier"} arm`} className="rounded border border-neutral-200 bg-white px-3 py-2">
+          <section key={arm} aria-label={`${arm === "names_only" ? "Names-only" : "Identifier"} arm`} className="min-w-0 rounded border border-neutral-200 bg-white px-3 py-2">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">{arm === "names_only" ? "Names-only arm" : "Identifier arm"}</p>
             {s.skipped ? (
               <p className="mt-1 text-xs text-neutral-700" data-testid={`arm-skipped-${arm}`}>
@@ -85,7 +85,7 @@ export function ArmStrip({ report, onOpenDetails }: { report: Report; onOpenDeta
           </section>
         );
       })}
-      <div className="flex flex-col gap-0.5 rounded border border-neutral-200 bg-white px-3 py-2 lg:max-w-xs">
+      <div className="flex min-w-0 flex-col gap-0.5 rounded border border-neutral-200 bg-white px-3 py-2">
         {diff && (
           <p className="text-xs text-neutral-700" data-testid="diff-strip">
             {diff.counts.map((c, i) => (
@@ -110,7 +110,9 @@ export function ArmStrip({ report, onOpenDetails }: { report: Report; onOpenDeta
           </p>
         )}
         <Button variant="link" size="sm" className="h-auto self-start text-xs" onClick={onOpenDetails}>
-          All run details
+          {warnings(report).length > 0
+            ? `${plural(warnings(report).length, "warning")}, pins and all run details`
+            : "Pins, excluded rows and all run details"}
         </Button>
       </div>
     </div>

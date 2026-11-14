@@ -224,6 +224,60 @@ class FakeBackend {
   }
 }
 
+// The scroll-bar rule of scroll.spec.ts (docs/harmonization/scroll-audit.md), applied to this screen: every box
+// whose content overflows scrolls with a drawn bar, and the document itself never scrolls.
+type Violation = { where: string; axis: "x" | "y"; why: string };
+async function audit(page: Page): Promise<{ violations: Violation[]; overflowing: string[] }> {
+  return page.evaluate(() => {
+    const describe = (el: Element) => {
+      const id = el.getAttribute("data-testid");
+      const cls = (el.getAttribute("class") ?? "").split(/\s+/).filter(Boolean).slice(0, 4).join(".");
+      return `${el.tagName.toLowerCase()}${id ? `[data-testid=${id}]` : ""}${cls ? `.${cls}` : ""}`;
+    };
+    const violations: { where: string; axis: "x" | "y"; why: string }[] = [];
+    const overflowing: string[] = [];
+
+    const doc = document.scrollingElement as HTMLElement;
+    if (doc.scrollHeight > doc.clientHeight + 1) violations.push({ where: "document", axis: "y", why: "the document scrolls instead of the shell's main region" });
+    if (doc.scrollWidth > doc.clientWidth + 1) violations.push({ where: "document", axis: "x", why: "the document scrolls horizontally" });
+
+    for (const el of Array.from(document.body.querySelectorAll<HTMLElement>("*"))) {
+      const cs = getComputedStyle(el);
+      if (cs.display === "none" || cs.visibility === "hidden" || cs.display === "contents") continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 1 || rect.height <= 1) continue; // sr-only and collapsed boxes
+      const isViewport = el.hasAttribute("data-radix-scroll-area-viewport");
+      const bar = isViewport && el.parentElement?.querySelector("[data-orientation]") != null;
+      const borderX = parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
+      const borderY = parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+      for (const axis of ["y", "x"] as const) {
+        const over = axis === "y" ? el.scrollHeight > el.clientHeight + 1 : el.scrollWidth > el.clientWidth + 1;
+        if (!over) continue;
+        const overflow = axis === "y" ? cs.overflowY : cs.overflowX;
+        if (overflow === "visible") continue; // not a clipping box
+        if (axis === "x" && cs.textOverflow === "ellipsis") continue;
+        const where = describe(el);
+        overflowing.push(`${where} (${axis})`);
+        if (overflow === "hidden" && axis === "x" && el.getAttribute("data-clip-x") === "intended") continue;
+        if (overflow !== "auto" && overflow !== "scroll") {
+          violations.push({ where, axis, why: `content exceeds the box but overflow-${axis} is ${overflow}` });
+          continue;
+        }
+        if (!el.classList.contains("scroll-visible") && !bar) {
+          violations.push({ where, axis, why: "scrolls but has neither scroll-visible nor a ScrollArea scrollbar" });
+          continue;
+        }
+        if (!bar) {
+          const reserved = axis === "y" ? el.offsetWidth - el.clientWidth - borderX : el.offsetHeight - el.clientHeight - borderY;
+          if (reserved <= 0) violations.push({ where, axis, why: "no scrollbar is drawn (no room reserved for it)" });
+        }
+      }
+    }
+    return { violations, overflowing };
+  });
+}
+
+
 const FINISHED_JOBS = [
   { jobId: "job-a", displayName: "Panel A", status: "complete", total: 5, completed: 5, errorCount: 0, env: "production", createdAt: 1_700_000_000, updatedAt: 1_700_000_100 },
   { jobId: "job-b", displayName: "Panel B", status: "complete", total: 5, completed: 5, errorCount: 0, env: "production", createdAt: 1_700_000_200, updatedAt: 1_700_000_300 },
@@ -479,5 +533,33 @@ test.describe("harmonization workbench @app", () => {
     expect(docScrolls).toBe(false);
     await page.getByRole("button", { name: "Next page" }).click();
     await expect(page.getByTestId("items-range")).toContainText("Showing 101 to 156 of 156");
+  });
+
+  test("every overflowing box on the screen shows a scroll bar: table, runs, docked panels and the setup sheet", async ({ page }) => {
+    await setup(page, (b) => {
+      for (let i = 0; i < 30; i++) b.addRun("harmonize_cohorts", [`cohort_${i}_a`, `cohort_${i}_b`], TWO_REPORT, twoCohortItems(150));
+      // The newest run, opened first: five cohorts make the widest summary strip.
+      b.addRun("harmonize_many", ["a", "b", "c", "d", "e"].map((x) => `example_cohort_${x}`), MANY_REPORT, twoCohortItems(150));
+    });
+    await page.setViewportSize({ width: 1100, height: 600 });
+    await goto(page, "/harmonize");
+    await expect(page.getByTestId("items-table")).toBeVisible();
+    await page.getByRole("button", { name: "Run details", exact: true }).click();
+    await expect(page.getByTestId("details-panel")).toBeVisible();
+    let result = await audit(page);
+    expect(result.violations, JSON.stringify(result.violations, null, 2)).toEqual([]);
+    for (const needle of ["items-scroll", "run-list"]) expect(result.overflowing.some((o) => o.includes(needle)), `${needle} never overflowed`).toBe(true);
+
+    await page.getByRole("button", { name: "Close Run details" }).click();
+    await page.getByRole("button", { name: "New run" }).first().click();
+    await page.getByRole("radio", { name: /Many cohorts/ }).click();
+    await page.getByTestId("harm-file-input").setInputFiles(
+      ["a", "b", "c", "d", "e"].map((x) => ({ name: `${x}.tsv`, mimeType: "text/tab-separated-values", buffer: Buffer.from("row_id\tAnalyte\n1\tx\n") })),
+    );
+    await expect(page.getByTestId("cohort-card")).toHaveCount(5);
+    await expect(page.getByTestId("cohort-inspect")).toHaveCount(5);
+    result = await audit(page);
+    expect(result.violations, JSON.stringify(result.violations, null, 2)).toEqual([]);
+    expect(result.overflowing.length).toBeGreaterThan(0);
   });
 });

@@ -463,13 +463,12 @@ export function ItemsView({
                   />
                 </th>
                 <th className="px-2 py-2">Flag</th>
+                <th className="px-2 py-2" title="Where the flag state came from, and biomapper's own suggestion">Flag source</th>
                 <th className="px-2 py-2">Kind</th>
                 <th className="px-2 py-2">Item</th>
                 <th className="px-2 py-2">Arm</th>
-                <th className="px-2 py-2">Members</th>
+                <th className="w-2/5 px-2 py-2">Members</th>
                 <th className="px-2 py-2">Details</th>
-                <th className="px-2 py-2" title="Where the flag state came from">Flag source</th>
-                <th className="px-2 py-2">Suggested</th>
               </tr>
             </thead>
             <tbody>
@@ -503,12 +502,16 @@ export function ItemsView({
                     <td className="px-2 py-1.5">
                       <FlagToggle item={item} name={name} busy={busyRefs.has(item.ref)} onToggle={() => void toggle(item)} />
                     </td>
+                    <td className="whitespace-nowrap px-2 py-1.5">
+                      <SourceText item={item} />
+                      <div className="mt-0.5 text-[11px] text-neutral-500">suggested: {item.suggested ? "flag" : "no flag"}</div>
+                    </td>
                     <td className="whitespace-nowrap px-2 py-1.5 text-xs text-neutral-700">{ITEM_KIND_LABELS[item.kind]}</td>
                     <td className="px-2 py-1.5">
-                      <div className="flex items-center gap-1.5 whitespace-nowrap">
+                      <div className="flex min-w-[9rem] max-w-[15rem] flex-wrap items-center gap-1.5">
                         <button
                           type="button"
-                          className="flex items-center gap-1.5 text-left font-medium text-ph-navy hover:underline"
+                          className="flex flex-wrap items-center gap-1.5 text-left font-medium text-ph-navy hover:underline"
                           aria-label={`Open ${name}`}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -542,10 +545,6 @@ export function ItemsView({
                     <td className="max-w-[18rem] px-2 py-1.5 text-xs text-neutral-700">
                       {d.facts.length ? d.facts.map((f) => <div key={f} className="truncate" title={f}>{f}</div>) : <span className="text-neutral-400">No further detail</span>}
                     </td>
-                    <td className="px-2 py-1.5">
-                      <SourceText item={item} />
-                    </td>
-                    <td className="whitespace-nowrap px-2 py-1.5 text-xs text-neutral-700">{item.suggested ? "Flag" : "No flag"}</td>
                   </tr>
                 );
               })}

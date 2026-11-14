@@ -307,7 +307,7 @@ export function RunHeader({
   );
 }
 
-export function NoRunSelected({ onNewRun, onExample }: { onNewRun: () => void; onExample: (kind: "two_cohort" | "many_cohort") => void }) {
+export function NoRunSelected({ onNewRun, onExample }: { onNewRun: (tab: "files" | "jobs") => void; onExample: (kind: "two_cohort" | "many_cohort") => void }) {
   return (
     <div className="flex flex-1 items-center justify-center rounded border border-dashed border-neutral-300 bg-white">
       <EmptyState
@@ -321,8 +321,9 @@ export function NoRunSelected({ onNewRun, onExample }: { onNewRun: () => void; o
         }
         action={
           <>
-            <Button onClick={onNewRun}>
-              <Plus aria-hidden /> New run
+            <Button onClick={() => onNewRun("files")}>Upload cohort files</Button>
+            <Button variant="secondary" onClick={() => onNewRun("jobs")}>
+              Harmonize finished mapping jobs
             </Button>
             <Button variant="secondary" onClick={() => onExample("two_cohort")}>
               Run the two-cohort example

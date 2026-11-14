@@ -258,7 +258,7 @@ export default function HarmonizePage() {
         <SkeletonRows rows={8} />
       </div>
     ) : (
-      <NoRunSelected onNewRun={() => openSetup("files")} onExample={(k) => void example.start(k)} />
+      <NoRunSelected onNewRun={(tab) => openSetup(tab)} onExample={(k) => void example.start(k)} />
     );
   } else if (run.isLoading) {
     body = (
@@ -291,7 +291,7 @@ export default function HarmonizePage() {
             </>
           }
         />
-        {hasResults(r.state) ? <ResultsWorkbench run={r} dock={dock} setDock={setDock} /> : <ProgressPanel run={r} />}
+        {hasResults(r.state) ? <ResultsWorkbench key={r.jobId} run={r} dock={dock} setDock={setDock} /> : <ProgressPanel run={r} />}
       </>
     );
   }

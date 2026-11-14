@@ -491,7 +491,9 @@ function JobEntity({ jobId }: { jobId: string }) {
   if (!jobId) return null;
   if (q.isLoading) return <span className="text-xs text-neutral-500">Reading the entity type</span>;
   if (q.isError) return <span className="text-xs text-neutral-600">Entity type unavailable: {apiErrorMessage(q.error)}</span>;
-  const entity = q.data?.config?.entityType;
+  // The API sends the stored config as written (entity_type); the schema names it entityType. Read either.
+  const config = (q.data?.config ?? null) as { entityType?: string; entity_type?: string } | null;
+  const entity = config?.entityType ?? config?.entity_type;
   return <span className="text-xs text-neutral-600">Entity type: {entity || "not recorded"}</span>;
 }
 

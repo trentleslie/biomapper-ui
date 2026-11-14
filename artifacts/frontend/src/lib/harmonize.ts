@@ -345,7 +345,7 @@ export function describeItem(item: Pick<HarmonizeItem, "kind" | "detail" | "memb
       if (pairs !== null) facts.push(`${pairs} row ${pairs === 1 ? "pair" : "pairs"}`);
     } else if (origin === "id_check_review") {
       const check = (d.check ?? {}) as Record<string, unknown>;
-      if (typeof check.status === "string") badges.push({ text: check.status.replace(/_/g, " "), tone: "warning" });
+      if (typeof check.status === "string" && check.status !== "not_confirmed") badges.push({ text: check.status.replace(/_/g, " "), tone: "warning" });
       if (Array.isArray(check.declared) && check.declared.length) facts.push(`Declared ${check.declared.join(", ")}`);
       if (typeof d.node === "string") facts.push(`Node ${d.node}`);
     } else if (origin === "possible_missed") {
