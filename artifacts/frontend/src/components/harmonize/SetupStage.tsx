@@ -36,7 +36,7 @@ import {
   type CohortDraft,
 } from "@/lib/harmonize";
 import { CohortEditor, EMPTY_INSPECT, FilePick, inspectOk, type CohortSlot } from "./CohortEditor";
-import { Note, Panel } from "./common";
+import { Glossary, Note, Panel } from "./common";
 import { stageHref } from "./StageRail";
 
 type Mode = "two" | "many" | "jobs";
@@ -91,14 +91,24 @@ export function SetupStage() {
   const updateSlot = (setter: typeof setTwoSlots, id: string, fn: (s: CohortSlot) => CohortSlot) =>
     setter((prev) => prev.map((s) => (s.id === id ? fn(s) : s)));
 
-  const loadFile = (setter: typeof setTwoSlots, id: string, file: File, takenLabels: string[]) => {
+  // The label is chosen inside the state update, against the other slots' labels as they are then. Two files loaded
+  // in the same tick (a two-file drop) each see the label the other was just given, so same-stem files get
+  // distinct labels instead of two equal ones and a refused run.
+  const loadFile = (setter: typeof setTwoSlots, id: string, file: File) => {
     setSubmitError(null);
-    updateSlot(setter, id, (s) => ({
-      ...s,
-      file,
-      inspect: { ...EMPTY_INSPECT, status: "loading" },
-      draft: s.labelTouched ? s.draft : { ...s.draft, label: distinctLabel(labelFromFilename(file.name), takenLabels) },
-    }));
+    setter((prev) => {
+      const taken = prev.filter((o) => o.id !== id).map((o) => o.draft.label);
+      return prev.map((s) =>
+        s.id !== id
+          ? s
+          : {
+              ...s,
+              file,
+              inspect: { ...EMPTY_INSPECT, status: "loading" },
+              draft: s.labelTouched ? s.draft : { ...s.draft, label: distinctLabel(labelFromFilename(file.name), taken) },
+            },
+      );
+    });
     inspectHarmonizeFile({ file }).then(
       (res) => {
         const inspect = inspectOk(res.columns, res.rowCount);
@@ -120,14 +130,33 @@ export function SetupStage() {
   };
 
   const addManyFiles = (files: File[]) => {
-    const taken = manySlots.map((s) => s.draft.label);
     const added = files.map(() => newSlot());
     setManySlots((prev) => [...prev, ...added]);
-    files.forEach((file, i) => {
-      const label = distinctLabel(labelFromFilename(file.name), taken);
-      taken.push(label);
-      loadFile(setManySlots, added[i].id, file, taken.filter((l) => l !== label));
-    });
+    files.forEach((file, i) => loadFile(setManySlots, added[i].id, file));
+  };
+
+  // Two-cohort mode takes several files at once: two fill both cohorts; one fills the first cohort without a file;
+  // more than two cannot fit, so the screen offers many-cohort mode with those files instead of dropping any.
+  const [tooMany, setTooMany] = useState<File[] | null>(null);
+  const [pickNote, setPickNote] = useState<string | null>(null);
+  const addTwoFiles = (files: File[]) => {
+    setPickNote(null);
+    setTooMany(null);
+    if (files.length > 2) return setTooMany(files);
+    if (files.length === 2) {
+      loadFile(setTwoSlots, twoSlots[0].id, files[0]);
+      loadFile(setTwoSlots, twoSlots[1].id, files[1]);
+      return;
+    }
+    const empty = twoSlots.find((s) => !s.file);
+    if (!empty) return setPickNote("Both cohorts already have a file. Use Replace file on a cohort to change its file.");
+    loadFile(setTwoSlots, empty.id, files[0]);
+  };
+  const switchToMany = (files: File[]) => {
+    setTooMany(null);
+    setMode("many");
+    setSubmitError(null);
+    addManyFiles(files);
   };
 
   const started = (run: HarmonizeRunStatus) => {
@@ -265,6 +294,32 @@ export function SetupStage() {
           >
             <div className="space-y-4">
               {mode === "two" ? (
+                <>
+                <FilePick label="Choose both cohort files" multiple onFiles={addTwoFiles} testId="two-pick" />
+                {pickNote && (
+                  <Note tone="info" testId="two-pick-note">
+                    {pickNote}
+                  </Note>
+                )}
+                {tooMany && (
+                  <Note
+                    tone="warning"
+                    title={`You chose ${tooMany.length} files`}
+                    testId="two-pick-too-many"
+                    action={
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" onClick={() => switchToMany(tooMany)}>
+                          Switch to many cohorts with these {tooMany.length} files
+                        </Button>
+                        <Button size="sm" variant="secondary" onClick={() => setTooMany(null)}>
+                          Keep two cohorts
+                        </Button>
+                      </div>
+                    }
+                  >
+                    Two-cohort setup takes two files. Many-cohort setup takes 2 to {MAX_COHORTS}. None of these files has been added yet.
+                  </Note>
+                )}
                 <div className="grid gap-4 xl:grid-cols-2">
                   {twoSlots.map((slot, i) => (
                     <CohortEditor
@@ -272,15 +327,15 @@ export function SetupStage() {
                       title={i === 0 ? "Cohort A" : "Cohort B"}
                       slot={slot}
                       vocabSuggestions={vocabSuggestions}
-                      onFile={(file) =>
-                        loadFile(setTwoSlots, slot.id, file, twoSlots.filter((s) => s.id !== slot.id).map((s) => s.draft.label))
-                      }
+                      onFile={(file) => loadFile(setTwoSlots, slot.id, file)}
+                      onManyFiles={addTwoFiles}
                       onChange={(draft: CohortDraft, touched) =>
                         updateSlot(setTwoSlots, slot.id, (s) => ({ ...s, draft, labelTouched: s.labelTouched || !!touched }))
                       }
                     />
                   ))}
                 </div>
+                </>
               ) : (
                 <>
                   <FilePick label="Add cohort files" multiple onFiles={addManyFiles} testId="many-pick" />
@@ -295,9 +350,11 @@ export function SetupStage() {
                           slot={slot}
                           compact
                           vocabSuggestions={vocabSuggestions}
-                          onFile={(file) =>
-                            loadFile(setManySlots, slot.id, file, manySlots.filter((s) => s.id !== slot.id).map((s) => s.draft.label))
-                          }
+                          onFile={(file) => loadFile(setManySlots, slot.id, file)}
+                          onManyFiles={(files) => {
+                            loadFile(setManySlots, slot.id, files[0]);
+                            addManyFiles(files.slice(1));
+                          }}
                           onChange={(draft: CohortDraft, touched) =>
                             updateSlot(setManySlots, slot.id, (s) => ({ ...s, draft, labelTouched: s.labelTouched || !!touched }))
                           }
@@ -324,6 +381,8 @@ export function SetupStage() {
               )}
             </div>
           </Panel>
+
+          <Glossary terms={["keyColumn", "category"]} />
 
           <StartBar
             submitting={submitting}

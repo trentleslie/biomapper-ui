@@ -136,6 +136,7 @@ export function CohortEditor({
   slot,
   vocabSuggestions,
   onFile,
+  onManyFiles,
   onChange,
   onRemove,
   compact = false,
@@ -144,6 +145,8 @@ export function CohortEditor({
   slot: CohortSlot;
   vocabSuggestions: string[];
   onFile: (file: File) => void;
+  /** Several files dropped or picked on this cohort at once. */
+  onManyFiles?: (files: File[]) => void;
   onChange: (draft: CohortDraft, labelTouched?: boolean) => void;
   onRemove?: () => void;
   compact?: boolean;
@@ -201,10 +204,19 @@ export function CohortEditor({
                 )}
               </div>
             </div>
-            <FilePick label={`Replace file for ${title}`} onFiles={(f) => onFile(f[0])} compact />
+            <FilePick
+              label={`Replace file for ${title}`}
+              multiple={!!onManyFiles}
+              onFiles={(f) => (f.length > 1 && onManyFiles ? onManyFiles(f) : onFile(f[0]))}
+              compact
+            />
           </div>
         ) : (
-          <FilePick label={`Choose file for ${title}`} onFiles={(f) => onFile(f[0])} />
+          <FilePick
+            label={`Choose file for ${title}`}
+            multiple={!!onManyFiles}
+            onFiles={(f) => (f.length > 1 && onManyFiles ? onManyFiles(f) : onFile(f[0]))}
+          />
         )}
         {inspect.status === "error" && inspect.error && (
           <p role="alert" className="rounded border border-danger-border bg-danger-bg px-3 py-2 text-sm text-danger">
@@ -255,7 +267,7 @@ export function CohortEditor({
               placeholder="No key column"
               onChange={(v) => onChange({ ...draft, keyColumn: v })}
             />
-            <p className="text-xs text-neutral-500">Without one, rows are keyed by their name.</p>
+            <p className="text-xs text-neutral-500">Without one, a row's key is its row number and name.</p>
           </div>
         </div>
 

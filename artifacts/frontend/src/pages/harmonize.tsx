@@ -42,9 +42,9 @@ function PageHeader({ run }: { run: HarmonizeRunStatus | null }) {
     <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
       <div className="min-w-0">
         <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Harmonize cohorts</h1>
-        <p className="mt-1 max-w-2xl text-sm text-neutral-500">
-          Find the rows that are the same entity across your datasets, flag what an expert should check, and export the
-          pairs for expert review.
+        <p className="mt-1 max-w-2xl text-sm text-neutral-500" data-testid="page-intro">
+          Find which rows in two or more datasets are the same thing. Set up your datasets, let biomapper match them,
+          check what it flagged for an expert, and export the pairs for expert review.
         </p>
       </div>
       {run && (
