@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 from pydantic.alias_generators import to_camel
 from typing import Literal
 
@@ -53,7 +53,20 @@ class JobListItem(BaseModel):
 
 class JobDetail(JobListItem):
     results: list[dict] = []
+    # Stored as MappingConfig.model_dump(mode="json"), so snake_case in the database. Kept a plain dict so a
+    # legacy row that would not validate as MappingConfig still loads.
     config: dict | None = None
+
+    @field_serializer("config")
+    def _camel_config(self, config: dict | None) -> dict | None:
+        """Camelize the top-level config keys at the response boundary, as the spec's MappingConfig has them.
+
+        Only the top level: the values of ``hints`` and ``hint_columns`` are keyed by prefix and column
+        name, which must reach the client as written. Stored rows are not changed.
+        """
+        if config is None:
+            return None
+        return {to_camel(k) if isinstance(k, str) else k: v for k, v in config.items()}
 
 
 class JobUpdate(BaseModel):

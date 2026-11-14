@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { test, expect, type Page } from "@playwright/test";
 import { goto, isolate, JOBS } from "./helpers";
 
@@ -197,6 +199,43 @@ test.describe("scroll bars on the signed-in surface @app", () => {
     await goto(page, "/flagged");
     await expect(page.getByText("flagged compound 0", { exact: true })).toBeVisible();
     await expectNoViolations(page, ["main"]);
+  });
+
+  test("harmonize: runs list, items list, result tables and cohort column list", async ({ page }) => {
+    const report = JSON.parse(
+      readFileSync(path.resolve(import.meta.dirname, "../../python-api/data/harmonize_examples/many_cohort/recording/report.json"), "utf8"),
+    );
+    const runBase = { kind: "harmonize_many", labels: ["a", "b", "c"], entity: "metabolites", createdAt: "2026-11-14T00:00:00Z" };
+    const runs = Array.from({ length: 40 }, (_, i) => ({ ...runBase, jobId: `run${i}`, state: "complete" }));
+    const items = Array.from({ length: 150 }, (_, i) => ({
+      ref: `group:names_only:${i}`, kind: "group", arm: "names_only", suggested: false, flagged: false, source: "biomapper",
+      members: Array.from({ length: 3 }, (_, m) => ({ cohort: `cohort_${m}`, key: `k${i}_${m}`, name: `a long analyte name number ${i} ${m}`, chosenKgId: "RM:0000001" })),
+      detail: { node: "RM:0000001", clean: true, multiplicity: false, broad: false, origin: "groups" },
+    }));
+    await isolate(page, {
+      "/api/harmonize/runs": runs,
+      "/api/harmonize/runs/run0": runs[0],
+      "/api/harmonize/runs/run0/report": report,
+      "/api/harmonize/runs/run0/items": async (route, url) => {
+        const limit = Number(url.searchParams.get("limit") ?? 100);
+        return route.fulfill({ json: { total: items.length, flaggedTotal: 0, items: items.slice(0, limit) } });
+      },
+      "/api/harmonize/inspect": { columns: Array.from({ length: 40 }, (_, i) => `column_${i}`), rowCount: 10 },
+    });
+    await page.setViewportSize({ width: 1100, height: 700 });
+    await goto(page, "/harmonize");
+    await expect(page.getByTestId("runs-list")).toContainText("a, b, c");
+    await page.getByLabel("Choose file for Cohort A", { exact: true }).first().setInputFiles({ name: "wide.tsv", mimeType: "text/tab-separated-values", buffer: Buffer.from("x\n") });
+    await expect(page.getByTestId("vocab-columns").first()).toBeVisible();
+    await expectNoViolations(page, ["main", "ul.scroll-visible.max-h-", "vocab-columns"]);
+
+    await goto(page, "/harmonize/runs/run0/review?view=flags");
+    await expect(page.getByTestId("items-table")).toBeVisible();
+    await expectNoViolations(page, ["items-table"]);
+
+    await goto(page, "/harmonize/runs/run0/review?view=results");
+    await expect(page.getByTestId("groups-table")).toBeVisible();
+    await expectNoViolations(page, ["groups-table"]);
   });
 
   test("benchmark runs table, run results tables and filter dropdowns", async ({ page }) => {

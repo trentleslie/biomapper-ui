@@ -7,15 +7,18 @@ import { defineConfig } from "@playwright/test";
 // out so secret scanners do not flag a key-shaped literal.
 const DUMMY_CLERK_KEY = `pk_test_${Buffer.from("example.clerk.accounts.dev$").toString("base64")}`;
 
-const APP_PORT = 5191;
-const BYPASS_PORT = 5192;
+// E2E_PORT_BASE moves both servers (APP on the base, BYPASS on base + 1) so several worktrees can run the suite at
+// once; when it is set, a server already on those ports is never reused. Unset, the ports and reuse are as before.
+const PORT_BASE = process.env.E2E_PORT_BASE ? Number(process.env.E2E_PORT_BASE) : undefined;
+const APP_PORT = PORT_BASE ?? 5191;
+const BYPASS_PORT = PORT_BASE !== undefined ? PORT_BASE + 1 : 5192;
 
 function server(port: number, extraEnv: Record<string, string> = {}) {
   return {
     // Plain `vite`: `pnpm run e2e` puts node_modules/.bin on PATH, and npx would add npm config warnings.
     command: "vite --config vite.config.ts --strictPort",
     url: `http://localhost:${port}/`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !process.env.CI && PORT_BASE === undefined,
     timeout: 120_000,
     env: {
       PORT: String(port),
@@ -53,7 +56,7 @@ export default defineConfig({
       // The signed-in surface: the dev-only auth bypass in App.tsx renders AppShell without a Clerk session.
       name: "bypass",
       use: { baseURL: `http://localhost:${BYPASS_PORT}` },
-      testMatch: /(shell|scroll)\.spec\.ts/,
+      testMatch: /(shell|scroll|harmonize)\.spec\.ts/,
       grep: /@app/,
     },
   ],
