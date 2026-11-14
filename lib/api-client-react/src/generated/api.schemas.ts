@@ -5,6 +5,26 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type HarmonizeExportTable =
+  (typeof HarmonizeExportTable)[keyof typeof HarmonizeExportTable];
+
+export const HarmonizeExportTable = {
+  links: "links",
+  groups: "groups",
+  review: "review",
+  unresolved: "unresolved",
+  eitl_pairs: "eitl_pairs",
+} as const;
+
+export type HarmonizeExportFormat =
+  (typeof HarmonizeExportFormat)[keyof typeof HarmonizeExportFormat];
+
+export const HarmonizeExportFormat = {
+  csv: "csv",
+  tsv: "tsv",
+  json: "json",
+} as const;
+
 export interface HealthStatus {
   status: string;
 }
@@ -695,3 +715,10 @@ export type ListHarmonizeItemsParams = {
    */
   limit?: number;
 };
+
+export type ExportHarmonizeRunParams = {
+  table: HarmonizeExportTable;
+  format: HarmonizeExportFormat;
+};
+
+export type ExportHarmonizeRun200ThreeItem = { [key: string]: unknown };

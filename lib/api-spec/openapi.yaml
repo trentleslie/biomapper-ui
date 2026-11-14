@@ -982,8 +982,97 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /harmonize/runs/{jobId}/export:
+    get:
+      operationId: exportHarmonizeRun
+      tags: [harmonize]
+      summary: Download one table of a finished run with the caller's effective flags
+      description: >-
+        links, groups, review and unresolved hold every item of that kind in both arms, one row
+        per item, with ref, arm, flagged, flag_source, suggested, one column group per cohort
+        label (label_key, label_name, label_chosen_kg_id; several rows of one cohort are joined
+        with " | " in key order), member_count, basis and the item's detail fields. JSON
+        carries members as a list instead of the column groups. A table that does not apply to
+        the run's kind has its header and no rows. eitl_pairs holds only flagged links and
+        flagged groups (n - 1 pairs per group of n) in the columns the expert-in-the-loop
+        pairs upload reads; it is CSV or JSON only. CSV and TSV cells that could start a
+        spreadsheet formula are prefixed with an apostrophe.
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: table
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/HarmonizeExportTable"
+        - name: format
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/HarmonizeExportFormat"
+      responses:
+        "200":
+          description: >-
+            The file, as an attachment named kind_labels_table.format (labels in report order,
+            reduced to letters, digits, dot, underscore and hyphen)
+          headers:
+            Content-Disposition:
+              description: attachment; filename="..."
+              schema:
+                type: string
+            X-Harmonize-Skipped-One-Sided:
+              description: >-
+                eitl_pairs only: the number of flagged items the file cannot hold (review and
+                unresolved items, and one-row groups)
+              schema:
+                type: integer
+          content:
+            text/csv:
+              schema:
+                type: string
+            text/tab-separated-values:
+              schema:
+                type: string
+            application/json:
+              schema:
+                type: array
+                description: One object per row, keys in header order
+                items:
+                  type: object
+                  additionalProperties: true
+        "400":
+          description: >-
+            Missing user ID header, an unknown table or format, or eitl_pairs as TSV
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No such run for this user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: The run has not finished yet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
+    HarmonizeExportTable:
+      type: string
+      enum: [links, groups, review, unresolved, eitl_pairs]
+
+    HarmonizeExportFormat:
+      type: string
+      enum: [csv, tsv, json]
+
     HealthStatus:
       type: object
       properties:

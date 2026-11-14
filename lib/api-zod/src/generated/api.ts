@@ -1430,3 +1430,24 @@ export const ResetHarmonizeFlagsBody = zod.object({
 export const ResetHarmonizeFlagsResponse = zod.object({
   flaggedTotal: zod.number(),
 });
+
+/**
+ * links, groups, review and unresolved hold every item of that kind in both arms, one row per item, with ref, arm, flagged, flag_source, suggested, one column group per cohort label (label_key, label_name, label_chosen_kg_id; several rows of one cohort are joined with " | " in key order), member_count, basis and the item's detail fields. JSON carries members as a list instead of the column groups. A table that does not apply to the run's kind has its header and no rows. eitl_pairs holds only flagged links and flagged groups (n - 1 pairs per group of n) in the columns the expert-in-the-loop pairs upload reads; it is CSV or JSON only. CSV and TSV cells that could start a spreadsheet formula are prefixed with an apostrophe.
+ * @summary Download one table of a finished run with the caller's effective flags
+ */
+export const ExportHarmonizeRunParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const ExportHarmonizeRunQueryParams = zod.object({
+  table: zod.enum(["links", "groups", "review", "unresolved", "eitl_pairs"]),
+  format: zod.enum(["csv", "tsv", "json"]),
+});
+
+export const ExportHarmonizeRunResponseItem = zod.record(
+  zod.string(),
+  zod.unknown(),
+);
+export const ExportHarmonizeRunResponse = zod.array(
+  ExportHarmonizeRunResponseItem,
+);

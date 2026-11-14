@@ -52,6 +52,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # Harmonize exports: the download's filename and the EITL file's skipped-item count.
+    expose_headers=["Content-Disposition", "X-Harmonize-Skipped-One-Sided"],
 )
 
 app.include_router(health.router)

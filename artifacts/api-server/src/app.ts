@@ -41,7 +41,15 @@ if (clerkEnabled) {
   app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 }
 
-app.use(cors({ credentials: true, origin: true }));
+// The proxies below pass every response header through; a cross-origin browser can only read
+// the harmonize export's filename and skipped-item count when they are exposed here.
+app.use(
+  cors({
+    credentials: true,
+    origin: true,
+    exposedHeaders: ["Content-Disposition", "X-Harmonize-Skipped-One-Sided"],
+  }),
+);
 
 if (clerkEnabled) {
   // clerkMiddleware only reads headers/cookies — safe to mount before body parsers.

@@ -24,6 +24,8 @@ import type {
   DeleteFlagParams,
   EntityType,
   ErrorResponse,
+  ExportHarmonizeRun200ThreeItem,
+  ExportHarmonizeRunParams,
   FlaggedNameCountResponse,
   HarmonizeBulkFlagsRequest,
   HarmonizeCohortsBody,
@@ -2660,3 +2662,124 @@ export const useResetHarmonizeFlags = <
 > => {
   return useMutation(getResetHarmonizeFlagsMutationOptions(options));
 };
+
+/**
+ * links, groups, review and unresolved hold every item of that kind in both arms, one row per item, with ref, arm, flagged, flag_source, suggested, one column group per cohort label (label_key, label_name, label_chosen_kg_id; several rows of one cohort are joined with " | " in key order), member_count, basis and the item's detail fields. JSON carries members as a list instead of the column groups. A table that does not apply to the run's kind has its header and no rows. eitl_pairs holds only flagged links and flagged groups (n - 1 pairs per group of n) in the columns the expert-in-the-loop pairs upload reads; it is CSV or JSON only. CSV and TSV cells that could start a spreadsheet formula are prefixed with an apostrophe.
+ * @summary Download one table of a finished run with the caller's effective flags
+ */
+export const getExportHarmonizeRunUrl = (
+  jobId: string,
+  params: ExportHarmonizeRunParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/harmonize/runs/${jobId}/export?${stringifiedParams}`
+    : `/api/harmonize/runs/${jobId}/export`;
+};
+
+export const exportHarmonizeRun = async (
+  jobId: string,
+  params: ExportHarmonizeRunParams,
+  options?: RequestInit,
+): Promise<string | ExportHarmonizeRun200ThreeItem[]> => {
+  return customFetch<string | ExportHarmonizeRun200ThreeItem[]>(
+    getExportHarmonizeRunUrl(jobId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getExportHarmonizeRunQueryKey = (
+  jobId: string,
+  params?: ExportHarmonizeRunParams,
+) => {
+  return [
+    `/api/harmonize/runs/${jobId}/export`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getExportHarmonizeRunQueryOptions = <
+  TData = Awaited<ReturnType<typeof exportHarmonizeRun>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  params: ExportHarmonizeRunParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportHarmonizeRun>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getExportHarmonizeRunQueryKey(jobId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof exportHarmonizeRun>>
+  > = ({ signal }) =>
+    exportHarmonizeRun(jobId, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!jobId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof exportHarmonizeRun>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ExportHarmonizeRunQueryResult = NonNullable<
+  Awaited<ReturnType<typeof exportHarmonizeRun>>
+>;
+export type ExportHarmonizeRunQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Download one table of a finished run with the caller's effective flags
+ */
+
+export function useExportHarmonizeRun<
+  TData = Awaited<ReturnType<typeof exportHarmonizeRun>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  params: ExportHarmonizeRunParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportHarmonizeRun>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getExportHarmonizeRunQueryOptions(
+    jobId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}

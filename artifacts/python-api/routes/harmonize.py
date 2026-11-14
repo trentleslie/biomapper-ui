@@ -1,5 +1,5 @@
-"""Cohort harmonization runs: uploads, submit, run status, report, review items, and the
-reviewable items with the organizer's flags.
+"""Cohort harmonization runs: uploads, submit, run status, report, review items, the
+reviewable items with the organizer's flags, and exports.
 
 Every route takes the ``x-clerk-user-id`` header (400 when missing). A run belongs to the user
 who started it; any other user gets 404 for it, on every route.
@@ -37,7 +37,7 @@ from typing import Any, Literal
 
 from biomapper.jobs import FINISHED_STATES, CohortSpec, HarmonizeStatus, JobError
 from biomapper.mcp.config import ServerConfig
-from fastapi import APIRouter, File, Form, Header, HTTPException, Query, UploadFile
+from fastapi import APIRouter, File, Form, Header, HTTPException, Query, Response, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, ValidationError
 from pydantic.alias_generators import to_camel
@@ -45,6 +45,15 @@ from pydantic.alias_generators import to_camel
 from services import harmonize_storage
 from services.database import database
 from services.harmonize_backend import HarmonizeBackend, get_backend
+from services.harmonize_export import (
+    EITL_FORMATS,
+    FORMATS,
+    TABLES,
+    export_filename,
+    export_rows,
+    render,
+    skipped_one_sided,
+)
 from services.harmonize_items import FlaggedItem, Item, items_from_report, with_flags
 from services.harmonize_storage import (
     MAX_COHORT_BYTES,
@@ -709,3 +718,55 @@ async def reset_flags(
     await database.reset_harmonize_flags(job_id, user_id, refs)
     flagged_now = await _flagged_items(job_id, user_id, items)
     return {"flaggedTotal": await run_in_threadpool(_flagged_total, flagged_now)}
+
+
+# ---------------------------------------------------------------------------
+# Routes: exports
+# ---------------------------------------------------------------------------
+
+SKIPPED_ONE_SIDED_HEADER = "X-Harmonize-Skipped-One-Sided"
+
+
+@router.get("/runs/{job_id}/export")
+async def export_run(
+    job_id: str,
+    table: str | None = Query(None),
+    fmt: str | None = Query(None, alias="format"),
+    x_clerk_user_id: str | None = Header(None),
+) -> Response:
+    """Download one table of a finished run (services.harmonize_export) with the caller's
+    effective flags, as ``<kind>_<labels>_<table>.<format>``.
+
+    The ``eitl_pairs`` table also reports, in ``X-Harmonize-Skipped-One-Sided``, how many
+    flagged items it could not hold.
+    """
+    user_id = _require_user(x_clerk_user_id)
+    await _owned_run(job_id, user_id)
+    if table not in TABLES:
+        raise HTTPException(status_code=400,
+                            detail=f"Unknown table '{table}'. Tables: {', '.join(TABLES)}.")
+    if fmt not in FORMATS:
+        raise HTTPException(status_code=400,
+                            detail=f"Unknown format '{fmt}'. Formats: {', '.join(FORMATS)}.")
+    if table == "eitl_pairs" and fmt not in EITL_FORMATS:
+        raise HTTPException(status_code=400,
+                            detail="The EITL pairs file is CSV or JSON: the expert-in-the-loop "
+                                   "upload does not read TSV.")
+    flagged = await _flagged_items(job_id, user_id, await _run_items(job_id))
+    backend = get_backend()
+
+    def build() -> tuple[bytes, str, str]:
+        report = backend.load_report(job_id)
+        header, rows = export_rows(report, flagged, table, nested=fmt == "json")
+        body, media_type = render(scrub(header), scrub(rows), fmt)
+        return body, media_type, export_filename(report, table, fmt)
+
+    try:
+        body, media_type, filename = await run_in_threadpool(build)
+    except JobError as exc:
+        raise await _finished_or_409(backend, job_id, exc) from None
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    if table == "eitl_pairs":
+        headers[SKIPPED_ONE_SIDED_HEADER] = str(
+            await run_in_threadpool(skipped_one_sided, flagged))
+    return Response(content=body, media_type=media_type, headers=headers)
