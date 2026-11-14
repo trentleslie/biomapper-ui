@@ -49,6 +49,33 @@ describe("fetchExport", () => {
   it("encodes the job id", () => {
     expect(exportUrl("a/b", "links", "csv")).toMatch(/runs\/a%2Fb\/export/);
   });
+
+  it("builds the same URL as the generated client, with no base path prefix", () => {
+    expect(exportUrl("job1", "eitl_pairs", "json")).toBe("/api/harmonize/runs/job1/export?table=eitl_pairs&format=json");
+  });
+
+  it("refuses a 200 web page: under a wrong base the site's own page would be saved as the export", async () => {
+    const fetchImpl = async () => response("<!doctype html><html></html>", { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
+    await expect(fetchExport("job1", "links", "csv", { fetchImpl: fetchImpl as unknown as typeof fetch })).rejects.toThrow(
+      "The server answered with a web page instead of the file. The download was not saved.",
+    );
+  });
+
+  it("turns a proxy's HTML error page into a sentence from the status", async () => {
+    const fetchImpl = async () => response("<html><head><title>502 Bad Gateway</title></head><body>nginx</body></html>", { status: 502, headers: { "Content-Type": "text/html" } });
+    await expect(fetchExport("job1", "links", "csv", { fetchImpl: fetchImpl as unknown as typeof fetch })).rejects.toThrow(
+      "The server is unavailable or did not answer in time (HTTP 502). Try again in a moment.",
+    );
+  });
+
+  it("says the server could not be reached when fetch itself fails", async () => {
+    const fetchImpl = async () => {
+      throw new TypeError("Failed to fetch");
+    };
+    await expect(fetchExport("job1", "links", "csv", { fetchImpl: fetchImpl as unknown as typeof fetch })).rejects.toThrow(
+      "Could not reach the server. Check your connection, then try again.",
+    );
+  });
 });
 
 describe("stage rail", () => {

@@ -1,6 +1,7 @@
 // Exports need response headers the generated client hides (Content-Disposition for the file name, and
 // X-Harmonize-Skipped-One-Sided for the EITL pairs file), so they use a plain fetch against the same /api path.
 
+import { getExportHarmonizeRunUrl } from "@workspace/api-client-react";
 import {
   errorMessage,
   filenameFromDisposition,
@@ -25,10 +26,9 @@ export class ExportError extends Error {
   }
 }
 
+/** The same URL the generated client calls (no base path prefix), with the job id encoded. */
 export function exportUrl(jobId: string, table: ExportTable, format: ExportFormat): string {
-  const base = import.meta.env?.BASE_URL ? String(import.meta.env.BASE_URL).replace(/\/$/, "") : "";
-  const params = new URLSearchParams({ table, format });
-  return `${base}/api/harmonize/runs/${encodeURIComponent(jobId)}/export?${params.toString()}`;
+  return getExportHarmonizeRunUrl(encodeURIComponent(jobId), { table, format });
 }
 
 /** Fetch one export. A non-2xx answer throws ExportError carrying the server's message as written. */
@@ -41,7 +41,12 @@ export async function fetchExport(
   const headers: Record<string, string> = {};
   if (opts.env) headers["X-Biomapper-Env"] = opts.env;
   const doFetch = opts.fetchImpl ?? fetch;
-  const res = await doFetch(exportUrl(jobId, table, format), { headers });
+  let res: Response;
+  try {
+    res = await doFetch(exportUrl(jobId, table, format), { headers });
+  } catch (err) {
+    throw new ExportError(errorMessage(err), 0);
+  }
   if (!res.ok) {
     let data: unknown = null;
     const text = await res.text();
@@ -50,7 +55,11 @@ export async function fetchExport(
     } catch {
       data = text;
     }
-    throw new ExportError(errorMessage({ data }, `The download failed (HTTP ${res.status}).`), res.status);
+    throw new ExportError(errorMessage({ data, status: res.status }, `The download failed (HTTP ${res.status}).`), res.status);
+  }
+  // Under a wrong path the site's own page answers 200 with HTML; that is never an export.
+  if ((res.headers.get("Content-Type") ?? "").toLowerCase().includes("text/html")) {
+    throw new ExportError("The server answered with a web page instead of the file. The download was not saved.", res.status);
   }
   const blob = await res.blob();
   const filename =
