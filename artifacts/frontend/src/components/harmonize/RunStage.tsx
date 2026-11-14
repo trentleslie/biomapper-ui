@@ -99,7 +99,7 @@ export function RunStage({ run }: { run: HarmonizeRunStatus }) {
         <div className="space-y-5" aria-live="polite">
           <div className="flex flex-wrap items-center gap-3">
             <StateBadge state={run.state} className="text-sm" />
-            {info.meaning && <p className="text-sm text-neutral-600">{info.meaning}</p>}
+            {info.meaning && !run.reason && <p className="text-sm text-neutral-600">{info.meaning}</p>}
           </div>
           {run.reason && (
             <Note tone={run.state === "failed" ? "danger" : "info"} title="Reason" testId="run-reason">

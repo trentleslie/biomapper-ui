@@ -49,7 +49,7 @@ export function RunsList() {
                 <Link
                   href={stageHref(r.jobId, defaultStage(r.state))}
                   className="flex items-center gap-4 px-5 py-3 hover:bg-neutral-50"
-                  aria-label={`Open run ${r.labels.join(", ")}, ${kindLabel(r.kind)}, state ${stateInfo(r.state).label}`}
+                  aria-label={`Open ${stateInfo(r.state).label.toLowerCase()} run: ${r.labels.join(", ")} (${kindLabel(r.kind)})`}
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-neutral-900" title={r.labels.join(", ")}>

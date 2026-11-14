@@ -92,7 +92,11 @@ function ArmCard({ report, arm, kind }: { report: Json; arm: Arm; kind: string }
     <section aria-label={armLabel(arm)} className="rounded border border-neutral-200 bg-white p-4" data-testid={`arm-${arm}`}>
       <h3 className="text-sm font-semibold text-neutral-900">{armLabel(arm)}</h3>
       <p className="text-xs text-neutral-500">
-        {arm === "names_only" ? "Rows mapped by name only." : "Rows mapped with their declared identifiers as hints."}
+        {kind === "harmonize_results"
+          ? "The two jobs' rows as they were mapped in entity resolution."
+          : arm === "names_only"
+            ? "Rows mapped by name only."
+            : "Rows mapped with their declared identifiers as hints."}
       </p>
       <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
         {stats.map(([label, value]) => (

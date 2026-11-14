@@ -309,7 +309,7 @@ export function SetupStage() {
                     </Button>
                   )}
                   <div className="flex items-start gap-3 rounded border border-neutral-200 bg-neutral-50 px-4 py-3">
-                    <Checkbox id="harm-remap" checked={remapAll} onCheckedChange={(v) => setRemapAll(v === true)} />
+                    <Checkbox id="harm-remap" aria-label="Remap all rows" checked={remapAll} onCheckedChange={(v) => setRemapAll(v === true)} />
                     <div>
                       <Label htmlFor="harm-remap" className="text-sm text-neutral-900">
                         Remap all rows
@@ -523,6 +523,7 @@ function FromJobsForm({ onStarted }: { onStarted: (run: HarmonizeRunStatus) => v
           <Label htmlFor={`fj-${key}-label`}>Label</Label>
           <Input
             id={`fj-${key}-label`}
+            aria-label={`Label for ${title}`}
             value={label}
             placeholder="e.g. arivale_2024"
             onChange={(e) => {
@@ -560,7 +561,7 @@ function FromJobsForm({ onStarted }: { onStarted: (run: HarmonizeRunStatus) => v
               {side("b")}
             </div>
             <div className="flex items-start gap-3 rounded border border-neutral-200 bg-neutral-50 px-4 py-3">
-              <Switch id="fj-link-by-name" checked={linkByName} onCheckedChange={setLinkByName} aria-describedby="fj-link-by-name-help" />
+              <Switch id="fj-link-by-name" aria-label="Link by name" checked={linkByName} onCheckedChange={setLinkByName} aria-describedby="fj-link-by-name-help" />
               <div>
                 <Label htmlFor="fj-link-by-name" className="text-sm text-neutral-900">
                   Link by name
