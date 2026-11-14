@@ -508,4 +508,23 @@ test.describe("harmonize @app", () => {
     await expect(page.getByTestId("item-totals")).toContainText("0 flagged in this run");
     expect(bulkCalls).toBe(1);
   });
+
+  test("a report with 1,000 links draws them a page at a time", async ({ page }) => {
+    const { stubs } = runStubs([{ state: "complete", progress: null, stage: "done" }]);
+    const big = structuredClone(REPORT);
+    const link0 = big.arms.names_only.links[0];
+    big.arms.names_only.links = Array.from({ length: 1000 }, (_, n) => ({ ...link0, a_key: `a${n + 1}`, b_key: `b${n + 1}`, a_name: `Analyte ${n + 1}` }));
+    big.diff.names_only_only = Array.from({ length: 1000 }, (_, n) => ({ a_key: `a${n + 1}`, b_key: `b${n + 1}` }));
+    await isolate(page, { ...stubs, [`/api/harmonize/runs/${JOB}/report`]: big });
+    await goto(page, `/harmonize/runs/${JOB}/review?view=results`);
+    const table = page.getByTestId("links-table");
+    await expect(table.locator("tbody tr")).toHaveCount(100);
+    await expect(page.getByText("Showing 1 to 100 of 1,000 links")).toBeVisible();
+    await page.getByRole("button", { name: "Next page" }).first().click();
+    await expect(page.getByText("Showing 101 to 200 of 1,000 links")).toBeVisible();
+    await expect(table).toContainText("Analyte 101");
+    await page.getByRole("tab", { name: "Summary" }).click();
+    await page.locator("summary", { hasText: "Found only by the names-only arm" }).click();
+    await expect(page.getByText(/Showing 1 to 100 of 1,000 (rows|links)/)).toBeVisible();
+  });
 });

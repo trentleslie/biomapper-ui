@@ -31,8 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { ITEM_KIND_LABEL, armLabel, errorMessage, humanize, itemSummary, originLabel, plural } from "@/lib/harmonize";
-import { EmptyState, ErrorPanel, LoadingBlock, Mono, Note, Panel, Untrusted } from "./common";
-import { Pager } from "./ReviewSummary";
+import { EmptyState, ErrorPanel, LoadingBlock, Mono, Note, Pager, Panel, Untrusted } from "./common";
 
 const PAGE = 100;
 const ANY = "any";

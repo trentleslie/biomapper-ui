@@ -34,7 +34,7 @@ import {
   type Arm,
   type Json,
 } from "@/lib/harmonize";
-import { DataTable, EmptyState, ErrorPanel, LoadingBlock, Mono, Note, Panel, Stat, Untrusted } from "./common";
+import { DataTable, EmptyState, ErrorPanel, LoadingBlock, Mono, Note, Pager, Panel, Stat, TABLE_PAGE, Untrusted } from "./common";
 
 const fmt = (v: unknown) => (typeof v === "number" ? v.toLocaleString() : v == null ? "Not reported" : String(v));
 const yesNo = (v: unknown) => (v === true ? "Yes" : v === false ? "No" : "Not reported");
@@ -129,6 +129,8 @@ function ArmCard({ report, arm, kind }: { report: Json; arm: Arm; kind: string }
 }
 
 function DiffList({ title, entries, many }: { title: string; entries: unknown[]; many: boolean }) {
+  const [offset, setOffset] = useState(0);
+  const start = offset < entries.length ? offset : 0;
   return (
     <details className="rounded border border-neutral-200 bg-white">
       <summary className="cursor-pointer px-4 py-2 text-sm font-medium text-neutral-900">
@@ -138,14 +140,17 @@ function DiffList({ title, entries, many }: { title: string; entries: unknown[];
         {entries.length === 0 ? (
           <p className="text-sm text-neutral-500">None.</p>
         ) : many ? (
-          <div className="scroll-visible max-h-48 rounded border border-neutral-100 p-2">
-            <ul className="flex flex-wrap gap-1.5">
-              {entries.map((e, i) => (
-                <li key={i}>
-                  <Mono className="rounded bg-neutral-100 px-1.5 py-0.5">{String(e)}</Mono>
-                </li>
-              ))}
-            </ul>
+          <div className="space-y-2">
+            <div className="scroll-visible max-h-48 rounded border border-neutral-100 p-2">
+              <ul className="flex flex-wrap gap-1.5">
+                {entries.slice(start, start + TABLE_PAGE).map((e, i) => (
+                  <li key={start + i}>
+                    <Mono className="rounded bg-neutral-100 px-1.5 py-0.5">{String(e)}</Mono>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {entries.length > TABLE_PAGE && <Pager offset={start} pageSize={TABLE_PAGE} total={entries.length} onOffset={setOffset} noun="nodes" />}
           </div>
         ) : (
           <DataTable
@@ -327,6 +332,7 @@ function TwoCohortArm({ data, report, arm }: { data: Json; report: Json; arm: Ar
         <DataTable
           caption="Links"
           testId="links-table"
+          noun="links"
           maxHeight="max-h-96"
           headers={[`${la} key`, `${la} name`, `${lb} key`, `${lb} name`, "Type", "Basis", `${la} partners`, `${lb} partners`, "Node"]}
           rows={links.map((l) => [
@@ -410,6 +416,7 @@ function ManyCohortArm({ data, report, arm }: { data: Json; report: Json; arm: A
         <DataTable
           caption="Groups"
           testId="groups-table"
+          noun="groups"
           maxHeight="max-h-[28rem]"
           headers={["Node", "Cohorts", "Members", "Clean", "Multiplicity", "Broad"]}
           rows={groups.map((g) => [
@@ -744,39 +751,3 @@ export function ReviewQueueView({ report, run }: { report: Json; run: HarmonizeR
     </div>
   );
 }
-
-export function Pager({
-  offset,
-  pageSize,
-  total,
-  onOffset,
-  noun,
-}: {
-  offset: number;
-  pageSize: number;
-  total: number;
-  onOffset: (n: number) => void;
-  noun: string;
-}) {
-  if (total === 0) return null;
-  const from = offset + 1;
-  const to = Math.min(offset + pageSize, total);
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-neutral-600">
-      <p className="tabular-nums" aria-live="polite">
-        Showing {from.toLocaleString()} to {to.toLocaleString()} of {total.toLocaleString()} {noun}
-      </p>
-      {total > pageSize && (
-        <div className="flex gap-2">
-          <Button size="sm" variant="secondary" disabled={offset === 0} onClick={() => onOffset(Math.max(0, offset - pageSize))}>
-            Previous page
-          </Button>
-          <Button size="sm" variant="secondary" disabled={to >= total} onClick={() => onOffset(offset + pageSize)}>
-            Next page
-          </Button>
-        </div>
-      )}
-    </div>
-  );
-}
-

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { AlertOctagon, AlertTriangle, CheckCircle2, Info, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -175,6 +175,8 @@ export function DataTable({
   empty,
   maxHeight = "max-h-80",
   testId,
+  pageSize = TABLE_PAGE,
+  noun = "rows",
 }: {
   caption: string;
   headers: ReactNode[];
@@ -182,38 +184,49 @@ export function DataTable({
   empty: string;
   maxHeight?: string;
   testId?: string;
+  /** Rows drawn at once; a report can hold tens of thousands. */
+  pageSize?: number;
+  noun?: string;
 }) {
+  const [offset, setOffset] = useState(0);
   if (rows.length === 0) {
     return <p className="rounded border border-dashed border-neutral-200 px-4 py-3 text-sm text-neutral-500">{empty}</p>;
   }
+  const start = offset < rows.length ? offset : 0;
+  const shown = rows.slice(start, start + pageSize);
   return (
-    <div className={cn("scroll-visible rounded border border-neutral-200", maxHeight)} data-testid={testId}>
-      <table className="w-full text-sm tabular-nums">
-        <caption className="sr-only">{caption}</caption>
-        <thead className="sticky top-0 z-10 bg-neutral-50">
-          <tr className="border-b border-neutral-200">
-            {headers.map((h, i) => (
-              <th key={i} scope="col" className="whitespace-nowrap px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-neutral-500">
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((cells, r) => (
-            <tr key={r} className="border-b border-neutral-100 last:border-b-0">
-              {cells.map((c, i) => (
-                <td key={i} className="whitespace-nowrap px-3 py-2 align-top text-neutral-900">
-                  {c}
-                </td>
+    <div className="space-y-2">
+      <div className={cn("scroll-visible rounded border border-neutral-200", maxHeight)} data-testid={testId}>
+        <table className="w-full text-sm tabular-nums">
+          <caption className="sr-only">{caption}</caption>
+          <thead className="sticky top-0 z-10 bg-neutral-50">
+            <tr className="border-b border-neutral-200">
+              {headers.map((h, i) => (
+                <th key={i} scope="col" className="whitespace-nowrap px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-neutral-500">
+                  {h}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {shown.map((cells, r) => (
+              <tr key={r} className="border-b border-neutral-100 last:border-b-0">
+                {cells.map((c, i) => (
+                  <td key={i} className="whitespace-nowrap px-3 py-2 align-top text-neutral-900">
+                    {c}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {rows.length > pageSize && <Pager offset={start} pageSize={pageSize} total={rows.length} onOffset={setOffset} noun={noun} />}
     </div>
   );
 }
+
+export const TABLE_PAGE = 100;
 
 /** An identifier, in the mono face. */
 export function Mono({ children, className }: { children: ReactNode; className?: string }) {
@@ -224,4 +237,39 @@ export function Mono({ children, className }: { children: ReactNode; className?:
 export function Untrusted({ value, empty = "No name" }: { value: string | null | undefined; empty?: string }) {
   if (value == null || value === "") return <span className="text-neutral-400">{empty}</span>;
   return <span>{value}</span>;
+}
+
+export function Pager({
+  offset,
+  pageSize,
+  total,
+  onOffset,
+  noun,
+}: {
+  offset: number;
+  pageSize: number;
+  total: number;
+  onOffset: (n: number) => void;
+  noun: string;
+}) {
+  if (total === 0) return null;
+  const from = offset + 1;
+  const to = Math.min(offset + pageSize, total);
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-neutral-600">
+      <p className="tabular-nums" aria-live="polite">
+        Showing {from.toLocaleString()} to {to.toLocaleString()} of {total.toLocaleString()} {noun}
+      </p>
+      {total > pageSize && (
+        <div className="flex gap-2">
+          <Button size="sm" variant="secondary" disabled={offset === 0} onClick={() => onOffset(Math.max(0, offset - pageSize))}>
+            Previous page
+          </Button>
+          <Button size="sm" variant="secondary" disabled={to >= total} onClick={() => onOffset(offset + pageSize)}>
+            Next page
+          </Button>
+        </div>
+      )}
+    </div>
+  );
 }
