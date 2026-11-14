@@ -31,6 +31,7 @@ import {
   Download, AlertCircle, Loader2,
   ChevronDown, ChevronRight, ChevronUp, Search, Flag, X, LogIn,
 } from "lucide-react";
+import { identifierKeysFor } from "@/lib/vocab-keys";
 
 const TIER_COLORS: Record<string, string> = {
   high: '#005B33',
@@ -312,9 +313,10 @@ export default function DashboardPage() {
     results.forEach(r => {
       if (r.identifiers) Object.keys(r.identifiers).forEach(k => allVocabs.add(k));
     });
+    const wantedKeys = identifierKeysFor(visibleOntologies);
     const vocabCols = Array.from(allVocabs)
       .map(v => v.toLowerCase())
-      .filter(v => visibleOntologies.size === 0 || visibleOntologies.has(v))
+      .filter(v => wantedKeys === null || wantedKeys.has(v))
       .sort();
 
     const allEquivPrefixes = new Set<string>();
@@ -528,8 +530,9 @@ export default function DashboardPage() {
     return s;
   }, [results]);
   const visibleVocabCols = useMemo(() => {
-    const allowed = visibleOntologies.size > 0
-      ? Array.from(presentVocabKeys).filter(v => visibleOntologies.has(v))
+    const wantedKeys = identifierKeysFor(visibleOntologies);
+    const allowed = wantedKeys !== null
+      ? Array.from(presentVocabKeys).filter(v => wantedKeys.has(v))
       : Array.from(presentVocabKeys);
     return allowed.sort();
   }, [presentVocabKeys, visibleOntologies]);

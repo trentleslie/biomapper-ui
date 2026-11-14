@@ -349,8 +349,9 @@ export default function UploadPage() {
       return;
     }
 
-    // URL ontologies param uses lowercase prefix (matches the case backend uses
-    // in MappingResultItem.identifiers keys).
+    // URL ontologies param uses lowercase CURIE prefixes. MappingResultItem.identifiers
+    // uses shorter keys for some (pubchem.compound -> pubchem); the dashboard compares
+    // the two through lib/vocab-keys.
     const ontologiesParam = Array.from(selectedVocabPrefixes).map(p => p.toLowerCase()).join(",");
     const annotatorsList = Array.from(selectedAnnotators);
 

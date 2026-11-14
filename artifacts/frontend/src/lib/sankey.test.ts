@@ -51,6 +51,17 @@ describe("buildSankeyData vocabulary layer", () => {
     expect(vocabIds(d)).toEqual(["vocab_HMDB"]);
   });
 
+  it("keeps a selected CURIE prefix whose mapper key is a short name", () => {
+    // Real keys from python-api services/mapper.py _process_result.
+    const real = [
+      res("high", { hmdb: ["1"], pubchem: ["2"], kegg: ["3"], refmet: ["4"], lipidmaps: ["5"], chembl: ["6"] }),
+    ];
+    const selected = new Set(["pubchem.compound", "kegg.compound", "rm", "lm", "chembl.compound"]);
+    expect(vocabIds(buildSankeyData(summary, real, true, selected)).sort()).toEqual([
+      "vocab_CHEMBL", "vocab_KEGG", "vocab_LIPIDMAPS", "vocab_PUBCHEM", "vocab_REFMET",
+    ]);
+  });
+
   it("keeps the 'Not scored' label for the unscored tier", () => {
     const s = { ...summary, confidenceTierDistribution: { high: 0, medium: 0, low: 0, unknown: 2 } };
     const d = buildSankeyData(s, [res("unknown", { hmdb: ["1"] })], false);
