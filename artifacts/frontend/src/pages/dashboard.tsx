@@ -9,7 +9,7 @@ import { SankeyChart } from "@/components/SankeyChart";
 import { EquivalentIds } from "@/components/EquivalentIds";
 import { DemoGuide } from "@/components/DemoGuide";
 import { FieldTooltip } from "@/components/field-tooltip";
-import { EXPLAINERS, NOT_SCORED_LABEL, NOT_SCORED_TOOLTIP, reviewReason, rowNeedsReview } from "@/lib/result-explainers";
+import { EXPLAINERS, confidenceTierCounts, NOT_SCORED_LABEL, NOT_SCORED_TOOLTIP, reviewReason, rowNeedsReview } from "@/lib/result-explainers";
 import { useEnv } from "@/contexts/env-context";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
@@ -155,10 +155,7 @@ export default function DashboardPage() {
 
     const uniqueNames = new Set(results.map(r => r.name)).size;
     const resolved = results.filter(r => r.resolved).length;
-    const high = results.filter(r => r.confidenceTier === "high").length;
-    const medium = results.filter(r => r.confidenceTier === "medium").length;
-    const low = results.filter(r => r.confidenceTier === "low").length;
-    const unknownCount = results.filter(r => !r.confidenceTier || r.confidenceTier === "unknown").length;
+    const { high, medium, low, unknown: unknownCount } = confidenceTierCounts(results);
 
     const vocabCoverage: Record<string, number> = {};
     results.forEach(r => {
@@ -590,7 +587,7 @@ export default function DashboardPage() {
       `| High | ${cd.high} | ${(cd.high / summary.uniqueNames * 100).toFixed(1)}% |`,
       `| Medium | ${cd.medium} | ${(cd.medium / summary.uniqueNames * 100).toFixed(1)}% |`,
       `| Low | ${cd.low} | ${(cd.low / summary.uniqueNames * 100).toFixed(1)}% |`,
-      `| Unknown | ${cd.unknown} | ${(cd.unknown / summary.uniqueNames * 100).toFixed(1)}% |`,
+      `| Not scored | ${cd.unknown} | ${(cd.unknown / summary.uniqueNames * 100).toFixed(1)}% |`,
       ``,
       `## Vocabulary Coverage`,
       ``,
@@ -657,7 +654,7 @@ export default function DashboardPage() {
     { name: 'High', value: summary.confidenceTierDistribution.high, fill: TIER_COLORS.high },
     { name: 'Medium', value: summary.confidenceTierDistribution.medium, fill: TIER_COLORS.medium },
     { name: 'Low', value: summary.confidenceTierDistribution.low, fill: TIER_COLORS.low },
-    { name: 'Unknown', value: summary.confidenceTierDistribution.unknown, fill: TIER_COLORS.unknown },
+    { name: NOT_SCORED_LABEL, value: summary.confidenceTierDistribution.unknown, fill: TIER_COLORS.unknown },
   ].filter(d => d.value > 0) : [];
 
   const barData = summary ? Object.entries(summary.vocabularyCoverage)
@@ -845,7 +842,7 @@ export default function DashboardPage() {
                         {([["High", summary.confidenceTierDistribution.high, TIER_COLORS.high],
                            ["Medium", summary.confidenceTierDistribution.medium, TIER_COLORS.medium],
                            ["Low", summary.confidenceTierDistribution.low, TIER_COLORS.low],
-                           ["Unknown", summary.confidenceTierDistribution.unknown, TIER_COLORS.unknown]] as [string, number, string][]).map(([tier, count, color]) => (
+                           [NOT_SCORED_LABEL, summary.confidenceTierDistribution.unknown, TIER_COLORS.unknown]] as [string, number, string][]).map(([tier, count, color]) => (
                           <tr key={tier} className="border-b last:border-0">
                             <td className="py-1 flex items-center gap-1.5">
                               <span className="w-2 h-2 rounded-full inline-block" style={{ background: color }} />

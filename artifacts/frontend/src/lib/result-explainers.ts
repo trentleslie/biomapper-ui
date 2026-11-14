@@ -49,7 +49,24 @@ export function reviewReason(row: {
   reviewReason?: string | null;
 }): string {
   if (!row.resolved) return REVIEW_REASONS.unresolved;
-  // The backend decides the reason; the tier fallback covers rows saved before the field existed.
+  // Legacy fallback: exists only for rows saved before `reviewReason` existed.
   const reason = row.reviewReason ?? row.chosenKgIdReview ?? (!row.confidenceTier || row.confidenceTier === "unknown" ? "not_scored" : "low_confidence");
   return REVIEW_REASONS[reason as keyof typeof REVIEW_REASONS] ?? REVIEW_REASONS.low_confidence;
+}
+
+// Tier distribution for summaries. The `unknown` key (API name) counts RESOLVED rows with no
+// score ("Not scored"); unresolved rows are counted separately as Unresolved.
+export function confidenceTierCounts(
+  results: { resolved: boolean; confidenceTier?: string | null }[],
+): { high: number; medium: number; low: number; unknown: number } {
+  const counts = { high: 0, medium: 0, low: 0, unknown: 0 };
+  for (const r of results) {
+    if (!r.resolved) continue;
+    if (r.confidenceTier === "high" || r.confidenceTier === "medium" || r.confidenceTier === "low") {
+      counts[r.confidenceTier]++;
+    } else {
+      counts.unknown++;
+    }
+  }
+  return counts;
 }

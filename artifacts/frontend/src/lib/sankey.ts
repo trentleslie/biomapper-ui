@@ -115,7 +115,7 @@ function buildLabel(id: string, summary: MappingSummary, unresolved: number): st
     case 'high':         return `High (${summary.confidenceTierDistribution.high})`;
     case 'medium':       return `Medium (${summary.confidenceTierDistribution.medium})`;
     case 'low':          return `Low (${summary.confidenceTierDistribution.low})`;
-    case 'unknown_tier': return `Unknown (${summary.confidenceTierDistribution.unknown})`;
+    case 'unknown_tier': return `Not scored (${summary.confidenceTierDistribution.unknown})`;
     default:             return id;
   }
 }
