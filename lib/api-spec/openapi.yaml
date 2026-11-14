@@ -444,7 +444,8 @@ paths:
         "400":
           description: >-
             Missing user ID header, a bad spec or file, a column the file does not have,
-            duplicate labels, or a refusal from the job runner (its message, as written)
+            duplicate or reserved labels, or a refusal from the job runner (its message, as
+            written)
           content:
             application/json:
               schema:
@@ -477,8 +478,8 @@ paths:
         "400":
           description: >-
             Missing user ID header, fewer than 2 or more than 12 files, a spec that does not
-            match the files, a bad file or column, duplicate labels, or a refusal from the job
-            runner (its message, as written)
+            match the files, a bad file or column, duplicate or reserved labels, or a refusal
+            from the job runner (its message, as written)
           content:
             application/json:
               schema:
@@ -547,8 +548,9 @@ paths:
         "400":
           description: >-
             Missing user ID header, jobs of different entity types, a job mapped before
-            harmonizing finished jobs was supported (map the file again), equal labels, or a
-            job that lists one name more than once
+            harmonizing finished jobs was supported (map the file again), a label outside the
+            cohort label rule, equal or reserved labels, or a job that lists one name more than
+            once
           content:
             application/json:
               schema:

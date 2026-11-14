@@ -289,6 +289,33 @@ def test_duplicate_labels_rejected_before_saving(client, two_files, spec_two):
     assert not runs_root().exists() or list(runs_root().iterdir()) == []
 
 
+@pytest.mark.parametrize("label", ["n_links", "links_by_basis"])
+def test_reserved_label_rejected_before_saving_on_cohort_runs(client, two_files, spec_two, label):
+    spec = {**spec_two, "b": _cohort(label)}
+    r = client.post("/harmonize/cohorts", files=two_files, data={"spec": json.dumps(spec)}, headers=U1)
+    assert r.status_code == 400
+    assert r.json()["detail"] == f"The label '{label}' is reserved. Choose a different label."
+    assert not runs_root().exists() or list(runs_root().iterdir()) == []
+
+
+@pytest.mark.parametrize("label", ["n_links", "node", "Clean"])
+def test_reserved_label_rejected_on_many_cohort_runs(client, spec_many, label):
+    spec = {**spec_many, "cohorts": [_cohort("a"), _cohort("b"), _cohort(label)]}
+    r = client.post("/harmonize/many", files=many_files(3), data={"spec": json.dumps(spec)},
+                    headers=U1)
+    assert r.status_code == 400
+    assert r.json()["detail"] == f"The label '{label}' is reserved. Choose a different label."
+    assert not runs_root().exists() or list(runs_root().iterdir()) == []
+
+
+def test_bad_label_rejected_before_saving(client, two_files, spec_two):
+    spec = {**spec_two, "b": _cohort("")}
+    r = client.post("/harmonize/cohorts", files=two_files, data={"spec": json.dumps(spec)}, headers=U1)
+    assert r.status_code == 400
+    assert r.json()["detail"] == "Cohort label '' can only use letters, digits, '.', '-' and '_'."
+    assert not runs_root().exists() or list(runs_root().iterdir()) == []
+
+
 @pytest.mark.parametrize("spec", ["not json", json.dumps({"entity": "metabolites"}),
                                   json.dumps({"entity": "m", "a": _cohort("a"),
                                               "b": {**_cohort("b"), "extra": 1}})])

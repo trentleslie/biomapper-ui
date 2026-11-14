@@ -39,7 +39,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
+from biomapper.harmonize import harmonize
 from biomapper.jobs import FINISHED_STATES, CohortSpec, HarmonizeStatus, JobError, ReviewItemsPage
+from biomapper.many_cohorts import MATRIX_FIXED_HEADER
 from biomapper.mcp.config import ServerConfig
 from fastapi import APIRouter, File, Form, Header, HTTPException, Query, Response, UploadFile
 from fastapi.concurrency import run_in_threadpool
@@ -69,6 +71,7 @@ from services.harmonize_offline import (
 from services.harmonize_storage import (
     MAX_COHORT_BYTES,
     CohortFileError,
+    check_label,
     new_run_dir,
     read_header,
     remove_run_dir,
@@ -90,6 +93,9 @@ MAX_COHORTS: int = next(
 )
 REVIEW_PAGE_DEFAULT: int = next(
     f.default for f in dataclasses.fields(ServerConfig) if f.name == "review_page_default"
+)
+REVIEW_PAGE_MAX: int = next(
+    f.default for f in dataclasses.fields(ServerConfig) if f.name == "review_page_max"
 )
 
 
@@ -328,11 +334,17 @@ async def _run_status(run: dict[str, Any]) -> dict[str, Any]:
     return await _status_json(get_backend(), run)
 
 
-def _no_review_items_page(job_id: str, offset: int, limit: int | None) -> dict[str, Any]:
-    """An empty review-items page in the runner's shape: there is no captured evidence."""
+def _no_review_items_page(job_id: str, kind: str | None, offset: int,
+                          limit: int | None) -> dict[str, Any]:
+    """An empty review-items page in the runner's shape: there is no captured evidence.
+
+    Any ``kind`` filter matches nothing, so it changes nothing; ``offset`` and ``limit`` are
+    clamped into the runner's range instead of refused, since there is no page to get wrong.
+    """
+    del kind  # nothing to filter
+    size = REVIEW_PAGE_DEFAULT if limit is None else min(max(limit, 1), REVIEW_PAGE_MAX)
     page = ReviewItemsPage(job_id=job_id, total=0, counts={"row": 0, "link": 0},
-                           skipped_no_node=0, offset=max(offset, 0),
-                           limit=REVIEW_PAGE_DEFAULT if limit is None else limit,
+                           skipped_no_node=0, offset=max(offset, 0), limit=size,
                            next_offset=None, items=[])
     return camelize(page.model_dump(mode="json"))
 
@@ -362,11 +374,41 @@ def _parse_spec(raw: str, model: type[_CamelModel]) -> Any:
         raise HTTPException(status_code=400, detail=msg) from None
 
 
-def _check_distinct_labels(cohorts: list[CohortInput]) -> None:
-    labels = [c.label for c in cohorts]
+# The many-cohort matrix report's fixed columns; harmonize_many refuses a label equal to one,
+# ignoring case and surrounding space.
+_MATRIX_RESERVED = frozenset(h.casefold() for h in MATRIX_FIXED_HEADER)
+
+
+def _is_reserved_summary_key(label: str) -> bool:
+    """True when harmonize() refuses ``label`` as a summary key.
+
+    The package keeps its reserved names private, so ask harmonize() itself: on two empty
+    inputs it does nothing but check the labels. The other label differs only by a character
+    the label rule forbids, so it can be neither equal nor reserved.
+    """
+    try:
+        harmonize([], [], a_label=label, b_label=label + "\n")
+    except ValueError:
+        return True
+    return False
+
+
+def _check_labels(labels: list[str], *, many: bool = False) -> None:
+    """One rule for every kind's labels, with messages written for the user: the cohort label
+    rule, then distinct, then not reserved by the package. Run before anything is saved."""
+    for label in labels:
+        try:
+            check_label(label)
+        except CohortFileError as exc:
+            raise HTTPException(status_code=400, detail=_message(exc)) from None
     if len(set(labels)) != len(labels):
         raise HTTPException(status_code=400,
                             detail=f"Cohort labels must be distinct (got {', '.join(labels)}).")
+    for label in labels:
+        if _is_reserved_summary_key(label) or (many and label.casefold() in _MATRIX_RESERVED):
+            raise HTTPException(
+                status_code=400,
+                detail=f"The label '{label}' is reserved. Choose a different label.")
 
 
 async def _read_upload(upload: UploadFile) -> tuple[str, bytes]:
@@ -478,7 +520,7 @@ async def submit_cohorts(
 ) -> dict[str, Any]:
     user_id = _require_user(x_clerk_user_id)
     parsed: CohortsSpec = _parse_spec(spec, CohortsSpec)
-    _check_distinct_labels([parsed.a, parsed.b])
+    _check_labels([parsed.a.label, parsed.b.label])
     a_name, a_data = await _read_upload(file_a)
     b_name, b_data = await _read_upload(file_b)
     return await _start_run(user_id, KIND_TWO, parsed.entity, parsed.category,
@@ -504,7 +546,7 @@ async def submit_many(
             detail=f"The spec describes {len(parsed.cohorts)} cohorts but {len(files)} files "
                    "were uploaded. Give one cohort per file, in file order.",
         )
-    _check_distinct_labels(parsed.cohorts)
+    _check_labels([c.label for c in parsed.cohorts], many=True)
     uploads = [(cohort, *await _read_upload(f)) for cohort, f in zip(parsed.cohorts, files)]
     return await _start_run(user_id, KIND_MANY, parsed.entity, parsed.category, uploads,
                             remap_all=parsed.remap_all)
@@ -523,7 +565,7 @@ async def submit_example(
     if not all(p.is_file() for p in [spec_path, *files]):
         raise HTTPException(status_code=400, detail="The example dataset is not installed.")
     parsed: CohortsSpec = _parse_spec(spec_path.read_text(encoding="utf-8"), CohortsSpec)
-    _check_distinct_labels([parsed.a, parsed.b])
+    _check_labels([parsed.a.label, parsed.b.label])
     return await _start_run(
         user_id, KIND_TWO, parsed.entity, parsed.category,
         [(cohort, path.name, path.read_bytes()) for cohort, path in zip((parsed.a, parsed.b), files)],
@@ -557,6 +599,7 @@ async def submit_from_jobs(
     harmonizing finished jobs was supported, are a 400.
     """
     user_id = _require_user(x_clerk_user_id)
+    _check_labels([body.a_label, body.b_label])
     job_a = await _finished_mapping_job(body.job_a, user_id)
     job_b = await _finished_mapping_job(body.job_b, user_id)
     entity_a, entity_b = entity_type(job_a), entity_type(job_b)
@@ -572,7 +615,7 @@ async def submit_from_jobs(
         report = await run_in_threadpool(
             harmonize_finished_jobs, job_a, job_b, a_label=body.a_label, b_label=body.b_label,
             link_by_name=body.link_by_name)
-    except ValueError as exc:  # StaleMappingJobError included
+    except ValueError as exc:  # StaleMappingJobError, duplicate names; package label backstop
         raise HTTPException(status_code=400, detail=_message(exc)) from None
 
     upload_id, run_dir = new_run_dir()
@@ -668,7 +711,7 @@ async def list_review_items(
 ) -> dict[str, Any]:
     run = await _owned_run(job_id, _require_user(x_clerk_user_id))
     if _is_results(run):
-        return _no_review_items_page(job_id, offset, limit)
+        return _no_review_items_page(job_id, kind, offset, limit)
     backend = get_backend()
     try:
         page = backend.review_items(job_id, kind=kind, offset=offset, limit=limit)

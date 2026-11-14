@@ -227,7 +227,25 @@ def test_route_refuses_a_job_mapped_before_the_change(client):
 
 def test_route_refuses_equal_labels(two_jobs):
     r = two_jobs.post("/harmonize/from-jobs", json=_body(bLabel="a"), headers=U1)
-    assert r.status_code == 400 and "distinct" in r.json()["detail"]
+    assert r.status_code == 400
+    assert r.json()["detail"] == "Cohort labels must be distinct (got a, a)."
+
+
+@pytest.mark.parametrize("label", ["", " ", "a b", "line\nbreak", "=SUM(A1)"])
+def test_route_refuses_labels_outside_the_cohort_rule(two_jobs, label):
+    r = two_jobs.post("/harmonize/from-jobs", json=_body(aLabel=label), headers=U1)
+    assert r.status_code == 400
+    assert r.json()["detail"] == (f"Cohort label {label!r} can only use letters, digits, '.', "
+                                  "'-' and '_'.")
+    assert two_jobs.get("/harmonize/runs", headers=U1).json() == []
+
+
+@pytest.mark.parametrize("label", ["n_links", "n_needs_review"])
+def test_route_refuses_a_reserved_label_readably(two_jobs, label):
+    r = two_jobs.post("/harmonize/from-jobs", json=_body(bLabel=label), headers=U1)
+    assert r.status_code == 400
+    assert r.json()["detail"] == f"The label '{label}' is reserved. Choose a different label."
+    assert two_jobs.get("/harmonize/runs", headers=U1).json() == []
 
 
 def test_from_jobs_run_is_served_from_disk(two_jobs, monkeypatch):
@@ -263,6 +281,12 @@ def test_from_jobs_run_is_served_from_disk(two_jobs, monkeypatch):
 
     page = two_jobs.get(f"/harmonize/runs/{job_id}/review-items", headers=U1).json()
     assert page["total"] == 0 and page["items"] == [] and page["jobId"] == job_id
+    page = two_jobs.get(f"/harmonize/runs/{job_id}/review-items",
+                        params={"kind": "link", "offset": -3, "limit": -1}, headers=U1).json()
+    assert page["total"] == 0 and page["offset"] == 0 and page["limit"] == 1
+    page = two_jobs.get(f"/harmonize/runs/{job_id}/review-items", params={"limit": 999},
+                        headers=U1).json()
+    assert page["limit"] == 50
     r = two_jobs.get(f"/harmonize/runs/{job_id}/review-items/x", headers=U1)
     assert r.status_code == 400
 

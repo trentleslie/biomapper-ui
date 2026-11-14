@@ -3,6 +3,7 @@ import pytest
 from services import harmonize_storage
 from services.harmonize_storage import (
     CohortFileError,
+    check_label,
     new_run_dir,
     read_header,
     remove_run_dir,
@@ -55,3 +56,15 @@ def test_remove_run_dir_propagates_os_errors(tmp_path, monkeypatch):
     (tmp_path / "runs").mkdir()
     with pytest.raises(FileNotFoundError):
         remove_run_dir(tmp_path / "runs" / "gone")
+
+
+@pytest.mark.parametrize("label", ["a", "UKBB_2024", "x.y-z"])
+def test_check_label_accepts_the_cohort_rule(label):
+    check_label(label)
+
+
+@pytest.mark.parametrize("label", ["", " ", "a b", "a\nb", "a\n", "=cmd", "../a"])
+def test_check_label_refuses_with_the_cohort_message(label):
+    with pytest.raises(CohortFileError) as exc:
+        check_label(label)
+    assert str(exc.value) == f"Cohort label {label!r} can only use letters, digits, '.', '-' and '_'."

@@ -25,12 +25,25 @@ HARMONIZE_HOME: Path = Path(
 
 MAX_COHORT_BYTES = 50 * 1024 * 1024
 ALLOWED_SUFFIXES = (".csv", ".tsv", ".txt")
-# The package's CohortSpec label rule: letters, digits, '.', '-', '_'.
-_LABEL_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+# The package's CohortSpec label rule: letters, digits, '.', '-', '_'. Matched with fullmatch,
+# because "$" would also accept a trailing newline.
+_LABEL_RE = re.compile(r"[A-Za-z0-9._-]+")
 
 
 class CohortFileError(ValueError):
     """A cohort upload that cannot be used. The message is written for the end user."""
+
+
+def check_label(label: str) -> None:
+    """Refuse a cohort label outside the rule every harmonization kind shares.
+
+    Raises:
+        CohortFileError: The label is not one or more letters, digits, '.', '-' and '_'.
+    """
+    if not isinstance(label, str) or _LABEL_RE.fullmatch(label) is None:
+        raise CohortFileError(
+            f"Cohort label {label!r} can only use letters, digits, '.', '-' and '_'."
+        )
 
 
 def runs_root() -> Path:
@@ -67,10 +80,7 @@ def save_cohort_file(run_dir: Path, label: str, filename: str, data: bytes) -> P
         CohortFileError: The file is empty, over 50 MB, not .csv/.tsv/.txt, not UTF-8 text, or
             the label is not letters, digits, '.', '-' and '_'.
     """
-    if not _LABEL_RE.match(label or ""):
-        raise CohortFileError(
-            f"Cohort label {label!r} can only use letters, digits, '.', '-' and '_'."
-        )
+    check_label(label)
     suffix = Path(filename or "").suffix.lower()
     if suffix not in ALLOWED_SUFFIXES:
         raise CohortFileError(
