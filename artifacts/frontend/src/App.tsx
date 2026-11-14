@@ -13,6 +13,7 @@ import FlaggedPage from "@/pages/flagged";
 import BenchmarkPage from "@/pages/benchmark";
 import BenchmarkRunsPage from "@/pages/benchmark-runs";
 import BenchmarkResultsPage from "@/pages/benchmark-results";
+import HarmonizePage from "@/pages/harmonize";
 
 import NotFound from "@/pages/not-found";
 import { EnvProvider } from "@/contexts/env-context";
@@ -132,6 +133,14 @@ function Router() {
         {() => <ProtectedRoute component={JobsPage} />}
       </Route>
 
+      {/* /harmonize = harmonization workbench; /harmonize/:jobId opens one run */}
+      <Route path="/harmonize/:jobId">
+        {() => <ProtectedRoute component={HarmonizePage} />}
+      </Route>
+      <Route path="/harmonize">
+        {() => <ProtectedRoute component={HarmonizePage} />}
+      </Route>
+
       {/* /flagged = aggregated flagged annotations page */}
       <Route path="/flagged">
         {() => <ProtectedRoute component={FlaggedPage} />}
@@ -196,6 +205,8 @@ function DevBypassApp() {
               <Route path="/upload">{() => <UploadPage />}</Route>
               <Route path="/job/:jobId">{() => <DashboardPage />}</Route>
               <Route path="/jobs">{() => <JobsPage />}</Route>
+              <Route path="/harmonize/:jobId">{() => <HarmonizePage />}</Route>
+              <Route path="/harmonize">{() => <HarmonizePage />}</Route>
               <Route path="/flagged">{() => <FlaggedPage />}</Route>
               <Route path="/benchmark/runs/:runId">{() => <BenchmarkResultsPage />}</Route>
               <Route path="/benchmark/runs">{() => <BenchmarkRunsPage />}</Route>
