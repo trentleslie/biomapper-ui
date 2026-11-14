@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Link, useRoute } from "wouter";
 import { ArrowLeft, Plus } from "lucide-react";
 import {
@@ -246,11 +246,27 @@ function OpenRun({ jobId, requested }: { jobId: string; requested: string | unde
     );
   }
 
+  // A stage change unmounts the link that was focused and leaves the page scrolled down: start the new stage at
+  // the top, with focus on its heading so keyboard and screen reader users land in it.
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const shownStage = useRef<Stage | null>(null);
+  const ready = !!run;
+  useEffect(() => {
+    if (!ready) return;
+    if (shownStage.current !== null && shownStage.current !== stage) {
+      headingRef.current?.closest("main")?.scrollTo({ top: 0 });
+      headingRef.current?.focus({ preventScroll: true });
+    }
+    shownStage.current = stage;
+  }, [stage, ready]);
+
   return (
     <>
       <PageHeader run={run} />
       <FlowLayout rail={<StageRail jobId={run ? jobId : null} current={stage} run={run} flaggedTotal={flaggedTotal} />}>
-        <h2 className="sr-only">{STAGE_TITLE[stage]}</h2>
+        <h2 ref={headingRef} tabIndex={-1} className="sr-only" data-testid="stage-heading">
+          {STAGE_TITLE[stage]}
+        </h2>
         {body}
       </FlowLayout>
     </>

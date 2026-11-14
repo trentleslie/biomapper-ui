@@ -241,6 +241,10 @@ test.describe("harmonize @app", () => {
 
     await page.getByRole("link", { name: "Continue to export" }).click();
     await expect(page).toHaveURL(new RegExp(`/harmonize/runs/${JOB}/export$`));
+    // The new stage starts at the top with focus on its heading.
+    await expect(page.getByTestId("stage-heading")).toBeFocused();
+    await expect(page.getByTestId("stage-heading")).toHaveText("Export");
+    expect(await page.locator("main").evaluate((m) => m.scrollTop)).toBe(0);
     await expect(page.getByRole("radio", { name: "JSON (recommended)" })).toBeChecked();
     await expect(page.getByRole("button", { name: "Send to EITL" })).toBeDisabled();
     await expect(page.getByTestId("eitl-skipped")).toContainText("1 flagged item is left out");
