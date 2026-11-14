@@ -1,3 +1,4 @@
+import asyncio
 import os
 import pytest
 from unittest.mock import patch
@@ -75,7 +76,7 @@ class TestJobEnvField:
 
     def test_job_store_create_with_env(self):
         store = JobStore()
-        job = store.create("test-id", total=3, env="dev")
+        job = asyncio.run(store.create("test-id", total=3, env="dev"))
         assert job.env == "dev"
         retrieved = store.get("test-id")
         assert retrieved is not None
@@ -83,5 +84,5 @@ class TestJobEnvField:
 
     def test_job_store_create_default_env(self):
         store = JobStore()
-        job = store.create("test-id", total=3)
+        job = asyncio.run(store.create("test-id", total=3))
         assert job.env == "production"
