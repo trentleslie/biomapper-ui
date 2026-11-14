@@ -401,4 +401,45 @@ test.describe("harmonize @app", () => {
     expect(submitted).toContain('"keyColumn":"id"');
     expect(submitted).not.toContain('"nameColumn":""');
   });
+
+  test("a failed poll keeps the run on screen with a could-not-refresh note", async ({ page }) => {
+    test.setTimeout(60_000);
+    const { stubs } = runStubs([{ state: "running", progress: progress("names_only", 5, 30), stage: "mapping" }]);
+    let gets = 0;
+    await isolate(page, {
+      ...stubs,
+      [`/api/harmonize/runs/${JOB}`]: async (route: Route, url: URL) => {
+        gets += 1;
+        if (gets === 1) return (stubs[`/api/harmonize/runs/${JOB}`] as (r: Route, u: URL) => Promise<void>)(route, url);
+        return route.fulfill({ status: 502, contentType: "text/html", body: "<html><body><h1>502 Bad Gateway</h1></body></html>" });
+      },
+    });
+    await goto(page, `/harmonize/runs/${JOB}/run`);
+    await expect(page.getByRole("progressbar", { name: "Names-only arm progress" })).toBeVisible();
+    await expect(page.getByTestId("refresh-failed")).toContainText("Could not refresh the run", { timeout: 20_000 });
+    await expect(page.getByRole("progressbar", { name: "Names-only arm progress" })).toBeVisible();
+    await expect(page.getByText("The run did not load")).toHaveCount(0);
+  });
+
+  test("a run the job runner lost opens from its list entry as unknown, with no retries and later steps locked", async ({ page }) => {
+    let gets = 0;
+    await isolate(page, {
+      "/api/harmonize/runs": [{ ...RUN_BASE, state: "unknown", reason: "The job runner has no record of this job; it may have been deleted." }],
+      [`/api/harmonize/runs/${JOB}`]: async (route: Route) => {
+        gets += 1;
+        return route.fulfill({ status: 400, json: { detail: "Unknown job id." } });
+      },
+    });
+    await goto(page, "/harmonize");
+    await page.getByRole("link", { name: /^Open unknown run: example_cohort_a, example_cohort_b/ }).click();
+    await expect(page).toHaveURL(new RegExp(`/harmonize/runs/${JOB}/run$`));
+    await expect(page.getByTestId("run-state").first()).toHaveText("Unknown");
+    await expect(page.getByTestId("run-reason")).toContainText("The job runner has no record of this job");
+    await expect(await stepState(page, "Review and flag")).toHaveAttribute("aria-disabled", "true");
+    await expect(page.getByRole("button", { name: "Try again" })).toHaveCount(0);
+    await page.waitForTimeout(1500);
+    expect(gets).toBe(1);
+    await goto(page, `/harmonize/runs/${JOB}/review`);
+    await expect(page.getByText("Review and flag is not available for this run")).toBeVisible();
+  });
 });

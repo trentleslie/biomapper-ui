@@ -8,6 +8,8 @@ import {
   useGetHarmonizeReport,
   useGetHarmonizeRun,
   useListHarmonizeItems,
+  useListHarmonizeRuns,
+  getListHarmonizeRunsQueryKey,
   type HarmonizeRunStatus,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -155,11 +157,17 @@ function RunSetupSummary({ run }: { run: HarmonizeRunStatus }) {
   );
 }
 
+/** A 4xx answer will not change on a retry. */
+function isClientError(err: unknown): boolean {
+  const status = errorStatus(err);
+  return status !== null && status >= 400 && status < 500;
+}
+
 function OpenRun({ jobId, requested }: { jobId: string; requested: string | undefined }) {
   const runQuery = useGetHarmonizeRun(jobId, {
     query: {
       queryKey: getGetHarmonizeRunQueryKey(jobId),
-      retry: (count, err) => errorStatus(err) !== 404 && count < 2,
+      retry: (count, err) => !isClientError(err) && count < 2,
       refetchInterval: (q) => {
         const state = q.state.data?.state;
         if (!state) return false;
@@ -169,7 +177,15 @@ function OpenRun({ jobId, requested }: { jobId: string; requested: string | unde
       },
     },
   });
-  const run = runQuery.data ?? null;
+  // The runs list still lists a run the job runner lost (state unknown, with its reason), while its own route
+  // answers 400. Such a run is shown from its list entry, with the later steps locked.
+  const refused = runQuery.isError && !runQuery.data && isClientError(runQuery.error) && errorStatus(runQuery.error) !== 404;
+  const runsQuery = useListHarmonizeRuns({ query: { queryKey: getListHarmonizeRunsQueryKey(), enabled: refused } });
+  const listed = refused ? (runsQuery.data?.find((r) => r.jobId === jobId) ?? null) : null;
+  const fromList: HarmonizeRunStatus | null = listed
+    ? { ...listed, state: "unknown", reason: listed.reason ?? errorMessage(runQuery.error) }
+    : null;
+  const run = runQuery.data ?? fromList;
   const finished = hasResults(run?.state);
   const flaggedQuery = useListHarmonizeItems(jobId, { limit: 1 }, {
     query: { queryKey: getListHarmonizeItemsQueryKey(jobId, { limit: 1 }), enabled: finished },
@@ -178,16 +194,16 @@ function OpenRun({ jobId, requested }: { jobId: string; requested: string | unde
 
   let body;
   let stage: Stage = isStage(requested) ? requested : defaultStage(run?.state);
-  if (runQuery.isLoading) {
+  if (runQuery.isLoading || (refused && runsQuery.isLoading)) {
     body = <LoadingBlock lines={5} label="Loading the run" />;
-  } else if (runQuery.isError || !run) {
+  } else if (!run) {
     const notFound = errorStatus(runQuery.error) === 404;
     body = (
       <div className="space-y-4">
         <ErrorPanel
           title={notFound ? "Run not found" : "The run did not load"}
           message={notFound ? "No run of yours has this id. It may belong to someone else, or the link is wrong." : errorMessage(runQuery.error)}
-          onRetry={notFound ? undefined : () => runQuery.refetch()}
+          onRetry={notFound || isClientError(runQuery.error) ? undefined : () => runQuery.refetch()}
         />
         <Button asChild variant="secondary">
           <Link href="/harmonize">
@@ -199,7 +215,14 @@ function OpenRun({ jobId, requested }: { jobId: string; requested: string | unde
   } else {
     let notice = null;
     if (!stageReachable(stage, run.state)) {
-      notice = (
+      const noResults = run.state === "failed" || run.state === "unknown";
+      notice = noResults ? (
+        <Note tone="info" title={`${STAGE_TITLE[stage]} is not available for this run`} className="mb-4">
+          {run.state === "failed"
+            ? "The run failed, so it has no results to review or export. Its status is below."
+            : "The job runner no longer knows this run, so it has no results to review or export. Its status is below."}
+        </Note>
+      ) : (
         <Note tone="info" title={`${STAGE_TITLE[stage]} opens when the run is complete`} className="mb-4">
           The run is {run.state === "running" ? "still running" : `${run.state.replace(/_/g, " ")}`}. Its progress is below.
         </Note>
@@ -209,6 +232,11 @@ function OpenRun({ jobId, requested }: { jobId: string; requested: string | unde
     body = (
       <>
         <RunIdentity run={run} />
+        {runQuery.isError && runQuery.data && (
+          <p role="status" className="mb-4 text-sm text-warning" data-testid="refresh-failed">
+            Could not refresh the run ({errorMessage(runQuery.error)}). Showing the last state received; it will try again.
+          </p>
+        )}
         {notice}
         {stage === "setup" && <RunSetupSummary run={run} />}
         {stage === "run" && <RunStage run={run} />}

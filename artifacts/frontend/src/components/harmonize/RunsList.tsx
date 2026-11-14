@@ -32,13 +32,19 @@ export function RunsList() {
         <div className="p-3">
           <LoadingBlock lines={3} label="Loading your runs" />
         </div>
-      ) : q.isError ? (
+      ) : q.isError && !q.data ? (
         <div className="p-3">
           <ErrorPanel title="Your runs did not load" message={errorMessage(q.error)} onRetry={() => q.refetch()} />
         </div>
       ) : runs.length === 0 ? (
         <EmptyState compact icon={History} title="No runs yet" description="Runs you start appear here, with their state." />
       ) : (
+        <>
+        {q.isError && (
+          <p role="status" className="px-4 pt-2 text-xs text-warning" data-testid="runs-refresh-failed">
+            Could not refresh the list ({errorMessage(q.error)}). Showing the last one received.
+          </p>
+        )}
         <ul className="scroll-visible max-h-[min(26rem,calc(100vh-24rem))] min-h-24 divide-y divide-neutral-100" aria-label="Harmonization runs">
           {runs.map((r) => {
             const p = r.state === "running" ? armProgress(r.progress) : null;
@@ -68,6 +74,7 @@ export function RunsList() {
             );
           })}
         </ul>
+        </>
       )}
     </section>
   );
