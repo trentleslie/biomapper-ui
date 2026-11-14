@@ -258,4 +258,17 @@ describe("items and exports", () => {
     ]);
     expect(headerProblems(["name", "hmdb"])).toEqual([]);
   });
+
+  it("never shows a web page or a raw network error as a message", () => {
+    expect(errorMessage({ status: 413, data: "<html><body><h1>413 Request Entity Too Large</h1></body></html>" })).toBe(
+      "The server refused the upload as too large (HTTP 413).",
+    );
+    expect(errorMessage({ status: 504, data: "<html><body>504 Gateway Time-out</body></html>" })).toBe(
+      "The server is unavailable or did not answer in time (HTTP 504). Try again in a moment.",
+    );
+    expect(errorMessage({ status: 500, data: "x".repeat(500) })).toBe("The server hit an error (HTTP 500). Try again.");
+    expect(errorMessage(new TypeError("Failed to fetch"))).toBe("Could not reach the server. Check your connection, then try again.");
+    // A short plain-text body is still shown as the server wrote it.
+    expect(errorMessage({ status: 400, data: "Unknown job id." })).toBe("Unknown job id.");
+  });
 });

@@ -166,6 +166,8 @@ export function armProgress(progress: HarmonizeRunStatus["progress"]): ArmProgre
  */
 export function errorMessage(err: unknown, fallback = "Something went wrong. Try again."): string {
   if (!err) return fallback;
+  // fetch rejects with a TypeError ("Failed to fetch") when the request never reached the server.
+  if (err instanceof TypeError) return CONNECTION_MESSAGE;
   const data = (err as { data?: unknown }).data;
   if (data && typeof data === "object") {
     const detail = (data as { detail?: unknown }).detail;
@@ -184,9 +186,31 @@ export function errorMessage(err: unknown, fallback = "Something went wrong. Try
       if (parts.length) return parts.join("; ");
     }
   }
-  if (typeof data === "string" && data.trim()) return data.trim();
-  if (err instanceof Error && err.message) return err.message;
+  if (typeof data === "string" && data.trim()) {
+    return looksLikePage(data) ? statusSentence(errorStatus(err)) : data.trim();
+  }
+  if (err instanceof Error && err.message) {
+    return looksLikePage(err.message) ? statusSentence(errorStatus(err)) : err.message;
+  }
   return fallback;
+}
+
+export const CONNECTION_MESSAGE = "Could not reach the server. Check your connection, then try again.";
+
+/** An error body that is a web page (a proxy's 502 or 413 page) or too long to be a message. */
+export function looksLikePage(text: string): boolean {
+  return /<\s*(!doctype|html|head|body|title|h1|center)\b/i.test(text) || text.trim().length > 400;
+}
+
+/** A plain sentence for an error answer whose body is not a message, from its HTTP status. */
+export function statusSentence(status: number | null): string {
+  const code = status ? ` (HTTP ${status})` : "";
+  if (status === 413) return `The server refused the upload as too large${code}.`;
+  if (status === 502 || status === 503 || status === 504) {
+    return `The server is unavailable or did not answer in time${code}. Try again in a moment.`;
+  }
+  if (status !== null && status >= 500) return `The server hit an error${code}. Try again.`;
+  return `The server answered with an error page${code}.`;
 }
 
 export function errorStatus(err: unknown): number | null {

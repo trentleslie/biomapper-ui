@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import {
   EXPORT_FORMATS,
   EXPORT_TABLES,
+  errorMessage,
   plural,
   tableApplies,
   type ExportFormat,
@@ -41,7 +42,7 @@ function useDownloader(jobId: string) {
       saveFile(file);
       if (table === "eitl_pairs") setSkipped(file.skipped);
     } catch (err) {
-      setError({ key, message: err instanceof Error ? err.message : String(err) });
+      setError({ key, message: errorMessage(err) });
     } finally {
       setBusy(null);
     }
