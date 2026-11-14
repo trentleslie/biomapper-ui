@@ -18,15 +18,16 @@ where. The recording is ``<out>/recording/``:
 * ``PINS.md``: biomapper version, the report's pins, UTC date, command, this repo's git SHA.
 
 Paths in the recording are relative to the job's root (``inputs/a.tsv``, ``report``, ``store``); no absolute path
-or key is written. ``<out>/work/`` holds the job's home and inputs; if the run is interrupted,
-run again with ``--out`` on the same folder and the job resumes without re-mapping. To install a
-recording, copy ``<out>/recording/`` over ``data/harmonize_examples/<kind>/recording/``.
+or key is written. ``<out>/work/`` holds the job's home and inputs. An interrupted run is not
+resumed: run the script again into a new folder. To install a recording, copy
+``<out>/recording/`` over ``data/harmonize_examples/<kind>/recording/``.
 """
 from __future__ import annotations
 
 import argparse
 import asyncio
 import json
+import os
 import shlex
 import shutil
 import subprocess
@@ -133,6 +134,7 @@ async def record(kind: str, out: Path, command: str) -> Path:
         specs.append(cohort.to_spec(dest))
 
     progress_path = recording / "progress.jsonl"
+    progress_path.write_text("", encoding="utf-8")  # one attempt per recording
     started = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     def on_progress(job_id: str, p: HarmonizeProgress) -> None:
@@ -155,8 +157,8 @@ async def record(kind: str, out: Path, command: str) -> Path:
         done = await backend.wait(status.job_id, poll_s=5.0)
         if done.state not in FINISHED_STATES:
             raise SystemExit(
-                f"job {done.job_id} ended {done.state}: {done.reason}. Run again with "
-                f"--out {out} to resume it.")
+                f"job {done.job_id} ended {done.state}: {done.reason}. Nothing was recorded; "
+                "run the script again.")
         report = backend.load_report(done.job_id)
         review = _review_dump(backend, done.job_id)
 
@@ -181,7 +183,11 @@ def main(argv: list[str] | None = None) -> None:
     out = args.out or API_DIR / "data" / "harmonize" / "recordings" / f"{args.kind}-{_stamp()}"
     out = out.resolve()
     out.mkdir(parents=True, exist_ok=True)
-    command = shlex.join(["python", "scripts/record_harmonize_run.py", args.kind])
+    words = ["python", "scripts/record_harmonize_run.py", args.kind]
+    if args.out is not None:
+        # As given, relative to artifacts/python-api, so no absolute path reaches PINS.md.
+        words += ["--out", os.path.relpath(out, API_DIR)]
+    command = shlex.join(words)
     print(f"Recording {args.kind} into {out}", flush=True)
     recording = asyncio.run(record(args.kind, out, command))
     print(f"Saved the recording to {recording}")

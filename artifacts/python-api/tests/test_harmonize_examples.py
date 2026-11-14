@@ -8,6 +8,7 @@ flags and export routes (Tasks 4, 6 and 7) the same way the package-generated fi
 import csv
 import io
 import json
+import re
 import time
 from pathlib import Path
 
@@ -80,6 +81,37 @@ def test_recording_is_complete_and_holds_no_local_path(kind):
     pins = (directory / "PINS.md").read_text(encoding="utf-8")
     assert "biomapper version: 1.9" in pins and "git SHA" in pins
     assert f"scripts/record_harmonize_run.py {kind}" in pins
+
+
+def unconfirmed_rows(report: dict) -> set[str]:
+    """Keys of rows whose declared identifier the recording does not confirm against the row's
+    names-only node: the identifier arm chose another node, or the names-only identifier
+    check left it unconfirmed (many-cohort ``id_check_review``)."""
+    if report["kind"] == "harmonize_cohorts":
+        def arm(name):
+            return {(label, row["key"]): row for label, rows in report["mappings"][name].items()
+                    for row in rows}
+        names, ids = arm("names_only"), arm("identifier")
+    else:
+        def arm(name):
+            return {(row["cohort"], row["key"]): row for row in report["arms"][name]["rows"]}
+        names, ids = arm("names_only"), arm("identifier")
+    keys = {key for (cohort, key), row in names.items()
+            if (cohort, key) in ids and ids[(cohort, key)]["chosen_kg_id"] != row["chosen_kg_id"]}
+    for name in ("names_only", "identifier"):
+        keys |= {e["key"] for e in report["arms"].get(name, {}).get("id_check_review") or []}
+    return keys
+
+
+@pytest.mark.parametrize("kind", KINDS)
+def test_source_names_every_unconfirmed_identifier(kind):
+    keys = unconfirmed_rows(report_of(kind))
+    assert keys, "the recording has rows whose identifier the names-only node does not carry"
+    source = (EXAMPLES_DIR / kind / "SOURCE.md").read_text(encoding="utf-8")
+    section = source.split("## Known identifier notes", 1)[1].split("\n## ", 1)[0]
+    assert "checked only against the recorded run" in section
+    missing = sorted(k for k in keys if not re.search(rf"\b{re.escape(k)}\b", section))
+    assert not missing, f"SOURCE.md 'Known identifier notes' does not name {missing}"
 
 
 @pytest.mark.asyncio

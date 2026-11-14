@@ -180,6 +180,36 @@ async def test_replay_rejects_malformed_recording(recording_dir):
             await b.submit_cohorts(spec("a"), spec("b"), entity="metabolites")
 
 
+@pytest.mark.parametrize("missing", ["two_cohort", "many_cohort"])
+async def test_replay_names_a_missing_recording_by_kind(recording_dir, missing):
+    import shutil
+
+    shutil.rmtree(recording_dir / missing / "recording")
+    expected = {"two_cohort": "No two-cohort recording is installed.",
+                "many_cohort": "No many-cohort recording is installed."}
+    async with replay(recording_dir) as b:
+        with pytest.raises(JobError) as caught:
+            if missing == "two_cohort":
+                await b.submit_cohorts(spec("a"), spec("b"), entity="metabolites")
+            else:
+                await b.submit_many([spec("a"), spec("b")], entity="metabolites")
+        assert str(caught.value) == expected[missing]
+        assert str(recording_dir) not in str(caught.value)
+        # The other kind still replays.
+        other = (b.submit_many([spec("a"), spec("b")], entity="metabolites")
+                 if missing == "two_cohort"
+                 else b.submit_cohorts(spec("a"), spec("b"), entity="metabolites"))
+        assert (await other).state == "queued"
+
+
+async def test_replay_rejects_malformed_recording_without_its_path(recording_dir):
+    (recording_dir / "many_cohort" / "recording" / "status.json").write_text("{not json")
+    async with replay(recording_dir) as b:
+        with pytest.raises(JobError) as caught:
+            await b.submit_many([spec("a"), spec("b")], entity="metabolites")
+        assert str(caught.value) == "The many-cohort recording cannot be read (ValidationError)."
+
+
 async def test_default_fixture_isolates_app_lifespan(tmp_path, monkeypatch):
     # Pins the autouse conftest fixture: entering the app lifespan uses a temp home and replay.
     from main import app

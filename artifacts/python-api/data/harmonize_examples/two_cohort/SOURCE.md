@@ -16,6 +16,16 @@
 - **Unresolved rows:** `###` in `a.tsv` and `???` in `b.tsv` are placeholder names with no meaning. Made-up words were tried first, but the engine resolves almost any word to some node; only punctuation-only names came back unresolved.
 - **One-sided rows:** Caffeine is only in `b.tsv`.
 
+## Known identifier notes
+
+The identifiers in these files were written from knowledge of the public HMDB and KEGG vocabularies and checked only against the recorded run in `recording/`. The rows below declare an identifier that the recording does not confirm against the row's names-only node: the identifier arm chose a different node. `tests/test_harmonize_examples.py` fails if a row like this is missing from this list.
+
+- **3-Hydroxybutyric acid (a18) and beta-Hydroxybutyrate (b17)** declare HMDB0000011, which is the (R)-form, (R)-3-hydroxybutyric acid. The generic name's code is HMDB0000357. The names-only arm chooses RM:0153056 (HMDB0000357, no stereo); the identifier arm resolves HMDB0000011 to RM:0152271, the (R)-enantiomer. The two arms choose different nodes, a useful demonstration of why the identifier arm matters. Both rows still link to each other in both arms.
+- **Glucose (a01) and D-Glucose (b01)** declare HMDB0000122. The names-only node RM:0135901 carries HMDB0304632, not HMDB0000122; the identifier arm resolves the code to a D-glucose node (HMDB:HMDB0000122).
+- **Betaine (a22) and Glycine betaine (b21)** declare HMDB0000043. The names-only node RM:0135869 has no HMDB code; the identifier arm resolves the code to RM:0204298, the same skeleton in a different protonation state.
+
+This report kind has no per-row identifier check, so these differences show only by comparing the two arms' `mappings`, not as review items.
+
 ## Recording
 
 `recording/` holds one real run of this example against the hosted BioMapper API, made with `scripts/record_harmonize_run.py two_cohort`. `recording/PINS.md` gives the biomapper version, the report's pins, the date, the command and the git SHA. The replay backend reads it when `BIOMAPPER_HARMONIZE_REPLAY_DIR` points at `data/harmonize_examples`.

@@ -41,6 +41,7 @@ REPORT_FILENAME = "report.json"
 REVIEW_PAGE_DEFAULT = 25
 REVIEW_PAGE_MAX = 50
 _RECORDING_OF = {"harmonize_cohorts": "two_cohort", "harmonize_many": "many_cohort"}
+_KIND_NAME = {"harmonize_cohorts": "two-cohort", "harmonize_many": "many-cohort"}
 RECORDING_SUBDIR = "recording"
 _RESUMABLE = frozenset({"stalled", "paused", "expired", "cancelled"})
 
@@ -57,7 +58,8 @@ class _Recording:
     review: dict[str, Any]
 
     @classmethod
-    def load(cls, directory: Path) -> _Recording:
+    def load(cls, directory: Path, name: str = "replay") -> _Recording:
+        """Read and check a recording. Error messages name it (``name``), never its path."""
         try:
             finished = HarmonizeStatus.model_validate_json(
                 (directory / "status.json").read_text(encoding="utf-8"))
@@ -66,7 +68,7 @@ class _Recording:
             review = json.loads((directory / "review_items.json").read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
             raise JobError(
-                f"The replay recording in {directory} cannot be read ({type(exc).__name__})."
+                f"The {name} recording cannot be read ({type(exc).__name__})."
             ) from None
         problem = None
         if finished.state not in FINISHED_STATES:
@@ -79,7 +81,7 @@ class _Recording:
         elif not (directory / REPORT_FILENAME).is_file():
             problem = f"{REPORT_FILENAME} is missing"
         if problem is not None:
-            raise JobError(f"The replay recording in {directory} is not usable: {problem}.")
+            raise JobError(f"The {name} recording is not usable: {problem}.")
         return cls(directory, finished, progress, review)
 
 
@@ -123,7 +125,10 @@ class ReplayBackend:
     # -- submit ------------------------------------------------------------
 
     def _recording(self, kind: str) -> _Recording:
-        return _Recording.load(self._recordings / _RECORDING_OF[kind] / RECORDING_SUBDIR)
+        directory = self._recordings / _RECORDING_OF[kind] / RECORDING_SUBDIR
+        if not directory.is_dir():
+            raise JobError(f"No {_KIND_NAME[kind]} recording is installed.")
+        return _Recording.load(directory, _KIND_NAME[kind])
 
     def _submit(self, kind: str, output_dir: Path | None) -> HarmonizeStatus:
         if not self._running:
