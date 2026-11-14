@@ -1,0 +1,256 @@
+{
+ "job_id": "e8a3e742a340ff3b",
+ "state": "complete",
+ "reason": null,
+ "kind": "harmonize_many",
+ "stage": "done",
+ "cohorts": [
+  {
+   "label": "example_cohort_a",
+   "path": "inputs/example_cohort_a.tsv",
+   "rows": 16
+  },
+  {
+   "label": "example_cohort_b",
+   "path": "inputs/example_cohort_b.tsv",
+   "rows": 16
+  },
+  {
+   "label": "example_cohort_c",
+   "path": "inputs/example_cohort_c.tsv",
+   "rows": 16
+  },
+  {
+   "label": "example_cohort_d",
+   "path": "inputs/example_cohort_d.tsv",
+   "rows": 16
+  },
+  {
+   "label": "example_cohort_e",
+   "path": "inputs/example_cohort_e.tsv",
+   "rows": 16
+  }
+ ],
+ "entity": "metabolites",
+ "output_dir": "report",
+ "store_dir": "store",
+ "entities_total": 49,
+ "entities_mapped": 93,
+ "rows_errored": 0,
+ "eta_s": null,
+ "kg_build": "2.3.0 (3dd08a5b)",
+ "kg_verified": true,
+ "owner": null,
+ "created_utc": "2026-11-14T04:44:08.645291+00:00",
+ "updated_utc": "2026-11-14T04:44:51.300067+00:00",
+ "summary": {
+  "status": "ok",
+  "publication_grade": "iteration-grade, not for publication",
+  "kg_build": "2.3.0 (3dd08a5b)",
+  "kg_verified": true,
+  "labels": [
+   "example_cohort_a",
+   "example_cohort_b",
+   "example_cohort_c",
+   "example_cohort_d",
+   "example_cohort_e"
+  ],
+  "arms": {
+   "names_only": {
+    "groups": 27,
+    "multi_cohort_groups": 22,
+    "clean_groups": 26,
+    "flagged_groups": 1,
+    "cross_node_entries": 0,
+    "cross_node_row_pairs": 0,
+    "per_cohort": {
+     "example_cohort_a": {
+      "total": 16,
+      "grouped": 15,
+      "no_node": 0,
+      "unresolved": 1,
+      "errored": 0
+     },
+     "example_cohort_b": {
+      "total": 16,
+      "grouped": 15,
+      "no_node": 0,
+      "unresolved": 1,
+      "errored": 0
+     },
+     "example_cohort_c": {
+      "total": 16,
+      "grouped": 15,
+      "no_node": 0,
+      "unresolved": 1,
+      "errored": 0
+     },
+     "example_cohort_d": {
+      "total": 16,
+      "grouped": 15,
+      "no_node": 0,
+      "unresolved": 1,
+      "errored": 0
+     },
+     "example_cohort_e": {
+      "total": 16,
+      "grouped": 15,
+      "no_node": 0,
+      "unresolved": 1,
+      "errored": 0
+     }
+    }
+   },
+   "identifier": {
+    "groups": 27,
+    "multi_cohort_groups": 22,
+    "clean_groups": 25,
+    "flagged_groups": 2,
+    "cross_node_entries": 1,
+    "cross_node_row_pairs": 4,
+    "per_cohort": {
+     "example_cohort_a": {
+      "total": 16,
+      "grouped": 15,
+      "no_node": 0,
+      "unresolved": 1,
+      "errored": 0
+     },
+     "example_cohort_b": {
+      "total": 16,
+      "grouped": 15,
+      "no_node": 0,
+      "unresolved": 1,
+      "errored": 0
+     },
+     "example_cohort_c": {
+      "total": 16,
+      "grouped": 15,
+      "no_node": 0,
+      "unresolved": 1,
+      "errored": 0
+     },
+     "example_cohort_d": {
+      "total": 16,
+      "grouped": 15,
+      "no_node": 0,
+      "unresolved": 1,
+      "errored": 0
+     },
+     "example_cohort_e": {
+      "total": 16,
+      "grouped": 15,
+      "no_node": 0,
+      "unresolved": 1,
+      "errored": 0
+     }
+    }
+   }
+  },
+  "identifier_arm_skipped": null,
+  "mapping": {
+   "names_only": {
+    "example_cohort_a": {
+     "n_rows": 16,
+     "n_reused": 0,
+     "n_fresh": 16,
+     "n_errored": 0
+    },
+    "example_cohort_b": {
+     "n_rows": 16,
+     "n_reused": 0,
+     "n_fresh": 16,
+     "n_errored": 0
+    },
+    "example_cohort_c": {
+     "n_rows": 16,
+     "n_reused": 0,
+     "n_fresh": 16,
+     "n_errored": 0
+    },
+    "example_cohort_d": {
+     "n_rows": 16,
+     "n_reused": 0,
+     "n_fresh": 16,
+     "n_errored": 0
+    },
+    "example_cohort_e": {
+     "n_rows": 16,
+     "n_reused": 0,
+     "n_fresh": 16,
+     "n_errored": 0
+    }
+   },
+   "identifier": {
+    "example_cohort_a": {
+     "n_rows": 16,
+     "n_reused": 0,
+     "n_fresh": 14,
+     "n_errored": 0
+    },
+    "example_cohort_b": {
+     "n_rows": 16,
+     "n_reused": 0,
+     "n_fresh": 14,
+     "n_errored": 0
+    },
+    "example_cohort_c": {
+     "n_rows": 16,
+     "n_reused": 0,
+     "n_fresh": 15,
+     "n_errored": 0
+    },
+    "example_cohort_d": {
+     "n_rows": 16,
+     "n_reused": 0,
+     "n_fresh": 15,
+     "n_errored": 0
+    },
+    "example_cohort_e": {
+     "n_rows": 16,
+     "n_reused": 0,
+     "n_fresh": 14,
+     "n_errored": 0
+    }
+   }
+  },
+  "store": {
+   "reuse_enabled": true,
+   "saving": true,
+   "reason": null
+  },
+  "warnings": [],
+  "name_linking": {
+   "enabled": true,
+   "category": "biolink:SmallMolecule",
+   "decided_by": "category",
+   "enabled_for_categories": [
+    "biolink:SmallMolecule"
+   ],
+   "overridable": false,
+   "reason": "Name links are on because the category is biolink:SmallMolecule. Two resolved rows whose names are equal (exactly, or ignoring case when both names are longer than 4 characters) are linked even when they resolved to different nodes, and each such link says so in its basis (name_exact or name_casefold)."
+  },
+  "output_dir": "report"
+ },
+ "review_items": {
+  "row": 6,
+  "link": 0,
+  "skipped_no_node": 0,
+  "candidates_captured": 6,
+  "candidates_not_captured": 0
+ },
+ "progress": {
+  "function": "harmonize_many",
+  "arm": "identifier",
+  "cohort": null,
+  "cohorts": [
+   "example_cohort_a",
+   "example_cohort_b",
+   "example_cohort_c",
+   "example_cohort_d",
+   "example_cohort_e"
+  ],
+  "entities_done": 44,
+  "entities_total": 44
+ }
+}

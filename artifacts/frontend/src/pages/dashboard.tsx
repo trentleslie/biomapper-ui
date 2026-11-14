@@ -9,7 +9,7 @@ import { SankeyChart } from "@/components/SankeyChart";
 import { EquivalentIds } from "@/components/EquivalentIds";
 import { DemoGuide } from "@/components/DemoGuide";
 import { FieldTooltip } from "@/components/field-tooltip";
-import { EXPLAINERS, reviewReason, rowNeedsReview } from "@/lib/result-explainers";
+import { EXPLAINERS, confidenceTierCounts, NOT_SCORED_LABEL, NOT_SCORED_TOOLTIP, reviewReason, rowNeedsReview } from "@/lib/result-explainers";
 import { useEnv } from "@/contexts/env-context";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
@@ -31,6 +31,7 @@ import {
   Download, AlertCircle, Loader2,
   ChevronDown, ChevronRight, ChevronUp, Search, Flag, X, LogIn,
 } from "lucide-react";
+import { identifierKeysFor } from "@/lib/vocab-keys";
 
 const TIER_COLORS: Record<string, string> = {
   high: '#005B33',
@@ -155,10 +156,7 @@ export default function DashboardPage() {
 
     const uniqueNames = new Set(results.map(r => r.name)).size;
     const resolved = results.filter(r => r.resolved).length;
-    const high = results.filter(r => r.confidenceTier === "high").length;
-    const medium = results.filter(r => r.confidenceTier === "medium").length;
-    const low = results.filter(r => r.confidenceTier === "low").length;
-    const unknownCount = results.filter(r => !r.confidenceTier || r.confidenceTier === "unknown").length;
+    const { high, medium, low, unknown: unknownCount } = confidenceTierCounts(results);
 
     const vocabCoverage: Record<string, number> = {};
     results.forEach(r => {
@@ -315,9 +313,10 @@ export default function DashboardPage() {
     results.forEach(r => {
       if (r.identifiers) Object.keys(r.identifiers).forEach(k => allVocabs.add(k));
     });
+    const wantedKeys = identifierKeysFor(visibleOntologies);
     const vocabCols = Array.from(allVocabs)
       .map(v => v.toLowerCase())
-      .filter(v => visibleOntologies.size === 0 || visibleOntologies.has(v))
+      .filter(v => wantedKeys === null || wantedKeys.has(v))
       .sort();
 
     const allEquivPrefixes = new Set<string>();
@@ -531,8 +530,9 @@ export default function DashboardPage() {
     return s;
   }, [results]);
   const visibleVocabCols = useMemo(() => {
-    const allowed = visibleOntologies.size > 0
-      ? Array.from(presentVocabKeys).filter(v => visibleOntologies.has(v))
+    const wantedKeys = identifierKeysFor(visibleOntologies);
+    const allowed = wantedKeys !== null
+      ? Array.from(presentVocabKeys).filter(v => wantedKeys.has(v))
       : Array.from(presentVocabKeys);
     return allowed.sort();
   }, [presentVocabKeys, visibleOntologies]);
@@ -590,7 +590,7 @@ export default function DashboardPage() {
       `| High | ${cd.high} | ${(cd.high / summary.uniqueNames * 100).toFixed(1)}% |`,
       `| Medium | ${cd.medium} | ${(cd.medium / summary.uniqueNames * 100).toFixed(1)}% |`,
       `| Low | ${cd.low} | ${(cd.low / summary.uniqueNames * 100).toFixed(1)}% |`,
-      `| Unknown | ${cd.unknown} | ${(cd.unknown / summary.uniqueNames * 100).toFixed(1)}% |`,
+      `| Not scored | ${cd.unknown} | ${(cd.unknown / summary.uniqueNames * 100).toFixed(1)}% |`,
       ``,
       `## Vocabulary Coverage`,
       ``,
@@ -657,7 +657,7 @@ export default function DashboardPage() {
     { name: 'High', value: summary.confidenceTierDistribution.high, fill: TIER_COLORS.high },
     { name: 'Medium', value: summary.confidenceTierDistribution.medium, fill: TIER_COLORS.medium },
     { name: 'Low', value: summary.confidenceTierDistribution.low, fill: TIER_COLORS.low },
-    { name: 'Unknown', value: summary.confidenceTierDistribution.unknown, fill: TIER_COLORS.unknown },
+    { name: NOT_SCORED_LABEL, value: summary.confidenceTierDistribution.unknown, fill: TIER_COLORS.unknown },
   ].filter(d => d.value > 0) : [];
 
   const barData = summary ? Object.entries(summary.vocabularyCoverage)
@@ -760,7 +760,7 @@ export default function DashboardPage() {
                   <CardDescription>Resolution flow from input names to confidence tiers</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <SankeyChart summary={summary} results={results} includeVocabLayer={true} />
+                  <SankeyChart summary={summary} results={results} includeVocabLayer={true} selectedVocabs={visibleOntologies} />
                 </CardContent>
               </Card>
 
@@ -845,7 +845,7 @@ export default function DashboardPage() {
                         {([["High", summary.confidenceTierDistribution.high, TIER_COLORS.high],
                            ["Medium", summary.confidenceTierDistribution.medium, TIER_COLORS.medium],
                            ["Low", summary.confidenceTierDistribution.low, TIER_COLORS.low],
-                           ["Unknown", summary.confidenceTierDistribution.unknown, TIER_COLORS.unknown]] as [string, number, string][]).map(([tier, count, color]) => (
+                           [NOT_SCORED_LABEL, summary.confidenceTierDistribution.unknown, TIER_COLORS.unknown]] as [string, number, string][]).map(([tier, count, color]) => (
                           <tr key={tier} className="border-b last:border-0">
                             <td className="py-1 flex items-center gap-1.5">
                               <span className="w-2 h-2 rounded-full inline-block" style={{ background: color }} />
@@ -862,7 +862,7 @@ export default function DashboardPage() {
                   {/* Vocabulary Coverage */}
                   <div>
                     <h4 className="text-sm font-semibold mb-2">Vocabulary Coverage</h4>
-                    <div className="max-h-[200px] overflow-y-auto">
+                    <div className="max-h-[200px] scroll-visible">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b text-neutral-500"><th className="py-1 text-left font-normal">Vocabulary</th><th className="py-1 text-right font-normal">Hits</th></tr>
@@ -941,7 +941,7 @@ export default function DashboardPage() {
                             <TableCell className="font-mono text-xs text-neutral-500">{row.primaryCurie || "-"}</TableCell>
                             <TableCell>
                               <Badge variant={row.confidenceTier === "high" ? "success" : row.confidenceTier === "medium" ? "warning" : row.confidenceTier === "low" ? "danger" : "neutral"}>
-                                {row.confidenceTier || "unresolved"}
+                                {!row.resolved ? "unresolved" : row.confidenceTier && row.confidenceTier !== "unknown" ? row.confidenceTier : <span title={NOT_SCORED_TOOLTIP}>{NOT_SCORED_LABEL}</span>}
                               </Badge>
                             </TableCell>
                             <TableCell className="text-xs text-neutral-500">
@@ -1098,14 +1098,14 @@ export default function DashboardPage() {
                             <TableCell>
                               {row.resolved ? (
                                 <Badge variant={row.confidenceTier === "high" ? "success" : row.confidenceTier === "medium" ? "warning" : row.confidenceTier === "low" ? "danger" : "neutral"}>
-                                  {row.confidenceTier || "unknown"}
+                                  {row.confidenceTier && row.confidenceTier !== "unknown" ? row.confidenceTier : <span title={NOT_SCORED_TOOLTIP}>{NOT_SCORED_LABEL}</span>}
                                 </Badge>
                               ) : (
                                 <Badge variant="neutral">unresolved</Badge>
                               )}
                             </TableCell>
                             <TableCell className="font-mono text-sm">
-                              {row.confidenceScore != null ? row.confidenceScore.toFixed(3) : "-"}
+                              {row.confidenceScore != null ? row.confidenceScore.toFixed(3) : row.resolved ? <span title={NOT_SCORED_TOOLTIP}>{NOT_SCORED_LABEL}</span> : "-"}
                             </TableCell>
                             {providedIdColsForTable.map(col => {
                               const val = row.providedIds?.[col];

@@ -61,3 +61,16 @@ __pycache__/
 artifacts/python-api/data/*.db
 artifacts/python-api/data/*.db-wal
 artifacts/python-api/data/*.db-shm
+
+# Harmonization job home and run outputs (local only)
+artifacts/python-api/data/harmonize/
+
+# python virtualenv
+.venv/
+
+# Playwright output
+artifacts/frontend/test-results/
+artifacts/frontend/playwright-report/
+
+# Task 13 live verification outputs (local only)
+artifacts/python-api/data/harmonize_verification/

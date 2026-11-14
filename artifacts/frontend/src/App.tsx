@@ -195,7 +195,11 @@ function DevBypassApp() {
               <Route path="/">{() => <UploadPage />}</Route>
               <Route path="/upload">{() => <UploadPage />}</Route>
               <Route path="/job/:jobId">{() => <DashboardPage />}</Route>
+              <Route path="/jobs">{() => <JobsPage />}</Route>
               <Route path="/flagged">{() => <FlaggedPage />}</Route>
+              <Route path="/benchmark/runs/:runId">{() => <BenchmarkResultsPage />}</Route>
+              <Route path="/benchmark/runs">{() => <BenchmarkRunsPage />}</Route>
+              <Route path="/benchmark">{() => <BenchmarkPage />}</Route>
               <Route component={NotFound} />
             </Switch>
           </AppShell>

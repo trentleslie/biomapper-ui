@@ -1,0 +1,16 @@
+biomapper-ui
+Copyright (c) 2026 Phenome Health
+
+The source code in this repository is licensed under the MIT License (see LICENSE).
+The following files are not covered by the MIT License.
+
+Phenome Health name and logos
+
+  The Phenome Health name and the logos in artifacts/frontend/src/assets/ph/ are
+  trademarks of Phenome Health. They are not licensed under the MIT License, and no
+  right to use them is granted by this repository.
+
+Inter font
+
+  The Inter font files in artifacts/frontend/public/fonts/ are licensed under the SIL
+  Open Font License, Version 1.1. The licence text is in OFL.txt beside them.

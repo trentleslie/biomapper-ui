@@ -13,21 +13,24 @@ export const EXPLAINERS = {
   primaryCurie:
     "The identifier BioMapper chose for this name, written as PREFIX:ID (for example CHEBI:17234 or HMDB:HMDB0000122). The prefix names the database.",
   score:
-    "How strongly the knowledge-graph search matched the name, on a scale of roughly 0 to 5 (higher is a closer text match). It is the best score among the identifiers returned. It is a search-relevance signal, not a probability of being correct.",
-  tier: `A bucket based on the score: High is ${TIER_HIGH_MIN.toFixed(1)} or more, Medium is ${TIER_MEDIUM_MIN.toFixed(1)} to ${TIER_HIGH_MIN.toFixed(1)}, Low is below ${TIER_MEDIUM_MIN.toFixed(1)}. Unknown means the match came from a curated source (such as RefMet or LIPID MAPS) that does not produce a search score, which is often a good match rather than a bad one. Unresolved means nothing was found.`,
+    "How strongly the knowledge-graph search matched the name, on a scale of roughly 0 to 5 (higher is a closer text match). It is the score of the entry BioMapper chose. It is a search-relevance signal, not a probability of being correct.",
+  tier: `A bucket based on the score: High is ${TIER_HIGH_MIN.toFixed(1)} or more, Medium is ${TIER_MEDIUM_MIN.toFixed(1)} to ${TIER_HIGH_MIN.toFixed(1)}, Low is below ${TIER_MEDIUM_MIN.toFixed(1)}. Not scored means the annotators did not score the chosen entry (for example a match from a curated source such as RefMet or LIPID MAPS). This is not a low score, and is often a good match rather than a bad one. Unresolved means nothing was found.`,
   highQuality: `Share of unique names whose tier is High or Medium (score ${TIER_MEDIUM_MIN.toFixed(1)} or more). This measures search strength, not verified accuracy.`,
   vocabColumns:
     "Cross-references to other databases (HMDB, ChEBI, PubChem, RefMet, LIPID MAPS, KEGG and more) for the same compound. Click a row to see all of them.",
   needsReview:
-    "Rows worth a human look: nothing found, a Low or Unknown tier, or a conflict between RefMet and ChEBI that BioMapper flagged.",
+    "Rows worth a human look: nothing found, a Low tier, a Not scored row, or a conflict between RefMet and ChEBI that BioMapper flagged.",
 } as const;
+
+export const NOT_SCORED_LABEL = "Not scored";
+export const NOT_SCORED_TOOLTIP = "The annotators did not score the chosen entry. This is not a low score.";
 
 export const REVIEW_REASONS = {
   unresolved: "No match found",
   divergent_refmet: "RefMet ChEBI conflict (structure differs)",
   conflict_no_structure: "RefMet ChEBI conflict (no structure to adjudicate)",
-  unknown: "No search score (curated-source match)",
-  low: "Low search score",
+  not_scored: NOT_SCORED_LABEL,
+  low_confidence: "Low search score",
 } as const;
 
 // Same rule as the Needs Review table, so downloads and the page agree on which rows are flagged.
@@ -43,10 +46,27 @@ export function reviewReason(row: {
   resolved: boolean;
   confidenceTier?: string | null;
   chosenKgIdReview?: string | null;
+  reviewReason?: string | null;
 }): string {
   if (!row.resolved) return REVIEW_REASONS.unresolved;
-  if (row.chosenKgIdReview === "divergent_refmet") return REVIEW_REASONS.divergent_refmet;
-  if (row.chosenKgIdReview === "conflict_no_structure") return REVIEW_REASONS.conflict_no_structure;
-  if (!row.confidenceTier || row.confidenceTier === "unknown") return REVIEW_REASONS.unknown;
-  return REVIEW_REASONS.low;
+  // Legacy fallback: exists only for rows saved before `reviewReason` existed.
+  const reason = row.reviewReason ?? row.chosenKgIdReview ?? (!row.confidenceTier || row.confidenceTier === "unknown" ? "not_scored" : "low_confidence");
+  return REVIEW_REASONS[reason as keyof typeof REVIEW_REASONS] ?? REVIEW_REASONS.low_confidence;
+}
+
+// Tier distribution for summaries. The `unknown` key (API name) counts RESOLVED rows with no
+// score ("Not scored"); unresolved rows are counted separately as Unresolved.
+export function confidenceTierCounts(
+  results: { resolved: boolean; confidenceTier?: string | null }[],
+): { high: number; medium: number; low: number; unknown: number } {
+  const counts = { high: 0, medium: 0, low: 0, unknown: 0 };
+  for (const r of results) {
+    if (!r.resolved) continue;
+    if (r.confidenceTier === "high" || r.confidenceTier === "medium" || r.confidenceTier === "low") {
+      counts[r.confidenceTier]++;
+    } else {
+      counts.unknown++;
+    }
+  }
+  return counts;
 }

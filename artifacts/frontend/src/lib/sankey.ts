@@ -1,4 +1,5 @@
 import { MappingResult, MappingSummary } from '../types/mapping';
+import { identifierKey, identifierKeysFor } from './vocab-keys';
 
 export interface SankeyNode {
   id: string;
@@ -37,8 +38,11 @@ const ALL_NODES: SankeyNode[] = [
 export function buildSankeyData(
   summary: MappingSummary,
   results: MappingResult[],
-  includeVocabLayer: boolean = false
+  includeVocabLayer: boolean = false,
+  selectedVocabs?: ReadonlySet<string>
 ): SankeyData {
+  // Compare on the identifiers key. Empty/undefined => every vocabulary present.
+  const wanted = identifierKeysFor(selectedVocabs);
   const unresolved = summary.uniqueNames - summary.resolved;
   const { high, medium, low, unknown: unknownCount } = summary.confidenceTierDistribution;
 
@@ -78,8 +82,11 @@ export function buildSankeyData(
       const tier = result.confidenceTier || 'unknown';
       if (!result.identifiers) continue;
 
-      for (const [vocab, ids] of Object.entries(result.identifiers)) {
+      for (const [rawVocab, ids] of Object.entries(result.identifiers)) {
         if (!ids || ids.length === 0) continue;
+        // Prefixes differing only by case are one vocabulary.
+        const vocab = rawVocab.toUpperCase();
+        if (wanted && !wanted.has(identifierKey(rawVocab))) continue;
         if (!vocabByTier[tier]) vocabByTier[tier] = {};
         vocabByTier[tier][vocab] = (vocabByTier[tier][vocab] || 0) + 1;
       }
@@ -93,7 +100,7 @@ export function buildSankeyData(
     }
 
     for (const vocab of Array.from(allVocabs).sort()) {
-      nodes.push({ id: `vocab_${vocab}`, label: vocab.toUpperCase(), color: '#113682' });
+      nodes.push({ id: `vocab_${vocab}`, label: vocab, color: '#113682' });
     }
     for (const [tier, counts] of Object.entries(vocabByTier)) {
       const tierId = tier === 'unknown' ? 'unknown_tier' : tier;
@@ -115,7 +122,7 @@ function buildLabel(id: string, summary: MappingSummary, unresolved: number): st
     case 'high':         return `High (${summary.confidenceTierDistribution.high})`;
     case 'medium':       return `Medium (${summary.confidenceTierDistribution.medium})`;
     case 'low':          return `Low (${summary.confidenceTierDistribution.low})`;
-    case 'unknown_tier': return `Unknown (${summary.confidenceTierDistribution.unknown})`;
+    case 'unknown_tier': return `Not scored (${summary.confidenceTierDistribution.unknown})`;
     default:             return id;
   }
 }

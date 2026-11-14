@@ -24,12 +24,32 @@ import type {
   DeleteFlagParams,
   EntityType,
   ErrorResponse,
+  ExportHarmonizeRun200ThreeItem,
+  ExportHarmonizeRunParams,
   FlaggedNameCountResponse,
+  HarmonizeBulkFlagsRequest,
+  HarmonizeCohortsBody,
+  HarmonizeExampleRequest,
+  HarmonizeFlagsRequest,
+  HarmonizeFlagsResult,
+  HarmonizeFromJobsRequest,
+  HarmonizeInspectBody,
+  HarmonizeInspectResult,
+  HarmonizeItemsPage,
+  HarmonizeManyBody,
+  HarmonizeReport,
+  HarmonizeResetFlagsRequest,
+  HarmonizeResetFlagsResult,
+  HarmonizeReviewItemDetail,
+  HarmonizeReviewItemsPage,
+  HarmonizeRunStatus,
   HealthStatus,
   JobDetail,
   JobListItem,
   JobResult,
   JobUpdateRequest,
+  ListHarmonizeItemsParams,
+  ListHarmonizeReviewItemsParams,
   Vocabulary,
 } from "./api.schemas";
 
@@ -1260,3 +1280,1595 @@ export const useDeleteJob = <
 > => {
   return useMutation(getDeleteJobMutationOptions(options));
 };
+
+/**
+ * Checks the file like a cohort upload (.csv, .tsv or .txt, UTF-8, not empty, at most 50 MB) and returns its column names, so a screen can offer column pickers. Nothing is kept.
+ * @summary Read a cohort file's header and row count
+ */
+export const getInspectHarmonizeFileUrl = () => {
+  return `/api/harmonize/inspect`;
+};
+
+export const inspectHarmonizeFile = async (
+  harmonizeInspectBody: HarmonizeInspectBody,
+  options?: RequestInit,
+): Promise<HarmonizeInspectResult> => {
+  const formData = new FormData();
+  formData.append(`file`, harmonizeInspectBody.file);
+
+  return customFetch<HarmonizeInspectResult>(getInspectHarmonizeFileUrl(), {
+    ...options,
+    method: "POST",
+    body: formData,
+  });
+};
+
+export const getInspectHarmonizeFileMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof inspectHarmonizeFile>>,
+    TError,
+    { data: BodyType<HarmonizeInspectBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof inspectHarmonizeFile>>,
+  TError,
+  { data: BodyType<HarmonizeInspectBody> },
+  TContext
+> => {
+  const mutationKey = ["inspectHarmonizeFile"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof inspectHarmonizeFile>>,
+    { data: BodyType<HarmonizeInspectBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return inspectHarmonizeFile(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type InspectHarmonizeFileMutationResult = NonNullable<
+  Awaited<ReturnType<typeof inspectHarmonizeFile>>
+>;
+export type InspectHarmonizeFileMutationBody = BodyType<HarmonizeInspectBody>;
+export type InspectHarmonizeFileMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Read a cohort file's header and row count
+ */
+export const useInspectHarmonizeFile = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof inspectHarmonizeFile>>,
+    TError,
+    { data: BodyType<HarmonizeInspectBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof inspectHarmonizeFile>>,
+  TError,
+  { data: BodyType<HarmonizeInspectBody> },
+  TContext
+> => {
+  return useMutation(getInspectHarmonizeFileMutationOptions(options));
+};
+
+/**
+ * @summary Start a two-cohort harmonization run
+ */
+export const getSubmitHarmonizeCohortsUrl = () => {
+  return `/api/harmonize/cohorts`;
+};
+
+export const submitHarmonizeCohorts = async (
+  harmonizeCohortsBody: HarmonizeCohortsBody,
+  options?: RequestInit,
+): Promise<HarmonizeRunStatus> => {
+  const formData = new FormData();
+  formData.append(`fileA`, harmonizeCohortsBody.fileA);
+  formData.append(`fileB`, harmonizeCohortsBody.fileB);
+  formData.append(`spec`, harmonizeCohortsBody.spec);
+
+  return customFetch<HarmonizeRunStatus>(getSubmitHarmonizeCohortsUrl(), {
+    ...options,
+    method: "POST",
+    body: formData,
+  });
+};
+
+export const getSubmitHarmonizeCohortsMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitHarmonizeCohorts>>,
+    TError,
+    { data: BodyType<HarmonizeCohortsBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof submitHarmonizeCohorts>>,
+  TError,
+  { data: BodyType<HarmonizeCohortsBody> },
+  TContext
+> => {
+  const mutationKey = ["submitHarmonizeCohorts"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof submitHarmonizeCohorts>>,
+    { data: BodyType<HarmonizeCohortsBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return submitHarmonizeCohorts(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SubmitHarmonizeCohortsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof submitHarmonizeCohorts>>
+>;
+export type SubmitHarmonizeCohortsMutationBody = BodyType<HarmonizeCohortsBody>;
+export type SubmitHarmonizeCohortsMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Start a two-cohort harmonization run
+ */
+export const useSubmitHarmonizeCohorts = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitHarmonizeCohorts>>,
+    TError,
+    { data: BodyType<HarmonizeCohortsBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof submitHarmonizeCohorts>>,
+  TError,
+  { data: BodyType<HarmonizeCohortsBody> },
+  TContext
+> => {
+  return useMutation(getSubmitHarmonizeCohortsMutationOptions(options));
+};
+
+/**
+ * @summary Start a many-cohort harmonization run (2 to 12 files)
+ */
+export const getSubmitHarmonizeManyUrl = () => {
+  return `/api/harmonize/many`;
+};
+
+export const submitHarmonizeMany = async (
+  harmonizeManyBody: HarmonizeManyBody,
+  options?: RequestInit,
+): Promise<HarmonizeRunStatus> => {
+  const formData = new FormData();
+  harmonizeManyBody.files.forEach((value) => formData.append(`files`, value));
+  formData.append(`spec`, harmonizeManyBody.spec);
+
+  return customFetch<HarmonizeRunStatus>(getSubmitHarmonizeManyUrl(), {
+    ...options,
+    method: "POST",
+    body: formData,
+  });
+};
+
+export const getSubmitHarmonizeManyMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitHarmonizeMany>>,
+    TError,
+    { data: BodyType<HarmonizeManyBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof submitHarmonizeMany>>,
+  TError,
+  { data: BodyType<HarmonizeManyBody> },
+  TContext
+> => {
+  const mutationKey = ["submitHarmonizeMany"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof submitHarmonizeMany>>,
+    { data: BodyType<HarmonizeManyBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return submitHarmonizeMany(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SubmitHarmonizeManyMutationResult = NonNullable<
+  Awaited<ReturnType<typeof submitHarmonizeMany>>
+>;
+export type SubmitHarmonizeManyMutationBody = BodyType<HarmonizeManyBody>;
+export type SubmitHarmonizeManyMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Start a many-cohort harmonization run (2 to 12 files)
+ */
+export const useSubmitHarmonizeMany = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitHarmonizeMany>>,
+    TError,
+    { data: BodyType<HarmonizeManyBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof submitHarmonizeMany>>,
+  TError,
+  { data: BodyType<HarmonizeManyBody> },
+  TContext
+> => {
+  return useMutation(getSubmitHarmonizeManyMutationOptions(options));
+};
+
+/**
+ * @summary Start a run on a built-in example dataset (two-cohort or many-cohort)
+ */
+export const getSubmitHarmonizeExampleUrl = () => {
+  return `/api/harmonize/example`;
+};
+
+export const submitHarmonizeExample = async (
+  harmonizeExampleRequest: HarmonizeExampleRequest,
+  options?: RequestInit,
+): Promise<HarmonizeRunStatus> => {
+  return customFetch<HarmonizeRunStatus>(getSubmitHarmonizeExampleUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(harmonizeExampleRequest),
+  });
+};
+
+export const getSubmitHarmonizeExampleMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitHarmonizeExample>>,
+    TError,
+    { data: BodyType<HarmonizeExampleRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof submitHarmonizeExample>>,
+  TError,
+  { data: BodyType<HarmonizeExampleRequest> },
+  TContext
+> => {
+  const mutationKey = ["submitHarmonizeExample"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof submitHarmonizeExample>>,
+    { data: BodyType<HarmonizeExampleRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return submitHarmonizeExample(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SubmitHarmonizeExampleMutationResult = NonNullable<
+  Awaited<ReturnType<typeof submitHarmonizeExample>>
+>;
+export type SubmitHarmonizeExampleMutationBody =
+  BodyType<HarmonizeExampleRequest>;
+export type SubmitHarmonizeExampleMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Start a run on a built-in example dataset (two-cohort or many-cohort)
+ */
+export const useSubmitHarmonizeExample = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitHarmonizeExample>>,
+    TError,
+    { data: BodyType<HarmonizeExampleRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof submitHarmonizeExample>>,
+  TError,
+  { data: BodyType<HarmonizeExampleRequest> },
+  TContext
+> => {
+  return useMutation(getSubmitHarmonizeExampleMutationOptions(options));
+};
+
+/**
+ * Runs synchronously with biomapper's local harmonize() over the two jobs' stored results and records a finished run of kind harmonize_results. Its report, items, flags and exports are served from disk; it has no review items and cannot be resumed or cancelled.
+ * @summary Harmonize two of the caller's finished mapping jobs, with no re-mapping
+ */
+export const getSubmitHarmonizeFromJobsUrl = () => {
+  return `/api/harmonize/from-jobs`;
+};
+
+export const submitHarmonizeFromJobs = async (
+  harmonizeFromJobsRequest: HarmonizeFromJobsRequest,
+  options?: RequestInit,
+): Promise<HarmonizeRunStatus> => {
+  return customFetch<HarmonizeRunStatus>(getSubmitHarmonizeFromJobsUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(harmonizeFromJobsRequest),
+  });
+};
+
+export const getSubmitHarmonizeFromJobsMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitHarmonizeFromJobs>>,
+    TError,
+    { data: BodyType<HarmonizeFromJobsRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof submitHarmonizeFromJobs>>,
+  TError,
+  { data: BodyType<HarmonizeFromJobsRequest> },
+  TContext
+> => {
+  const mutationKey = ["submitHarmonizeFromJobs"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof submitHarmonizeFromJobs>>,
+    { data: BodyType<HarmonizeFromJobsRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return submitHarmonizeFromJobs(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SubmitHarmonizeFromJobsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof submitHarmonizeFromJobs>>
+>;
+export type SubmitHarmonizeFromJobsMutationBody =
+  BodyType<HarmonizeFromJobsRequest>;
+export type SubmitHarmonizeFromJobsMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Harmonize two of the caller's finished mapping jobs, with no re-mapping
+ */
+export const useSubmitHarmonizeFromJobs = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitHarmonizeFromJobs>>,
+    TError,
+    { data: BodyType<HarmonizeFromJobsRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof submitHarmonizeFromJobs>>,
+  TError,
+  { data: BodyType<HarmonizeFromJobsRequest> },
+  TContext
+> => {
+  return useMutation(getSubmitHarmonizeFromJobsMutationOptions(options));
+};
+
+/**
+ * @summary List the caller's harmonization runs, newest first, each with its status
+ */
+export const getListHarmonizeRunsUrl = () => {
+  return `/api/harmonize/runs`;
+};
+
+export const listHarmonizeRuns = async (
+  options?: RequestInit,
+): Promise<HarmonizeRunStatus[]> => {
+  return customFetch<HarmonizeRunStatus[]>(getListHarmonizeRunsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListHarmonizeRunsQueryKey = () => {
+  return [`/api/harmonize/runs`] as const;
+};
+
+export const getListHarmonizeRunsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listHarmonizeRuns>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listHarmonizeRuns>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListHarmonizeRunsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listHarmonizeRuns>>
+  > = ({ signal }) => listHarmonizeRuns({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listHarmonizeRuns>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListHarmonizeRunsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listHarmonizeRuns>>
+>;
+export type ListHarmonizeRunsQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary List the caller's harmonization runs, newest first, each with its status
+ */
+
+export function useListHarmonizeRuns<
+  TData = Awaited<ReturnType<typeof listHarmonizeRuns>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listHarmonizeRuns>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListHarmonizeRunsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get a run's status
+ */
+export const getGetHarmonizeRunUrl = (jobId: string) => {
+  return `/api/harmonize/runs/${jobId}`;
+};
+
+export const getHarmonizeRun = async (
+  jobId: string,
+  options?: RequestInit,
+): Promise<HarmonizeRunStatus> => {
+  return customFetch<HarmonizeRunStatus>(getGetHarmonizeRunUrl(jobId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetHarmonizeRunQueryKey = (jobId: string) => {
+  return [`/api/harmonize/runs/${jobId}`] as const;
+};
+
+export const getGetHarmonizeRunQueryOptions = <
+  TData = Awaited<ReturnType<typeof getHarmonizeRun>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getHarmonizeRun>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetHarmonizeRunQueryKey(jobId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getHarmonizeRun>>> = ({
+    signal,
+  }) => getHarmonizeRun(jobId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!jobId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getHarmonizeRun>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetHarmonizeRunQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getHarmonizeRun>>
+>;
+export type GetHarmonizeRunQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get a run's status
+ */
+
+export function useGetHarmonizeRun<
+  TData = Awaited<ReturnType<typeof getHarmonizeRun>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getHarmonizeRun>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetHarmonizeRunQueryOptions(jobId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Resume a stalled, paused, expired or cancelled run
+ */
+export const getResumeHarmonizeRunUrl = (jobId: string) => {
+  return `/api/harmonize/runs/${jobId}/resume`;
+};
+
+export const resumeHarmonizeRun = async (
+  jobId: string,
+  options?: RequestInit,
+): Promise<HarmonizeRunStatus> => {
+  return customFetch<HarmonizeRunStatus>(getResumeHarmonizeRunUrl(jobId), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getResumeHarmonizeRunMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resumeHarmonizeRun>>,
+    TError,
+    { jobId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof resumeHarmonizeRun>>,
+  TError,
+  { jobId: string },
+  TContext
+> => {
+  const mutationKey = ["resumeHarmonizeRun"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof resumeHarmonizeRun>>,
+    { jobId: string }
+  > = (props) => {
+    const { jobId } = props ?? {};
+
+    return resumeHarmonizeRun(jobId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ResumeHarmonizeRunMutationResult = NonNullable<
+  Awaited<ReturnType<typeof resumeHarmonizeRun>>
+>;
+
+export type ResumeHarmonizeRunMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Resume a stalled, paused, expired or cancelled run
+ */
+export const useResumeHarmonizeRun = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resumeHarmonizeRun>>,
+    TError,
+    { jobId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof resumeHarmonizeRun>>,
+  TError,
+  { jobId: string },
+  TContext
+> => {
+  return useMutation(getResumeHarmonizeRunMutationOptions(options));
+};
+
+/**
+ * @summary Cancel a run after its current batch (what was mapped is kept)
+ */
+export const getCancelHarmonizeRunUrl = (jobId: string) => {
+  return `/api/harmonize/runs/${jobId}/cancel`;
+};
+
+export const cancelHarmonizeRun = async (
+  jobId: string,
+  options?: RequestInit,
+): Promise<HarmonizeRunStatus> => {
+  return customFetch<HarmonizeRunStatus>(getCancelHarmonizeRunUrl(jobId), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getCancelHarmonizeRunMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelHarmonizeRun>>,
+    TError,
+    { jobId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof cancelHarmonizeRun>>,
+  TError,
+  { jobId: string },
+  TContext
+> => {
+  const mutationKey = ["cancelHarmonizeRun"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof cancelHarmonizeRun>>,
+    { jobId: string }
+  > = (props) => {
+    const { jobId } = props ?? {};
+
+    return cancelHarmonizeRun(jobId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CancelHarmonizeRunMutationResult = NonNullable<
+  Awaited<ReturnType<typeof cancelHarmonizeRun>>
+>;
+
+export type CancelHarmonizeRunMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Cancel a run after its current batch (what was mapped is kept)
+ */
+export const useCancelHarmonizeRun = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelHarmonizeRun>>,
+    TError,
+    { jobId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof cancelHarmonizeRun>>,
+  TError,
+  { jobId: string },
+  TContext
+> => {
+  return useMutation(getCancelHarmonizeRunMutationOptions(options));
+};
+
+/**
+ * @summary Get a finished run's report.json as written by the package
+ */
+export const getGetHarmonizeReportUrl = (jobId: string) => {
+  return `/api/harmonize/runs/${jobId}/report`;
+};
+
+export const getHarmonizeReport = async (
+  jobId: string,
+  options?: RequestInit,
+): Promise<HarmonizeReport> => {
+  return customFetch<HarmonizeReport>(getGetHarmonizeReportUrl(jobId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetHarmonizeReportQueryKey = (jobId: string) => {
+  return [`/api/harmonize/runs/${jobId}/report`] as const;
+};
+
+export const getGetHarmonizeReportQueryOptions = <
+  TData = Awaited<ReturnType<typeof getHarmonizeReport>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getHarmonizeReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetHarmonizeReportQueryKey(jobId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getHarmonizeReport>>
+  > = ({ signal }) => getHarmonizeReport(jobId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!jobId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getHarmonizeReport>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetHarmonizeReportQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getHarmonizeReport>>
+>;
+export type GetHarmonizeReportQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get a finished run's report.json as written by the package
+ */
+
+export function useGetHarmonizeReport<
+  TData = Awaited<ReturnType<typeof getHarmonizeReport>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getHarmonizeReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetHarmonizeReportQueryOptions(jobId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary One page of a finished run's review items, highest impact first
+ */
+export const getListHarmonizeReviewItemsUrl = (
+  jobId: string,
+  params?: ListHarmonizeReviewItemsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/harmonize/runs/${jobId}/review-items?${stringifiedParams}`
+    : `/api/harmonize/runs/${jobId}/review-items`;
+};
+
+export const listHarmonizeReviewItems = async (
+  jobId: string,
+  params?: ListHarmonizeReviewItemsParams,
+  options?: RequestInit,
+): Promise<HarmonizeReviewItemsPage> => {
+  return customFetch<HarmonizeReviewItemsPage>(
+    getListHarmonizeReviewItemsUrl(jobId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListHarmonizeReviewItemsQueryKey = (
+  jobId: string,
+  params?: ListHarmonizeReviewItemsParams,
+) => {
+  return [
+    `/api/harmonize/runs/${jobId}/review-items`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListHarmonizeReviewItemsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listHarmonizeReviewItems>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  params?: ListHarmonizeReviewItemsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listHarmonizeReviewItems>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getListHarmonizeReviewItemsQueryKey(jobId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listHarmonizeReviewItems>>
+  > = ({ signal }) =>
+    listHarmonizeReviewItems(jobId, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!jobId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listHarmonizeReviewItems>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListHarmonizeReviewItemsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listHarmonizeReviewItems>>
+>;
+export type ListHarmonizeReviewItemsQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary One page of a finished run's review items, highest impact first
+ */
+
+export function useListHarmonizeReviewItems<
+  TData = Awaited<ReturnType<typeof listHarmonizeReviewItems>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  params?: ListHarmonizeReviewItemsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listHarmonizeReviewItems>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListHarmonizeReviewItemsQueryOptions(
+    jobId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary One review item in full
+ */
+export const getGetHarmonizeReviewItemUrl = (jobId: string, ref: string) => {
+  return `/api/harmonize/runs/${jobId}/review-items/${ref}`;
+};
+
+export const getHarmonizeReviewItem = async (
+  jobId: string,
+  ref: string,
+  options?: RequestInit,
+): Promise<HarmonizeReviewItemDetail> => {
+  return customFetch<HarmonizeReviewItemDetail>(
+    getGetHarmonizeReviewItemUrl(jobId, ref),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetHarmonizeReviewItemQueryKey = (
+  jobId: string,
+  ref: string,
+) => {
+  return [`/api/harmonize/runs/${jobId}/review-items/${ref}`] as const;
+};
+
+export const getGetHarmonizeReviewItemQueryOptions = <
+  TData = Awaited<ReturnType<typeof getHarmonizeReviewItem>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  ref: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getHarmonizeReviewItem>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetHarmonizeReviewItemQueryKey(jobId, ref);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getHarmonizeReviewItem>>
+  > = ({ signal }) =>
+    getHarmonizeReviewItem(jobId, ref, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(jobId && ref),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getHarmonizeReviewItem>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetHarmonizeReviewItemQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getHarmonizeReviewItem>>
+>;
+export type GetHarmonizeReviewItemQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary One review item in full
+ */
+
+export function useGetHarmonizeReviewItem<
+  TData = Awaited<ReturnType<typeof getHarmonizeReviewItem>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  ref: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getHarmonizeReviewItem>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetHarmonizeReviewItemQueryOptions(
+    jobId,
+    ref,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary A finished run's reviewable items with their effective flags, in report order
+ */
+export const getListHarmonizeItemsUrl = (
+  jobId: string,
+  params?: ListHarmonizeItemsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/harmonize/runs/${jobId}/items?${stringifiedParams}`
+    : `/api/harmonize/runs/${jobId}/items`;
+};
+
+export const listHarmonizeItems = async (
+  jobId: string,
+  params?: ListHarmonizeItemsParams,
+  options?: RequestInit,
+): Promise<HarmonizeItemsPage> => {
+  return customFetch<HarmonizeItemsPage>(
+    getListHarmonizeItemsUrl(jobId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListHarmonizeItemsQueryKey = (
+  jobId: string,
+  params?: ListHarmonizeItemsParams,
+) => {
+  return [
+    `/api/harmonize/runs/${jobId}/items`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListHarmonizeItemsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listHarmonizeItems>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  params?: ListHarmonizeItemsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listHarmonizeItems>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListHarmonizeItemsQueryKey(jobId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listHarmonizeItems>>
+  > = ({ signal }) =>
+    listHarmonizeItems(jobId, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!jobId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listHarmonizeItems>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListHarmonizeItemsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listHarmonizeItems>>
+>;
+export type ListHarmonizeItemsQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary A finished run's reviewable items with their effective flags, in report order
+ */
+
+export function useListHarmonizeItems<
+  TData = Awaited<ReturnType<typeof listHarmonizeItems>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  params?: ListHarmonizeItemsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listHarmonizeItems>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListHarmonizeItemsQueryOptions(
+    jobId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Setting an item to the value biomapper suggested removes the organizer's override, so its source returns to biomapper.
+ * @summary Flag or de-flag items by ref
+ */
+export const getSetHarmonizeFlagsUrl = (jobId: string) => {
+  return `/api/harmonize/runs/${jobId}/flags`;
+};
+
+export const setHarmonizeFlags = async (
+  jobId: string,
+  harmonizeFlagsRequest: HarmonizeFlagsRequest,
+  options?: RequestInit,
+): Promise<HarmonizeFlagsResult> => {
+  return customFetch<HarmonizeFlagsResult>(getSetHarmonizeFlagsUrl(jobId), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(harmonizeFlagsRequest),
+  });
+};
+
+export const getSetHarmonizeFlagsMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setHarmonizeFlags>>,
+    TError,
+    { jobId: string; data: BodyType<HarmonizeFlagsRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setHarmonizeFlags>>,
+  TError,
+  { jobId: string; data: BodyType<HarmonizeFlagsRequest> },
+  TContext
+> => {
+  const mutationKey = ["setHarmonizeFlags"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setHarmonizeFlags>>,
+    { jobId: string; data: BodyType<HarmonizeFlagsRequest> }
+  > = (props) => {
+    const { jobId, data } = props ?? {};
+
+    return setHarmonizeFlags(jobId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetHarmonizeFlagsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setHarmonizeFlags>>
+>;
+export type SetHarmonizeFlagsMutationBody = BodyType<HarmonizeFlagsRequest>;
+export type SetHarmonizeFlagsMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Flag or de-flag items by ref
+ */
+export const useSetHarmonizeFlags = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setHarmonizeFlags>>,
+    TError,
+    { jobId: string; data: BodyType<HarmonizeFlagsRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setHarmonizeFlags>>,
+  TError,
+  { jobId: string; data: BodyType<HarmonizeFlagsRequest> },
+  TContext
+> => {
+  return useMutation(getSetHarmonizeFlagsMutationOptions(options));
+};
+
+/**
+ * @summary Flag or de-flag every item matching a filter
+ */
+export const getBulkHarmonizeFlagsUrl = (jobId: string) => {
+  return `/api/harmonize/runs/${jobId}/flags/bulk`;
+};
+
+export const bulkHarmonizeFlags = async (
+  jobId: string,
+  harmonizeBulkFlagsRequest: HarmonizeBulkFlagsRequest,
+  options?: RequestInit,
+): Promise<HarmonizeFlagsResult> => {
+  return customFetch<HarmonizeFlagsResult>(getBulkHarmonizeFlagsUrl(jobId), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(harmonizeBulkFlagsRequest),
+  });
+};
+
+export const getBulkHarmonizeFlagsMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkHarmonizeFlags>>,
+    TError,
+    { jobId: string; data: BodyType<HarmonizeBulkFlagsRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof bulkHarmonizeFlags>>,
+  TError,
+  { jobId: string; data: BodyType<HarmonizeBulkFlagsRequest> },
+  TContext
+> => {
+  const mutationKey = ["bulkHarmonizeFlags"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof bulkHarmonizeFlags>>,
+    { jobId: string; data: BodyType<HarmonizeBulkFlagsRequest> }
+  > = (props) => {
+    const { jobId, data } = props ?? {};
+
+    return bulkHarmonizeFlags(jobId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type BulkHarmonizeFlagsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof bulkHarmonizeFlags>>
+>;
+export type BulkHarmonizeFlagsMutationBody =
+  BodyType<HarmonizeBulkFlagsRequest>;
+export type BulkHarmonizeFlagsMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Flag or de-flag every item matching a filter
+ */
+export const useBulkHarmonizeFlags = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkHarmonizeFlags>>,
+    TError,
+    { jobId: string; data: BodyType<HarmonizeBulkFlagsRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof bulkHarmonizeFlags>>,
+  TError,
+  { jobId: string; data: BodyType<HarmonizeBulkFlagsRequest> },
+  TContext
+> => {
+  return useMutation(getBulkHarmonizeFlagsMutationOptions(options));
+};
+
+/**
+ * @summary Drop the organizer's overrides, all of them or those named
+ */
+export const getResetHarmonizeFlagsUrl = (jobId: string) => {
+  return `/api/harmonize/runs/${jobId}/flags/reset`;
+};
+
+export const resetHarmonizeFlags = async (
+  jobId: string,
+  harmonizeResetFlagsRequest?: HarmonizeResetFlagsRequest,
+  options?: RequestInit,
+): Promise<HarmonizeResetFlagsResult> => {
+  return customFetch<HarmonizeResetFlagsResult>(
+    getResetHarmonizeFlagsUrl(jobId),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(harmonizeResetFlagsRequest),
+    },
+  );
+};
+
+export const getResetHarmonizeFlagsMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resetHarmonizeFlags>>,
+    TError,
+    { jobId: string; data: BodyType<HarmonizeResetFlagsRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof resetHarmonizeFlags>>,
+  TError,
+  { jobId: string; data: BodyType<HarmonizeResetFlagsRequest> },
+  TContext
+> => {
+  const mutationKey = ["resetHarmonizeFlags"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof resetHarmonizeFlags>>,
+    { jobId: string; data: BodyType<HarmonizeResetFlagsRequest> }
+  > = (props) => {
+    const { jobId, data } = props ?? {};
+
+    return resetHarmonizeFlags(jobId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ResetHarmonizeFlagsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof resetHarmonizeFlags>>
+>;
+export type ResetHarmonizeFlagsMutationBody =
+  BodyType<HarmonizeResetFlagsRequest>;
+export type ResetHarmonizeFlagsMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Drop the organizer's overrides, all of them or those named
+ */
+export const useResetHarmonizeFlags = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resetHarmonizeFlags>>,
+    TError,
+    { jobId: string; data: BodyType<HarmonizeResetFlagsRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof resetHarmonizeFlags>>,
+  TError,
+  { jobId: string; data: BodyType<HarmonizeResetFlagsRequest> },
+  TContext
+> => {
+  return useMutation(getResetHarmonizeFlagsMutationOptions(options));
+};
+
+/**
+ * links, groups, review and unresolved hold every item of that kind in both arms, one row per item, with ref, arm, flagged, flag_source, suggested, one column group per cohort label (label_key, label_name, label_chosen_kg_id; several rows of one cohort are joined with " | " in key order), member_count, basis and the item's detail fields. JSON carries members as a list instead of the column groups. A table that does not apply to the run's kind has its header and no rows. eitl_pairs holds only flagged links and flagged groups (n - 1 pairs per group of n) in the columns the expert-in-the-loop pairs upload reads; it is CSV or JSON only. CSV and TSV cells that could start a spreadsheet formula are prefixed with an apostrophe.
+ * @summary Download one table of a finished run with the caller's effective flags
+ */
+export const getExportHarmonizeRunUrl = (
+  jobId: string,
+  params: ExportHarmonizeRunParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/harmonize/runs/${jobId}/export?${stringifiedParams}`
+    : `/api/harmonize/runs/${jobId}/export`;
+};
+
+export const exportHarmonizeRun = async (
+  jobId: string,
+  params: ExportHarmonizeRunParams,
+  options?: RequestInit,
+): Promise<string | ExportHarmonizeRun200ThreeItem[]> => {
+  return customFetch<string | ExportHarmonizeRun200ThreeItem[]>(
+    getExportHarmonizeRunUrl(jobId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getExportHarmonizeRunQueryKey = (
+  jobId: string,
+  params?: ExportHarmonizeRunParams,
+) => {
+  return [
+    `/api/harmonize/runs/${jobId}/export`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getExportHarmonizeRunQueryOptions = <
+  TData = Awaited<ReturnType<typeof exportHarmonizeRun>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  params: ExportHarmonizeRunParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportHarmonizeRun>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getExportHarmonizeRunQueryKey(jobId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof exportHarmonizeRun>>
+  > = ({ signal }) =>
+    exportHarmonizeRun(jobId, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!jobId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof exportHarmonizeRun>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ExportHarmonizeRunQueryResult = NonNullable<
+  Awaited<ReturnType<typeof exportHarmonizeRun>>
+>;
+export type ExportHarmonizeRunQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Download one table of a finished run with the caller's effective flags
+ */
+
+export function useExportHarmonizeRun<
+  TData = Awaited<ReturnType<typeof exportHarmonizeRun>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  params: ExportHarmonizeRunParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportHarmonizeRun>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getExportHarmonizeRunQueryOptions(
+    jobId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}

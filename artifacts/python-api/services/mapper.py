@@ -189,15 +189,29 @@ class MapperService:
         # "divergent_refmet" / "conflict_no_structure" / None. getattr keeps this
         # safe if an older client without the field is installed.
         chosen_kg_id_review = getattr(result, "chosen_kg_id_review", None)
+        # confidence_score is the chosen node's score and may be None for a resolved row
+        # (biomapper >= 1.9.0); that is "not scored", which is not a low score.
+        score = result.confidence_score
+        tier = result.confidence_tier
+        if chosen_kg_id_review is not None:
+            review_reason = chosen_kg_id_review
+        elif result.resolved and score is None:
+            review_reason = "not_scored"
+        elif tier == "low":
+            review_reason = "low_confidence"
+        else:
+            review_reason = None
         processed: dict[str, Any] = {
             "name": name,
             "resolved": result.resolved,
             "primaryCurie": result.primary_curie,
-            "confidenceScore": result.confidence_score,
-            "confidenceTier": result.confidence_tier,
+            "confidenceScore": score,
+            "confidenceTier": tier,
+            "maxAnnotatorScore": getattr(result, "max_annotator_score", None),
+            "reviewReason": review_reason,
             "chosenKgIdReview": chosen_kg_id_review,
             # A resolver review flag is a review signal in its own right, alongside low confidence.
-            "needsReview": result.confidence_tier in ("low", "unknown") or chosen_kg_id_review is not None,
+            "needsReview": tier in ("low", "unknown") or chosen_kg_id_review is not None,
             "identifiers": {
                 "hmdb": result.ids_for("HMDB"),
                 "chebi": result.ids_for("CHEBI"),
@@ -213,4 +227,17 @@ class MapperService:
         }
         kg_equiv = getattr(result, "kg_equivalent_ids", None)
         processed["kgEquivalentIds"] = dict(kg_equiv) if kg_equiv is not None else {}
+        # What biomapper.harmonize.harmonize() reads beyond the fields above, so two finished
+        # jobs can be linked offline: the chosen node (it seeds the identifier set and the
+        # "node" basis; primaryCurie is a different value), the certificate state (a
+        # "contradicted" one is a possible-miss reason) and the engine's mixture flag, which
+        # harmonize() takes as name_is_mixture OR lipid_resolution.name_is_mixture.
+        certificate = getattr(result, "certificate", None)
+        lipid = getattr(result, "lipid_resolution", None)
+        name_is_mixture = getattr(result, "name_is_mixture", None)
+        if lipid is not None and lipid.name_is_mixture is True:
+            name_is_mixture = True
+        processed["chosenKgId"] = getattr(result, "chosen_kg_id", None)
+        processed["certificateState"] = certificate.state if certificate is not None else None
+        processed["nameIsMixture"] = name_is_mixture
         return processed

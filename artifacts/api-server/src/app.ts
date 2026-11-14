@@ -4,6 +4,7 @@ import pinoHttp from "pino-http";
 import { clerkMiddleware, getAuth } from "@clerk/express";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { CLERK_PROXY_PATH, clerkProxyMiddleware } from "./middlewares/clerkProxyMiddleware";
+import { identityHeaderMiddleware } from "./middlewares/identityHeader";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
@@ -41,7 +42,15 @@ if (clerkEnabled) {
   app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 }
 
-app.use(cors({ credentials: true, origin: true }));
+// The proxies below pass every response header through; a cross-origin browser can only read
+// the harmonize export's filename and skipped-item count when they are exposed here.
+app.use(
+  cors({
+    credentials: true,
+    origin: true,
+    exposedHeaders: ["Content-Disposition", "X-Harmonize-Skipped-One-Sided"],
+  }),
+);
 
 if (clerkEnabled) {
   // clerkMiddleware only reads headers/cookies — safe to mount before body parsers.
@@ -65,22 +74,10 @@ const requireMapAuth = (req: Request, res: Response, next: NextFunction): void =
   next();
 };
 
-/**
- * Shared onProxyReq handler — injects the authenticated Clerk user ID as a
- * trusted header for downstream Python services.  Any client-supplied value
- * is stripped first so the header is always server-authoritative.
- */
-function onProxyReqInjectUser(
-  proxyReq: import("http").ClientRequest,
-  req: import("http").IncomingMessage,
-  _res: import("http").ServerResponse,
-) {
-  proxyReq.removeHeader("X-Clerk-User-Id");
-  const auth = getAuth(req as any);
-  if (auth?.userId) {
-    proxyReq.setHeader("X-Clerk-User-Id", auth.userId);
-  }
-}
+// Every /api request gets a server-authoritative x-clerk-user-id before any proxy below runs:
+// the client's value is dropped and, when Clerk is enabled and the request is signed in,
+// replaced by the Clerk user id. See identityHeaderMiddleware for why this is not a proxyReq hook.
+app.use("/api", identityHeaderMiddleware(clerkEnabled));
 
 // Mount the map proxy BEFORE body parsers so the raw body stream is still intact.
 // The SSE stream endpoint (/api/map/stream/*) requires unbuffered pass-through.
@@ -114,7 +111,6 @@ app.use(
     // so we restore it for the Python FastAPI routes.
     pathRewrite: (path: string) => "/map" + path,
     on: {
-      proxyReq: onProxyReqInjectUser,
       error: (_err, _req, res) => {
         if (!("headersSent" in res && res.headersSent)) {
           (res as express.Response)
@@ -155,7 +151,6 @@ app.use(
     changeOrigin: true,
     pathRewrite: (path: string) => "/flags" + path.replace(/^\/(?=\?|$)/, ""),
     on: {
-      proxyReq: onProxyReqInjectUser,
       error: (_err, _req, res) => {
         if (!("headersSent" in res && res.headersSent)) {
           (res as express.Response)
@@ -176,12 +171,33 @@ app.use(
     changeOrigin: true,
     pathRewrite: (path: string) => "/jobs" + (path === "/" ? "" : path),
     on: {
-      proxyReq: onProxyReqInjectUser,
       error: (_err, _req, res) => {
         if (!("headersSent" in res && res.headersSent)) {
           (res as express.Response)
             .status(502)
             .json({ detail: "Jobs service unavailable. Please try again later." });
+        }
+      },
+    },
+  }),
+);
+
+// Harmonize endpoints: user-scoped, same auth gate as /api/jobs. Mounted before the body
+// parsers, so multipart cohort uploads stream through to the Python API with no size cap
+// here; the per-file limit (50 MB) and its message come from the Python API.
+app.use(
+  "/api/harmonize",
+  ...(clerkEnabled ? [requireMapAuth] : []),
+  createProxyMiddleware({
+    target: PYTHON_API_BASE,
+    changeOrigin: true,
+    pathRewrite: (path: string) => "/harmonize" + (path === "/" ? "" : path),
+    on: {
+      error: (_err, _req, res) => {
+        if (!("headersSent" in res && res.headersSent)) {
+          (res as express.Response)
+            .status(502)
+            .json({ detail: "Harmonization service unavailable. Please try again later." });
         }
       },
     },
@@ -199,7 +215,6 @@ app.use(
     changeOrigin: true,
     pathRewrite: (path: string) => "/benchmark" + (path === "/" ? "" : path),
     on: {
-      proxyReq: onProxyReqInjectUser,
       error: (_err, _req, res) => {
         if (!("headersSent" in res && res.headersSent)) {
           (res as express.Response)
@@ -220,7 +235,6 @@ app.use(
     changeOrigin: true,
     pathRewrite: (path: string) => "/feedback" + path.replace(/^\/(?=\?|$)/, ""),
     on: {
-      proxyReq: onProxyReqInjectUser,
       error: (_err, _req, res) => {
         if (!("headersSent" in res && res.headersSent)) {
           (res as express.Response)

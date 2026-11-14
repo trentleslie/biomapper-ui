@@ -349,8 +349,9 @@ export default function UploadPage() {
       return;
     }
 
-    // URL ontologies param uses lowercase prefix (matches the case backend uses
-    // in MappingResultItem.identifiers keys).
+    // URL ontologies param uses lowercase CURIE prefixes. MappingResultItem.identifiers
+    // uses shorter keys for some (pubchem.compound -> pubchem); the dashboard compares
+    // the two through lib/vocab-keys.
     const ontologiesParam = Array.from(selectedVocabPrefixes).map(p => p.toLowerCase()).join(",");
     const annotatorsList = Array.from(selectedAnnotators);
 
@@ -553,7 +554,7 @@ export default function UploadPage() {
                     <SelectTrigger id="column-select" data-testid="select-name-col">
                       <SelectValue placeholder="Select column..." />
                     </SelectTrigger>
-                    <SelectContent className="max-h-72 overflow-y-auto">
+                    <SelectContent>
                       {columns.map(col => (
                         <SelectItem key={col} value={col}>{col}</SelectItem>
                       ))}
@@ -673,7 +674,7 @@ export default function UploadPage() {
                     <SelectTrigger id="entity-type" data-testid="select-entity-type">
                       <SelectValue placeholder={entityTypesQuery.isLoading ? "Loading..." : "Select entity type"} />
                     </SelectTrigger>
-                    <SelectContent className="max-h-72 overflow-y-auto">
+                    <SelectContent>
                       {entityTypes.length === 0 && !entityTypesQuery.isLoading && (
                         <SelectItem value="biolink:SmallMolecule">biolink:SmallMolecule</SelectItem>
                       )}
@@ -787,7 +788,7 @@ export default function UploadPage() {
                     </p>
                   ) : (
                     <div
-                      className={`grid grid-cols-2 gap-2 ${showAllVocabs ? "max-h-64 overflow-y-auto pr-2" : ""}`}
+                      className={`grid grid-cols-2 gap-2 ${showAllVocabs ? "max-h-64 scroll-visible pr-2" : ""}`}
                       data-testid="vocab-checkboxes"
                     >
                       {visibleVocabs.map(v => (

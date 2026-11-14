@@ -1,0 +1,15 @@
+{
+  "entity": "metabolites",
+  "a": {
+    "label": "example_cohort_a",
+    "nameColumn": "name",
+    "keyColumn": "id",
+    "vocabularies": {"HMDB": ["hmdb"], "KEGG": ["kegg"]}
+  },
+  "b": {
+    "label": "example_cohort_b",
+    "nameColumn": "name",
+    "keyColumn": "id",
+    "vocabularies": {"HMDB": ["hmdb"]}
+  }
+}

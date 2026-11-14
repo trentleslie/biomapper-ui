@@ -10,6 +10,7 @@ import type { MappingResultItemConfidenceTier } from "./mappingResultItemConfide
 import type { MappingResultItemIdentifiers } from "./mappingResultItemIdentifiers";
 import type { MappingResultItemKgEquivalentIds } from "./mappingResultItemKgEquivalentIds";
 import type { MappingResultItemProvidedIds } from "./mappingResultItemProvidedIds";
+import type { MappingResultItemReviewReason } from "./mappingResultItemReviewReason";
 
 export interface MappingResultItem {
   name: string;
@@ -17,7 +18,16 @@ export interface MappingResultItem {
   primaryCurie?: string | null;
   confidenceScore?: number | null;
   confidenceTier?: MappingResultItemConfidenceTier;
+  /** The best score any annotator gave any node, whether or not the resolver chose
+that node. Before biomapper 1.9.0 this was confidenceScore.
+ */
+  maxAnnotatorScore?: number | null;
   needsReview?: boolean;
+  /** Why a resolved row needs review. "not_scored" means the annotators did not score
+the chosen entry (not a low score). A ChEBI conflict flag takes precedence over
+the other reasons. null when no reason applies.
+ */
+  reviewReason?: MappingResultItemReviewReason;
   /** Review flag set when the resolver source-weighted a small-molecule ChEBI
 conflict toward the RefMet annotator: "divergent_refmet" (RefMet node chosen
 across an InChIKey-connectivity difference) or "conflict_no_structure"
@@ -27,7 +37,7 @@ review is warranted.
   chosenKgIdReview?: MappingResultItemChosenKgIdReview;
   /** Map of vocabulary key → list of CURIEs/identifiers found for this entity.
 Keys are vocabulary identifiers (e.g. "hmdb", "chebi", "uniprot").
-Open record — backend may emit any vocabulary key the underlying
+Open record: the backend may emit any vocabulary key the underlying
 BioMapper run produces, including ones not in the small-molecule
 preset.
  */
@@ -37,6 +47,18 @@ knowledge graph node. Keys are native CURIE prefixes (e.g. "HMDB",
 "KEGG.COMPOUND"). Empty object when no KG match.
  */
   kgEquivalentIds?: MappingResultItemKgEquivalentIds;
+  /** The knowledge graph node the resolver chose. Not the same value as primaryCurie.
+Absent from results mapped before harmonizing finished jobs was supported.
+ */
+  chosenKgId?: string | null;
+  /** The resolution certificate's state (for example corroborated, uncorroborated,
+contradicted, unavailable, not_applicable). null when the engine sent none.
+ */
+  certificateState?: string | null;
+  /** The engine's flag that the name lists alternative compounds (its top-level flag or
+the lipid resolution's). null when the engine did not say.
+ */
+  nameIsMixture?: boolean | null;
   /** Original provided ID values from user's uploaded file, keyed by original column name */
   providedIds?: MappingResultItemProvidedIds;
   error?: string | null;

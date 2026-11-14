@@ -135,7 +135,24 @@ export const GetMappingResultResponse = zod.object({
       primaryCurie: zod.string().nullish(),
       confidenceScore: zod.number().nullish(),
       confidenceTier: zod.enum(["high", "medium", "low", "unknown"]).nullish(),
+      maxAnnotatorScore: zod
+        .number()
+        .nullish()
+        .describe(
+          "The best score any annotator gave any node, whether or not the resolver chose\nthat node. Before biomapper 1.9.0 this was confidenceScore.\n",
+        ),
       needsReview: zod.boolean().optional(),
+      reviewReason: zod
+        .enum([
+          "not_scored",
+          "low_confidence",
+          "divergent_refmet",
+          "conflict_no_structure",
+        ])
+        .nullish()
+        .describe(
+          'Why a resolved row needs review. \"not_scored\" means the annotators did not score\nthe chosen entry (not a low score). A ChEBI conflict flag takes precedence over\nthe other reasons. null when no reason applies.\n',
+        ),
       chosenKgIdReview: zod
         .enum(["divergent_refmet", "conflict_no_structure"])
         .nullish()
@@ -146,13 +163,31 @@ export const GetMappingResultResponse = zod.object({
         .record(zod.string(), zod.array(zod.string()))
         .optional()
         .describe(
-          'Map of vocabulary key → list of CURIEs\/identifiers found for this entity.\nKeys are vocabulary identifiers (e.g. \"hmdb\", \"chebi\", \"uniprot\").\nOpen record — backend may emit any vocabulary key the underlying\nBioMapper run produces, including ones not in the small-molecule\npreset.\n',
+          'Map of vocabulary key → list of CURIEs\/identifiers found for this entity.\nKeys are vocabulary identifiers (e.g. \"hmdb\", \"chebi\", \"uniprot\").\nOpen record: the backend may emit any vocabulary key the underlying\nBioMapper run produces, including ones not in the small-molecule\npreset.\n',
         ),
       kgEquivalentIds: zod
         .record(zod.string(), zod.array(zod.string()))
         .optional()
         .describe(
           'Map of CURIE prefix to list of equivalent local identifiers from the\nknowledge graph node. Keys are native CURIE prefixes (e.g. \"HMDB\",\n\"KEGG.COMPOUND\"). Empty object when no KG match.\n',
+        ),
+      chosenKgId: zod
+        .string()
+        .nullish()
+        .describe(
+          "The knowledge graph node the resolver chose. Not the same value as primaryCurie.\nAbsent from results mapped before harmonizing finished jobs was supported.\n",
+        ),
+      certificateState: zod
+        .string()
+        .nullish()
+        .describe(
+          "The resolution certificate's state (for example corroborated, uncorroborated,\ncontradicted, unavailable, not_applicable). null when the engine sent none.\n",
+        ),
+      nameIsMixture: zod
+        .boolean()
+        .nullish()
+        .describe(
+          "The engine's flag that the name lists alternative compounds (its top-level flag or\nthe lipid resolution's). null when the engine did not say.\n",
         ),
       providedIds: zod
         .record(
@@ -276,7 +311,24 @@ export const GetJobResponse = zod
             confidenceTier: zod
               .enum(["high", "medium", "low", "unknown"])
               .nullish(),
+            maxAnnotatorScore: zod
+              .number()
+              .nullish()
+              .describe(
+                "The best score any annotator gave any node, whether or not the resolver chose\nthat node. Before biomapper 1.9.0 this was confidenceScore.\n",
+              ),
             needsReview: zod.boolean().optional(),
+            reviewReason: zod
+              .enum([
+                "not_scored",
+                "low_confidence",
+                "divergent_refmet",
+                "conflict_no_structure",
+              ])
+              .nullish()
+              .describe(
+                'Why a resolved row needs review. \"not_scored\" means the annotators did not score\nthe chosen entry (not a low score). A ChEBI conflict flag takes precedence over\nthe other reasons. null when no reason applies.\n',
+              ),
             chosenKgIdReview: zod
               .enum(["divergent_refmet", "conflict_no_structure"])
               .nullish()
@@ -287,13 +339,31 @@ export const GetJobResponse = zod
               .record(zod.string(), zod.array(zod.string()))
               .optional()
               .describe(
-                'Map of vocabulary key → list of CURIEs\/identifiers found for this entity.\nKeys are vocabulary identifiers (e.g. \"hmdb\", \"chebi\", \"uniprot\").\nOpen record — backend may emit any vocabulary key the underlying\nBioMapper run produces, including ones not in the small-molecule\npreset.\n',
+                'Map of vocabulary key → list of CURIEs\/identifiers found for this entity.\nKeys are vocabulary identifiers (e.g. \"hmdb\", \"chebi\", \"uniprot\").\nOpen record: the backend may emit any vocabulary key the underlying\nBioMapper run produces, including ones not in the small-molecule\npreset.\n',
               ),
             kgEquivalentIds: zod
               .record(zod.string(), zod.array(zod.string()))
               .optional()
               .describe(
                 'Map of CURIE prefix to list of equivalent local identifiers from the\nknowledge graph node. Keys are native CURIE prefixes (e.g. \"HMDB\",\n\"KEGG.COMPOUND\"). Empty object when no KG match.\n',
+              ),
+            chosenKgId: zod
+              .string()
+              .nullish()
+              .describe(
+                "The knowledge graph node the resolver chose. Not the same value as primaryCurie.\nAbsent from results mapped before harmonizing finished jobs was supported.\n",
+              ),
+            certificateState: zod
+              .string()
+              .nullish()
+              .describe(
+                "The resolution certificate's state (for example corroborated, uncorroborated,\ncontradicted, unavailable, not_applicable). null when the engine sent none.\n",
+              ),
+            nameIsMixture: zod
+              .boolean()
+              .nullish()
+              .describe(
+                "The engine's flag that the name lists alternative compounds (its top-level flag or\nthe lipid resolution's). null when the engine did not say.\n",
               ),
             providedIds: zod
               .record(
@@ -387,7 +457,24 @@ export const UpdateJobResponse = zod
             confidenceTier: zod
               .enum(["high", "medium", "low", "unknown"])
               .nullish(),
+            maxAnnotatorScore: zod
+              .number()
+              .nullish()
+              .describe(
+                "The best score any annotator gave any node, whether or not the resolver chose\nthat node. Before biomapper 1.9.0 this was confidenceScore.\n",
+              ),
             needsReview: zod.boolean().optional(),
+            reviewReason: zod
+              .enum([
+                "not_scored",
+                "low_confidence",
+                "divergent_refmet",
+                "conflict_no_structure",
+              ])
+              .nullish()
+              .describe(
+                'Why a resolved row needs review. \"not_scored\" means the annotators did not score\nthe chosen entry (not a low score). A ChEBI conflict flag takes precedence over\nthe other reasons. null when no reason applies.\n',
+              ),
             chosenKgIdReview: zod
               .enum(["divergent_refmet", "conflict_no_structure"])
               .nullish()
@@ -398,13 +485,31 @@ export const UpdateJobResponse = zod
               .record(zod.string(), zod.array(zod.string()))
               .optional()
               .describe(
-                'Map of vocabulary key → list of CURIEs\/identifiers found for this entity.\nKeys are vocabulary identifiers (e.g. \"hmdb\", \"chebi\", \"uniprot\").\nOpen record — backend may emit any vocabulary key the underlying\nBioMapper run produces, including ones not in the small-molecule\npreset.\n',
+                'Map of vocabulary key → list of CURIEs\/identifiers found for this entity.\nKeys are vocabulary identifiers (e.g. \"hmdb\", \"chebi\", \"uniprot\").\nOpen record: the backend may emit any vocabulary key the underlying\nBioMapper run produces, including ones not in the small-molecule\npreset.\n',
               ),
             kgEquivalentIds: zod
               .record(zod.string(), zod.array(zod.string()))
               .optional()
               .describe(
                 'Map of CURIE prefix to list of equivalent local identifiers from the\nknowledge graph node. Keys are native CURIE prefixes (e.g. \"HMDB\",\n\"KEGG.COMPOUND\"). Empty object when no KG match.\n',
+              ),
+            chosenKgId: zod
+              .string()
+              .nullish()
+              .describe(
+                "The knowledge graph node the resolver chose. Not the same value as primaryCurie.\nAbsent from results mapped before harmonizing finished jobs was supported.\n",
+              ),
+            certificateState: zod
+              .string()
+              .nullish()
+              .describe(
+                "The resolution certificate's state (for example corroborated, uncorroborated,\ncontradicted, unavailable, not_applicable). null when the engine sent none.\n",
+              ),
+            nameIsMixture: zod
+              .boolean()
+              .nullish()
+              .describe(
+                "The engine's flag that the name lists alternative compounds (its top-level flag or\nthe lipid resolution's). null when the engine did not say.\n",
               ),
             providedIds: zod
               .record(
@@ -463,3 +568,1157 @@ export const UpdateJobResponse = zod
 export const DeleteJobParams = zod.object({
   jobId: zod.coerce.string(),
 });
+
+/**
+ * Checks the file like a cohort upload (.csv, .tsv or .txt, UTF-8, not empty, at most 50 MB) and returns its column names, so a screen can offer column pickers. Nothing is kept.
+ * @summary Read a cohort file's header and row count
+ */
+export const InspectHarmonizeFileBody = zod.object({
+  file: zod.instanceof(File),
+});
+
+export const InspectHarmonizeFileResponse = zod.object({
+  columns: zod.array(zod.string()),
+  rowCount: zod.number(),
+});
+
+/**
+ * @summary Start a two-cohort harmonization run
+ */
+export const SubmitHarmonizeCohortsBody = zod.object({
+  fileA: zod.instanceof(File),
+  fileB: zod.instanceof(File),
+  spec: zod.string().describe("A HarmonizeCohortsSpec as a JSON string"),
+});
+
+export const SubmitHarmonizeCohortsResponse = zod
+  .object({
+    jobId: zod.string(),
+    state: zod.enum([
+      "queued",
+      "running",
+      "paused",
+      "stalled",
+      "expired",
+      "cancelled",
+      "complete",
+      "failed",
+      "owned_elsewhere",
+      "partial",
+      "unknown",
+    ]),
+    reason: zod.string().nullish(),
+    kind: zod.enum([
+      "harmonize_cohorts",
+      "harmonize_many",
+      "harmonize_results",
+    ]),
+    labels: zod.array(zod.string()),
+    entity: zod.string(),
+    createdAt: zod
+      .string()
+      .describe("When this app recorded the run (UTC, ISO 8601)"),
+    stage: zod
+      .enum(["queued", "mapping", "building", "capture", "placing", "done"])
+      .optional(),
+    cohorts: zod
+      .array(
+        zod.object({
+          label: zod.string(),
+          rows: zod.number(),
+        }),
+      )
+      .optional(),
+    entitiesTotal: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities to map. Do not show entitiesMapped out of entitiesTotal as a fraction or percentage; use progress.entitiesDone out of progress.entitiesTotal for the current progress.arm instead.",
+      ),
+    entitiesMapped: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities mapped so far. The package counts mappings per arm and across restarts, so this can exceed entitiesTotal (107 of 53 has been seen on a live run). It must not be shown as a fraction of entitiesTotal. The source of truth for progress is progress.arm with progress.entitiesDone out of progress.entitiesTotal.",
+      ),
+    rowsErrored: zod.number().optional(),
+    etaS: zod.number().nullish(),
+    kgBuild: zod.string().optional(),
+    kgVerified: zod.boolean().optional(),
+    owner: zod
+      .object({
+        host: zod.string().nullish(),
+        pid: zod.number().nullish(),
+      })
+      .nullish(),
+    createdUtc: zod.string().optional(),
+    updatedUtc: zod.string().optional(),
+    summary: zod.record(zod.string(), zod.unknown()).nullish(),
+    reviewItems: zod
+      .object({
+        row: zod.number(),
+        link: zod.number(),
+        skippedNoNode: zod.number(),
+        candidatesCaptured: zod.number(),
+        candidatesNotCaptured: zod.number(),
+      })
+      .nullish(),
+    progress: zod
+      .object({
+        function: zod.string(),
+        arm: zod
+          .string()
+          .describe("names_only, identifier or (two cohorts only) review"),
+        cohort: zod.string().nullish(),
+        cohorts: zod.array(zod.string()).optional(),
+        entitiesDone: zod.number(),
+        entitiesTotal: zod.number(),
+      })
+      .describe(
+        "The latest progress update of the running arm (and cohort, on two-cohort runs)",
+      )
+      .nullish(),
+  })
+  .describe(
+    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
+  );
+
+/**
+ * @summary Start a many-cohort harmonization run (2 to 12 files)
+ */
+export const submitHarmonizeManyBodyFilesMin = 2;
+export const submitHarmonizeManyBodyFilesMax = 12;
+
+export const SubmitHarmonizeManyBody = zod.object({
+  files: zod
+    .array(zod.instanceof(File))
+    .min(submitHarmonizeManyBodyFilesMin)
+    .max(submitHarmonizeManyBodyFilesMax),
+  spec: zod.string().describe("A HarmonizeManySpec as a JSON string"),
+});
+
+export const SubmitHarmonizeManyResponse = zod
+  .object({
+    jobId: zod.string(),
+    state: zod.enum([
+      "queued",
+      "running",
+      "paused",
+      "stalled",
+      "expired",
+      "cancelled",
+      "complete",
+      "failed",
+      "owned_elsewhere",
+      "partial",
+      "unknown",
+    ]),
+    reason: zod.string().nullish(),
+    kind: zod.enum([
+      "harmonize_cohorts",
+      "harmonize_many",
+      "harmonize_results",
+    ]),
+    labels: zod.array(zod.string()),
+    entity: zod.string(),
+    createdAt: zod
+      .string()
+      .describe("When this app recorded the run (UTC, ISO 8601)"),
+    stage: zod
+      .enum(["queued", "mapping", "building", "capture", "placing", "done"])
+      .optional(),
+    cohorts: zod
+      .array(
+        zod.object({
+          label: zod.string(),
+          rows: zod.number(),
+        }),
+      )
+      .optional(),
+    entitiesTotal: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities to map. Do not show entitiesMapped out of entitiesTotal as a fraction or percentage; use progress.entitiesDone out of progress.entitiesTotal for the current progress.arm instead.",
+      ),
+    entitiesMapped: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities mapped so far. The package counts mappings per arm and across restarts, so this can exceed entitiesTotal (107 of 53 has been seen on a live run). It must not be shown as a fraction of entitiesTotal. The source of truth for progress is progress.arm with progress.entitiesDone out of progress.entitiesTotal.",
+      ),
+    rowsErrored: zod.number().optional(),
+    etaS: zod.number().nullish(),
+    kgBuild: zod.string().optional(),
+    kgVerified: zod.boolean().optional(),
+    owner: zod
+      .object({
+        host: zod.string().nullish(),
+        pid: zod.number().nullish(),
+      })
+      .nullish(),
+    createdUtc: zod.string().optional(),
+    updatedUtc: zod.string().optional(),
+    summary: zod.record(zod.string(), zod.unknown()).nullish(),
+    reviewItems: zod
+      .object({
+        row: zod.number(),
+        link: zod.number(),
+        skippedNoNode: zod.number(),
+        candidatesCaptured: zod.number(),
+        candidatesNotCaptured: zod.number(),
+      })
+      .nullish(),
+    progress: zod
+      .object({
+        function: zod.string(),
+        arm: zod
+          .string()
+          .describe("names_only, identifier or (two cohorts only) review"),
+        cohort: zod.string().nullish(),
+        cohorts: zod.array(zod.string()).optional(),
+        entitiesDone: zod.number(),
+        entitiesTotal: zod.number(),
+      })
+      .describe(
+        "The latest progress update of the running arm (and cohort, on two-cohort runs)",
+      )
+      .nullish(),
+  })
+  .describe(
+    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
+  );
+
+/**
+ * @summary Start a run on a built-in example dataset (two-cohort or many-cohort)
+ */
+export const SubmitHarmonizeExampleBody = zod.object({
+  kind: zod.enum(["two_cohort", "many_cohort"]),
+});
+
+export const SubmitHarmonizeExampleResponse = zod
+  .object({
+    jobId: zod.string(),
+    state: zod.enum([
+      "queued",
+      "running",
+      "paused",
+      "stalled",
+      "expired",
+      "cancelled",
+      "complete",
+      "failed",
+      "owned_elsewhere",
+      "partial",
+      "unknown",
+    ]),
+    reason: zod.string().nullish(),
+    kind: zod.enum([
+      "harmonize_cohorts",
+      "harmonize_many",
+      "harmonize_results",
+    ]),
+    labels: zod.array(zod.string()),
+    entity: zod.string(),
+    createdAt: zod
+      .string()
+      .describe("When this app recorded the run (UTC, ISO 8601)"),
+    stage: zod
+      .enum(["queued", "mapping", "building", "capture", "placing", "done"])
+      .optional(),
+    cohorts: zod
+      .array(
+        zod.object({
+          label: zod.string(),
+          rows: zod.number(),
+        }),
+      )
+      .optional(),
+    entitiesTotal: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities to map. Do not show entitiesMapped out of entitiesTotal as a fraction or percentage; use progress.entitiesDone out of progress.entitiesTotal for the current progress.arm instead.",
+      ),
+    entitiesMapped: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities mapped so far. The package counts mappings per arm and across restarts, so this can exceed entitiesTotal (107 of 53 has been seen on a live run). It must not be shown as a fraction of entitiesTotal. The source of truth for progress is progress.arm with progress.entitiesDone out of progress.entitiesTotal.",
+      ),
+    rowsErrored: zod.number().optional(),
+    etaS: zod.number().nullish(),
+    kgBuild: zod.string().optional(),
+    kgVerified: zod.boolean().optional(),
+    owner: zod
+      .object({
+        host: zod.string().nullish(),
+        pid: zod.number().nullish(),
+      })
+      .nullish(),
+    createdUtc: zod.string().optional(),
+    updatedUtc: zod.string().optional(),
+    summary: zod.record(zod.string(), zod.unknown()).nullish(),
+    reviewItems: zod
+      .object({
+        row: zod.number(),
+        link: zod.number(),
+        skippedNoNode: zod.number(),
+        candidatesCaptured: zod.number(),
+        candidatesNotCaptured: zod.number(),
+      })
+      .nullish(),
+    progress: zod
+      .object({
+        function: zod.string(),
+        arm: zod
+          .string()
+          .describe("names_only, identifier or (two cohorts only) review"),
+        cohort: zod.string().nullish(),
+        cohorts: zod.array(zod.string()).optional(),
+        entitiesDone: zod.number(),
+        entitiesTotal: zod.number(),
+      })
+      .describe(
+        "The latest progress update of the running arm (and cohort, on two-cohort runs)",
+      )
+      .nullish(),
+  })
+  .describe(
+    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
+  );
+
+/**
+ * Runs synchronously with biomapper's local harmonize() over the two jobs' stored results and records a finished run of kind harmonize_results. Its report, items, flags and exports are served from disk; it has no review items and cannot be resumed or cancelled.
+ * @summary Harmonize two of the caller's finished mapping jobs, with no re-mapping
+ */
+export const submitHarmonizeFromJobsBodyLinkByNameDefault = false;
+
+export const SubmitHarmonizeFromJobsBody = zod.object({
+  jobA: zod.string().describe("A finished mapping job's id (cohort A)"),
+  jobB: zod
+    .string()
+    .describe(
+      "A finished mapping job's id (cohort B), of the same entity type",
+    ),
+  aLabel: zod.string(),
+  bLabel: zod.string(),
+  linkByName: zod
+    .boolean()
+    .default(submitHarmonizeFromJobsBodyLinkByNameDefault)
+    .describe(
+      "Also link resolved rows whose names match (off links by identifier only)",
+    ),
+});
+
+export const SubmitHarmonizeFromJobsResponse = zod
+  .object({
+    jobId: zod.string(),
+    state: zod.enum([
+      "queued",
+      "running",
+      "paused",
+      "stalled",
+      "expired",
+      "cancelled",
+      "complete",
+      "failed",
+      "owned_elsewhere",
+      "partial",
+      "unknown",
+    ]),
+    reason: zod.string().nullish(),
+    kind: zod.enum([
+      "harmonize_cohorts",
+      "harmonize_many",
+      "harmonize_results",
+    ]),
+    labels: zod.array(zod.string()),
+    entity: zod.string(),
+    createdAt: zod
+      .string()
+      .describe("When this app recorded the run (UTC, ISO 8601)"),
+    stage: zod
+      .enum(["queued", "mapping", "building", "capture", "placing", "done"])
+      .optional(),
+    cohorts: zod
+      .array(
+        zod.object({
+          label: zod.string(),
+          rows: zod.number(),
+        }),
+      )
+      .optional(),
+    entitiesTotal: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities to map. Do not show entitiesMapped out of entitiesTotal as a fraction or percentage; use progress.entitiesDone out of progress.entitiesTotal for the current progress.arm instead.",
+      ),
+    entitiesMapped: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities mapped so far. The package counts mappings per arm and across restarts, so this can exceed entitiesTotal (107 of 53 has been seen on a live run). It must not be shown as a fraction of entitiesTotal. The source of truth for progress is progress.arm with progress.entitiesDone out of progress.entitiesTotal.",
+      ),
+    rowsErrored: zod.number().optional(),
+    etaS: zod.number().nullish(),
+    kgBuild: zod.string().optional(),
+    kgVerified: zod.boolean().optional(),
+    owner: zod
+      .object({
+        host: zod.string().nullish(),
+        pid: zod.number().nullish(),
+      })
+      .nullish(),
+    createdUtc: zod.string().optional(),
+    updatedUtc: zod.string().optional(),
+    summary: zod.record(zod.string(), zod.unknown()).nullish(),
+    reviewItems: zod
+      .object({
+        row: zod.number(),
+        link: zod.number(),
+        skippedNoNode: zod.number(),
+        candidatesCaptured: zod.number(),
+        candidatesNotCaptured: zod.number(),
+      })
+      .nullish(),
+    progress: zod
+      .object({
+        function: zod.string(),
+        arm: zod
+          .string()
+          .describe("names_only, identifier or (two cohorts only) review"),
+        cohort: zod.string().nullish(),
+        cohorts: zod.array(zod.string()).optional(),
+        entitiesDone: zod.number(),
+        entitiesTotal: zod.number(),
+      })
+      .describe(
+        "The latest progress update of the running arm (and cohort, on two-cohort runs)",
+      )
+      .nullish(),
+  })
+  .describe(
+    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
+  );
+
+/**
+ * @summary List the caller's harmonization runs, newest first, each with its status
+ */
+export const ListHarmonizeRunsResponseItem = zod
+  .object({
+    jobId: zod.string(),
+    state: zod.enum([
+      "queued",
+      "running",
+      "paused",
+      "stalled",
+      "expired",
+      "cancelled",
+      "complete",
+      "failed",
+      "owned_elsewhere",
+      "partial",
+      "unknown",
+    ]),
+    reason: zod.string().nullish(),
+    kind: zod.enum([
+      "harmonize_cohorts",
+      "harmonize_many",
+      "harmonize_results",
+    ]),
+    labels: zod.array(zod.string()),
+    entity: zod.string(),
+    createdAt: zod
+      .string()
+      .describe("When this app recorded the run (UTC, ISO 8601)"),
+    stage: zod
+      .enum(["queued", "mapping", "building", "capture", "placing", "done"])
+      .optional(),
+    cohorts: zod
+      .array(
+        zod.object({
+          label: zod.string(),
+          rows: zod.number(),
+        }),
+      )
+      .optional(),
+    entitiesTotal: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities to map. Do not show entitiesMapped out of entitiesTotal as a fraction or percentage; use progress.entitiesDone out of progress.entitiesTotal for the current progress.arm instead.",
+      ),
+    entitiesMapped: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities mapped so far. The package counts mappings per arm and across restarts, so this can exceed entitiesTotal (107 of 53 has been seen on a live run). It must not be shown as a fraction of entitiesTotal. The source of truth for progress is progress.arm with progress.entitiesDone out of progress.entitiesTotal.",
+      ),
+    rowsErrored: zod.number().optional(),
+    etaS: zod.number().nullish(),
+    kgBuild: zod.string().optional(),
+    kgVerified: zod.boolean().optional(),
+    owner: zod
+      .object({
+        host: zod.string().nullish(),
+        pid: zod.number().nullish(),
+      })
+      .nullish(),
+    createdUtc: zod.string().optional(),
+    updatedUtc: zod.string().optional(),
+    summary: zod.record(zod.string(), zod.unknown()).nullish(),
+    reviewItems: zod
+      .object({
+        row: zod.number(),
+        link: zod.number(),
+        skippedNoNode: zod.number(),
+        candidatesCaptured: zod.number(),
+        candidatesNotCaptured: zod.number(),
+      })
+      .nullish(),
+    progress: zod
+      .object({
+        function: zod.string(),
+        arm: zod
+          .string()
+          .describe("names_only, identifier or (two cohorts only) review"),
+        cohort: zod.string().nullish(),
+        cohorts: zod.array(zod.string()).optional(),
+        entitiesDone: zod.number(),
+        entitiesTotal: zod.number(),
+      })
+      .describe(
+        "The latest progress update of the running arm (and cohort, on two-cohort runs)",
+      )
+      .nullish(),
+  })
+  .describe(
+    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
+  );
+export const ListHarmonizeRunsResponse = zod.array(
+  ListHarmonizeRunsResponseItem,
+);
+
+/**
+ * @summary Get a run's status
+ */
+export const GetHarmonizeRunParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const GetHarmonizeRunResponse = zod
+  .object({
+    jobId: zod.string(),
+    state: zod.enum([
+      "queued",
+      "running",
+      "paused",
+      "stalled",
+      "expired",
+      "cancelled",
+      "complete",
+      "failed",
+      "owned_elsewhere",
+      "partial",
+      "unknown",
+    ]),
+    reason: zod.string().nullish(),
+    kind: zod.enum([
+      "harmonize_cohorts",
+      "harmonize_many",
+      "harmonize_results",
+    ]),
+    labels: zod.array(zod.string()),
+    entity: zod.string(),
+    createdAt: zod
+      .string()
+      .describe("When this app recorded the run (UTC, ISO 8601)"),
+    stage: zod
+      .enum(["queued", "mapping", "building", "capture", "placing", "done"])
+      .optional(),
+    cohorts: zod
+      .array(
+        zod.object({
+          label: zod.string(),
+          rows: zod.number(),
+        }),
+      )
+      .optional(),
+    entitiesTotal: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities to map. Do not show entitiesMapped out of entitiesTotal as a fraction or percentage; use progress.entitiesDone out of progress.entitiesTotal for the current progress.arm instead.",
+      ),
+    entitiesMapped: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities mapped so far. The package counts mappings per arm and across restarts, so this can exceed entitiesTotal (107 of 53 has been seen on a live run). It must not be shown as a fraction of entitiesTotal. The source of truth for progress is progress.arm with progress.entitiesDone out of progress.entitiesTotal.",
+      ),
+    rowsErrored: zod.number().optional(),
+    etaS: zod.number().nullish(),
+    kgBuild: zod.string().optional(),
+    kgVerified: zod.boolean().optional(),
+    owner: zod
+      .object({
+        host: zod.string().nullish(),
+        pid: zod.number().nullish(),
+      })
+      .nullish(),
+    createdUtc: zod.string().optional(),
+    updatedUtc: zod.string().optional(),
+    summary: zod.record(zod.string(), zod.unknown()).nullish(),
+    reviewItems: zod
+      .object({
+        row: zod.number(),
+        link: zod.number(),
+        skippedNoNode: zod.number(),
+        candidatesCaptured: zod.number(),
+        candidatesNotCaptured: zod.number(),
+      })
+      .nullish(),
+    progress: zod
+      .object({
+        function: zod.string(),
+        arm: zod
+          .string()
+          .describe("names_only, identifier or (two cohorts only) review"),
+        cohort: zod.string().nullish(),
+        cohorts: zod.array(zod.string()).optional(),
+        entitiesDone: zod.number(),
+        entitiesTotal: zod.number(),
+      })
+      .describe(
+        "The latest progress update of the running arm (and cohort, on two-cohort runs)",
+      )
+      .nullish(),
+  })
+  .describe(
+    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
+  );
+
+/**
+ * @summary Resume a stalled, paused, expired or cancelled run
+ */
+export const ResumeHarmonizeRunParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const ResumeHarmonizeRunResponse = zod
+  .object({
+    jobId: zod.string(),
+    state: zod.enum([
+      "queued",
+      "running",
+      "paused",
+      "stalled",
+      "expired",
+      "cancelled",
+      "complete",
+      "failed",
+      "owned_elsewhere",
+      "partial",
+      "unknown",
+    ]),
+    reason: zod.string().nullish(),
+    kind: zod.enum([
+      "harmonize_cohorts",
+      "harmonize_many",
+      "harmonize_results",
+    ]),
+    labels: zod.array(zod.string()),
+    entity: zod.string(),
+    createdAt: zod
+      .string()
+      .describe("When this app recorded the run (UTC, ISO 8601)"),
+    stage: zod
+      .enum(["queued", "mapping", "building", "capture", "placing", "done"])
+      .optional(),
+    cohorts: zod
+      .array(
+        zod.object({
+          label: zod.string(),
+          rows: zod.number(),
+        }),
+      )
+      .optional(),
+    entitiesTotal: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities to map. Do not show entitiesMapped out of entitiesTotal as a fraction or percentage; use progress.entitiesDone out of progress.entitiesTotal for the current progress.arm instead.",
+      ),
+    entitiesMapped: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities mapped so far. The package counts mappings per arm and across restarts, so this can exceed entitiesTotal (107 of 53 has been seen on a live run). It must not be shown as a fraction of entitiesTotal. The source of truth for progress is progress.arm with progress.entitiesDone out of progress.entitiesTotal.",
+      ),
+    rowsErrored: zod.number().optional(),
+    etaS: zod.number().nullish(),
+    kgBuild: zod.string().optional(),
+    kgVerified: zod.boolean().optional(),
+    owner: zod
+      .object({
+        host: zod.string().nullish(),
+        pid: zod.number().nullish(),
+      })
+      .nullish(),
+    createdUtc: zod.string().optional(),
+    updatedUtc: zod.string().optional(),
+    summary: zod.record(zod.string(), zod.unknown()).nullish(),
+    reviewItems: zod
+      .object({
+        row: zod.number(),
+        link: zod.number(),
+        skippedNoNode: zod.number(),
+        candidatesCaptured: zod.number(),
+        candidatesNotCaptured: zod.number(),
+      })
+      .nullish(),
+    progress: zod
+      .object({
+        function: zod.string(),
+        arm: zod
+          .string()
+          .describe("names_only, identifier or (two cohorts only) review"),
+        cohort: zod.string().nullish(),
+        cohorts: zod.array(zod.string()).optional(),
+        entitiesDone: zod.number(),
+        entitiesTotal: zod.number(),
+      })
+      .describe(
+        "The latest progress update of the running arm (and cohort, on two-cohort runs)",
+      )
+      .nullish(),
+  })
+  .describe(
+    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
+  );
+
+/**
+ * @summary Cancel a run after its current batch (what was mapped is kept)
+ */
+export const CancelHarmonizeRunParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const CancelHarmonizeRunResponse = zod
+  .object({
+    jobId: zod.string(),
+    state: zod.enum([
+      "queued",
+      "running",
+      "paused",
+      "stalled",
+      "expired",
+      "cancelled",
+      "complete",
+      "failed",
+      "owned_elsewhere",
+      "partial",
+      "unknown",
+    ]),
+    reason: zod.string().nullish(),
+    kind: zod.enum([
+      "harmonize_cohorts",
+      "harmonize_many",
+      "harmonize_results",
+    ]),
+    labels: zod.array(zod.string()),
+    entity: zod.string(),
+    createdAt: zod
+      .string()
+      .describe("When this app recorded the run (UTC, ISO 8601)"),
+    stage: zod
+      .enum(["queued", "mapping", "building", "capture", "placing", "done"])
+      .optional(),
+    cohorts: zod
+      .array(
+        zod.object({
+          label: zod.string(),
+          rows: zod.number(),
+        }),
+      )
+      .optional(),
+    entitiesTotal: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities to map. Do not show entitiesMapped out of entitiesTotal as a fraction or percentage; use progress.entitiesDone out of progress.entitiesTotal for the current progress.arm instead.",
+      ),
+    entitiesMapped: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities mapped so far. The package counts mappings per arm and across restarts, so this can exceed entitiesTotal (107 of 53 has been seen on a live run). It must not be shown as a fraction of entitiesTotal. The source of truth for progress is progress.arm with progress.entitiesDone out of progress.entitiesTotal.",
+      ),
+    rowsErrored: zod.number().optional(),
+    etaS: zod.number().nullish(),
+    kgBuild: zod.string().optional(),
+    kgVerified: zod.boolean().optional(),
+    owner: zod
+      .object({
+        host: zod.string().nullish(),
+        pid: zod.number().nullish(),
+      })
+      .nullish(),
+    createdUtc: zod.string().optional(),
+    updatedUtc: zod.string().optional(),
+    summary: zod.record(zod.string(), zod.unknown()).nullish(),
+    reviewItems: zod
+      .object({
+        row: zod.number(),
+        link: zod.number(),
+        skippedNoNode: zod.number(),
+        candidatesCaptured: zod.number(),
+        candidatesNotCaptured: zod.number(),
+      })
+      .nullish(),
+    progress: zod
+      .object({
+        function: zod.string(),
+        arm: zod
+          .string()
+          .describe("names_only, identifier or (two cohorts only) review"),
+        cohort: zod.string().nullish(),
+        cohorts: zod.array(zod.string()).optional(),
+        entitiesDone: zod.number(),
+        entitiesTotal: zod.number(),
+      })
+      .describe(
+        "The latest progress update of the running arm (and cohort, on two-cohort runs)",
+      )
+      .nullish(),
+  })
+  .describe(
+    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
+  );
+
+/**
+ * @summary Get a finished run's report.json as written by the package
+ */
+export const GetHarmonizeReportParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const GetHarmonizeReportResponse = zod
+  .object({
+    schema_version: zod.number(),
+    kind: zod.enum([
+      "harmonize_cohorts",
+      "harmonize_many",
+      "harmonize_results",
+    ]),
+  })
+  .describe("report.json as the package wrote it (snake_case keys)");
+
+/**
+ * @summary One page of a finished run's review items, highest impact first
+ */
+export const ListHarmonizeReviewItemsParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const listHarmonizeReviewItemsQueryOffsetDefault = 0;
+export const listHarmonizeReviewItemsQueryOffsetMin = 0;
+
+export const listHarmonizeReviewItemsQueryLimitMax = 50;
+
+export const ListHarmonizeReviewItemsQueryParams = zod.object({
+  kind: zod.enum(["row", "link"]).optional(),
+  offset: zod.coerce
+    .number()
+    .min(listHarmonizeReviewItemsQueryOffsetMin)
+    .default(listHarmonizeReviewItemsQueryOffsetDefault),
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(listHarmonizeReviewItemsQueryLimitMax)
+    .optional()
+    .describe("Page size, 1 to 50 (default 25)"),
+});
+
+export const ListHarmonizeReviewItemsResponse = zod.object({
+  jobId: zod.string(),
+  total: zod.number(),
+  counts: zod
+    .record(zod.string(), zod.number())
+    .describe("Items per kind in the whole run, keyed row and link"),
+  skippedNoNode: zod.number(),
+  offset: zod.number(),
+  limit: zod.number(),
+  nextOffset: zod.number().nullish(),
+  items: zod.array(
+    zod.object({
+      ref: zod.string(),
+      kind: zod.enum(["row", "link"]),
+      impact: zod.number(),
+      label: zod
+        .string()
+        .describe("Untrusted text, the entity name or one name per side"),
+      reasons: zod.array(zod.string()),
+      engineChoice: zod.string().nullish(),
+      nodes: zod.array(zod.string()),
+      nRows: zod.number(),
+      cohorts: zod.array(zod.string()),
+      evidence: zod.string(),
+      suggestion: zod.string().nullish(),
+    }),
+  ),
+  note: zod.string().optional(),
+});
+
+/**
+ * @summary One review item in full
+ */
+export const GetHarmonizeReviewItemParams = zod.object({
+  jobId: zod.coerce.string(),
+  ref: zod.coerce.string(),
+});
+
+export const GetHarmonizeReviewItemResponse = zod.object({
+  ref: zod.string(),
+  kind: zod.enum(["row", "link"]),
+  jobId: zod.string(),
+  impact: zod.number(),
+  suggestion: zod.string().nullish(),
+  row: zod
+    .object({
+      name: zod.string().optional(),
+      category: zod.string().optional(),
+      weakTrigger: zod.string().nullish(),
+      engineChoice: zod.string().nullish(),
+      certificateState: zod.string().nullish(),
+      rows: zod
+        .array(
+          zod.object({
+            cohort: zod.string(),
+            key: zod.string(),
+            name: zod.string(),
+          }),
+        )
+        .optional(),
+      nRows: zod.number().optional(),
+      cohorts: zod.array(zod.string()).optional(),
+      candidatesStatus: zod.string().optional(),
+      candidatesReason: zod.string().nullish(),
+      supersedingRef: zod.string().nullish(),
+    })
+    .nullish(),
+  link: zod
+    .object({
+      linkKind: zod.string().optional(),
+      basis: zod.string().nullish(),
+      bases: zod.array(zod.string()).optional(),
+      reviewReasons: zod.array(zod.string()).optional(),
+      nRowPairs: zod.number().optional(),
+      cohorts: zod.array(zod.string()).optional(),
+      question: zod.string().optional(),
+      a: zod
+        .object({
+          node: zod.string().nullish(),
+          nodeName: zod.string().nullish(),
+          nodeNameStatus: zod.string().optional(),
+          rows: zod
+            .array(
+              zod.object({
+                cohort: zod.string(),
+                key: zod.string(),
+                name: zod.string(),
+              }),
+            )
+            .optional(),
+          nRows: zod.number().optional(),
+          certificateStates: zod
+            .record(zod.string(), zod.number())
+            .optional()
+            .describe("Rows per certificate state, keyed by state"),
+          identifiers: zod
+            .record(zod.string(), zod.array(zod.string()))
+            .optional()
+            .describe("Identifiers per vocabulary, keyed by vocabulary"),
+        })
+        .optional(),
+      b: zod
+        .object({
+          node: zod.string().nullish(),
+          nodeName: zod.string().nullish(),
+          nodeNameStatus: zod.string().optional(),
+          rows: zod
+            .array(
+              zod.object({
+                cohort: zod.string(),
+                key: zod.string(),
+                name: zod.string(),
+              }),
+            )
+            .optional(),
+          nRows: zod.number().optional(),
+          certificateStates: zod
+            .record(zod.string(), zod.number())
+            .optional()
+            .describe("Rows per certificate state, keyed by state"),
+          identifiers: zod
+            .record(zod.string(), zod.array(zod.string()))
+            .optional()
+            .describe("Identifiers per vocabulary, keyed by vocabulary"),
+        })
+        .optional(),
+    })
+    .nullish(),
+  nextStep: zod.string(),
+  note: zod.string().optional(),
+});
+
+/**
+ * @summary A finished run's reviewable items with their effective flags, in report order
+ */
+export const ListHarmonizeItemsParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const listHarmonizeItemsQueryOffsetDefault = 0;
+export const listHarmonizeItemsQueryOffsetMin = 0;
+
+export const listHarmonizeItemsQueryLimitDefault = 100;
+export const listHarmonizeItemsQueryLimitMax = 1000;
+
+export const ListHarmonizeItemsQueryParams = zod.object({
+  kind: zod.enum(["link", "group", "review", "unresolved"]).optional(),
+  arm: zod.enum(["names_only", "identifier"]).optional(),
+  flagged: zod.coerce.boolean().optional(),
+  offset: zod.coerce
+    .number()
+    .min(listHarmonizeItemsQueryOffsetMin)
+    .default(listHarmonizeItemsQueryOffsetDefault),
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(listHarmonizeItemsQueryLimitMax)
+    .default(listHarmonizeItemsQueryLimitDefault)
+    .describe("Page size, 1 to 1000 (default 100)"),
+});
+
+export const ListHarmonizeItemsResponse = zod.object({
+  total: zod.number(),
+  flaggedTotal: zod.number(),
+  items: zod.array(
+    zod.object({
+      ref: zod
+        .string()
+        .describe("Stable across reloads, kind:arm:digest of the member rows"),
+      kind: zod.enum(["link", "group", "review", "unresolved"]),
+      arm: zod.enum(["names_only", "identifier"]),
+      members: zod.array(
+        zod.object({
+          cohort: zod.string(),
+          key: zod.string(),
+          name: zod
+            .string()
+            .nullable()
+            .describe("Untrusted text from the cohort file"),
+          chosenKgId: zod.string().nullable(),
+        }),
+      ),
+      detail: zod
+        .record(zod.string(), zod.unknown())
+        .describe(
+          "What the report gives for the item, camelCased (for example basis, ambiguous, oneToOne for a link; multiplicity, rowsPerCohort for a group; status or reason for a review entry; bucket and status for an unresolved or errored row), plus origin, the report list it came from",
+        ),
+      suggested: zod.boolean().describe("Biomapper's own flag"),
+      flagged: zod
+        .boolean()
+        .describe(
+          "The effective flag, the organizer's override if any, else suggested",
+        ),
+      source: zod.enum(["biomapper", "organizer"]),
+    }),
+  ),
+});
+
+/**
+ * Setting an item to the value biomapper suggested removes the organizer's override, so its source returns to biomapper.
+ * @summary Flag or de-flag items by ref
+ */
+export const SetHarmonizeFlagsParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const SetHarmonizeFlagsBody = zod.object({
+  refs: zod.array(zod.string()),
+  flagged: zod.boolean(),
+});
+
+export const SetHarmonizeFlagsResponse = zod.object({
+  updated: zod.number(),
+  flaggedTotal: zod.number(),
+});
+
+/**
+ * @summary Flag or de-flag every item matching a filter
+ */
+export const BulkHarmonizeFlagsParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const BulkHarmonizeFlagsBody = zod.object({
+  filter: zod
+    .object({
+      kind: zod.enum(["link", "group", "review", "unresolved"]).optional(),
+      arm: zod.enum(["names_only", "identifier"]).optional(),
+      basis: zod.string().optional(),
+      ambiguous: zod.boolean().optional(),
+    })
+    .describe(
+      "Every given field must match; a detail field matches only items that carry it. An empty filter matches every item of the run.",
+    ),
+  flagged: zod.boolean(),
+});
+
+export const BulkHarmonizeFlagsResponse = zod.object({
+  updated: zod.number(),
+  flaggedTotal: zod.number(),
+});
+
+/**
+ * @summary Drop the organizer's overrides, all of them or those named
+ */
+export const ResetHarmonizeFlagsParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const ResetHarmonizeFlagsBody = zod.object({
+  refs: zod
+    .array(zod.string())
+    .optional()
+    .describe("The items to reset; omitted means every item"),
+});
+
+export const ResetHarmonizeFlagsResponse = zod.object({
+  flaggedTotal: zod.number(),
+});
+
+/**
+ * links, groups, review and unresolved hold every item of that kind in both arms, one row per item, with ref, arm, flagged, flag_source, suggested, one column group per cohort label (label_key, label_name, label_chosen_kg_id; several rows of one cohort are joined with " | " in key order), member_count, basis and the item's detail fields. JSON carries members as a list instead of the column groups. A table that does not apply to the run's kind has its header and no rows. eitl_pairs holds only flagged links and flagged groups (n - 1 pairs per group of n) in the columns the expert-in-the-loop pairs upload reads; it is CSV or JSON only. CSV and TSV cells that could start a spreadsheet formula are prefixed with an apostrophe.
+ * @summary Download one table of a finished run with the caller's effective flags
+ */
+export const ExportHarmonizeRunParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const ExportHarmonizeRunQueryParams = zod.object({
+  table: zod.enum(["links", "groups", "review", "unresolved", "eitl_pairs"]),
+  format: zod.enum(["csv", "tsv", "json"]),
+});
+
+export const ExportHarmonizeRunResponseItem = zod.record(
+  zod.string(),
+  zod.unknown(),
+);
+export const ExportHarmonizeRunResponse = zod.array(
+  ExportHarmonizeRunResponseItem,
+);

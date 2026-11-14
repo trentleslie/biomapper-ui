@@ -1,0 +1,17 @@
+id	name	hmdb
+e01	Glucose	HMDB0000122
+e02	Lactate	HMDB0000190
+e03	Alanine	HMDB0000161
+e04	Creatinine	HMDB0000562
+e05	Urea	HMDB0000294
+e06	Cholesterol	HMDB0000067
+e07	L-Tryptophan	HMDB0000929
+e08	Hydrocortisone	HMDB0000063
+e09	Hippurate	HMDB0000714
+e10	Caffeine	HMDB0001847
+e11	Acetoacetate	HMDB0000060
+e12	3-Hydroxybutyric acid	HMDB0000011
+e13	Glycerol	HMDB0000131
+e14	Palmitic acid	HMDB0000220
+e15	CO
+e16	###

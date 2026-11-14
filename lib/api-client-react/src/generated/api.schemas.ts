@@ -5,6 +5,26 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type HarmonizeExportTable =
+  (typeof HarmonizeExportTable)[keyof typeof HarmonizeExportTable];
+
+export const HarmonizeExportTable = {
+  links: "links",
+  groups: "groups",
+  review: "review",
+  unresolved: "unresolved",
+  eitl_pairs: "eitl_pairs",
+} as const;
+
+export type HarmonizeExportFormat =
+  (typeof HarmonizeExportFormat)[keyof typeof HarmonizeExportFormat];
+
+export const HarmonizeExportFormat = {
+  csv: "csv",
+  tsv: "tsv",
+  json: "json",
+} as const;
+
 export interface HealthStatus {
   status: string;
 }
@@ -81,6 +101,23 @@ export const MappingResultItemConfidenceTier = {
 } as const;
 
 /**
+ * Why a resolved row needs review. "not_scored" means the annotators did not score
+the chosen entry (not a low score). A ChEBI conflict flag takes precedence over
+the other reasons. null when no reason applies.
+
+ */
+export type MappingResultItemReviewReason =
+  | (typeof MappingResultItemReviewReason)[keyof typeof MappingResultItemReviewReason]
+  | null;
+
+export const MappingResultItemReviewReason = {
+  not_scored: "not_scored",
+  low_confidence: "low_confidence",
+  divergent_refmet: "divergent_refmet",
+  conflict_no_structure: "conflict_no_structure",
+} as const;
+
+/**
  * Review flag set when the resolver source-weighted a small-molecule ChEBI
 conflict toward the RefMet annotator: "divergent_refmet" (RefMet node chosen
 across an InChIKey-connectivity difference) or "conflict_no_structure"
@@ -100,7 +137,7 @@ export const MappingResultItemChosenKgIdReview = {
 /**
  * Map of vocabulary key → list of CURIEs/identifiers found for this entity.
 Keys are vocabulary identifiers (e.g. "hmdb", "chebi", "uniprot").
-Open record — backend may emit any vocabulary key the underlying
+Open record: the backend may emit any vocabulary key the underlying
 BioMapper run produces, including ones not in the small-molecule
 preset.
 
@@ -126,7 +163,16 @@ export interface MappingResultItem {
   primaryCurie?: string | null;
   confidenceScore?: number | null;
   confidenceTier?: MappingResultItemConfidenceTier;
+  /** The best score any annotator gave any node, whether or not the resolver chose
+that node. Before biomapper 1.9.0 this was confidenceScore.
+ */
+  maxAnnotatorScore?: number | null;
   needsReview?: boolean;
+  /** Why a resolved row needs review. "not_scored" means the annotators did not score
+the chosen entry (not a low score). A ChEBI conflict flag takes precedence over
+the other reasons. null when no reason applies.
+ */
+  reviewReason?: MappingResultItemReviewReason;
   /** Review flag set when the resolver source-weighted a small-molecule ChEBI
 conflict toward the RefMet annotator: "divergent_refmet" (RefMet node chosen
 across an InChIKey-connectivity difference) or "conflict_no_structure"
@@ -136,7 +182,7 @@ review is warranted.
   chosenKgIdReview?: MappingResultItemChosenKgIdReview;
   /** Map of vocabulary key → list of CURIEs/identifiers found for this entity.
 Keys are vocabulary identifiers (e.g. "hmdb", "chebi", "uniprot").
-Open record — backend may emit any vocabulary key the underlying
+Open record: the backend may emit any vocabulary key the underlying
 BioMapper run produces, including ones not in the small-molecule
 preset.
  */
@@ -146,6 +192,18 @@ knowledge graph node. Keys are native CURIE prefixes (e.g. "HMDB",
 "KEGG.COMPOUND"). Empty object when no KG match.
  */
   kgEquivalentIds?: MappingResultItemKgEquivalentIds;
+  /** The knowledge graph node the resolver chose. Not the same value as primaryCurie.
+Absent from results mapped before harmonizing finished jobs was supported.
+ */
+  chosenKgId?: string | null;
+  /** The resolution certificate's state (for example corroborated, uncorroborated,
+contradicted, unavailable, not_applicable). null when the engine sent none.
+ */
+  certificateState?: string | null;
+  /** The engine's flag that the name lists alternative compounds (its top-level flag or
+the lipid resolution's). null when the engine did not say.
+ */
+  nameIsMixture?: boolean | null;
   /** Original provided ID values from user's uploaded file, keyed by original column name */
   providedIds?: MappingResultItemProvidedIds;
   error?: string | null;
@@ -218,6 +276,418 @@ export interface ErrorResponse {
   detail: string;
 }
 
+export interface HarmonizeInspectBody {
+  file: Blob;
+}
+
+export interface HarmonizeInspectResult {
+  columns: string[];
+  rowCount: number;
+}
+
+/**
+ * Identifier columns per vocabulary, for example {"HMDB": ["hmdb_id"]}
+ */
+export type HarmonizeCohortInputVocabularies = { [key: string]: string[] };
+
+/**
+ * One cohort's columns. Every named column must be in the file's header.
+ */
+export interface HarmonizeCohortInput {
+  /** Letters, digits, '.', '-' and '_'; distinct within a run */
+  label: string;
+  nameColumn: string;
+  keyColumn?: string | null;
+  /** Identifier columns per vocabulary, for example {"HMDB": ["hmdb_id"]} */
+  vocabularies?: HarmonizeCohortInputVocabularies;
+}
+
+export interface HarmonizeCohortsSpec {
+  entity: string;
+  category?: string | null;
+  a: HarmonizeCohortInput;
+  b: HarmonizeCohortInput;
+}
+
+export interface HarmonizeManySpec {
+  entity: string;
+  category?: string | null;
+  remapAll?: boolean;
+  /**
+   * One per uploaded file, in file order
+   * @minItems 2
+   * @maxItems 12
+   */
+  cohorts: HarmonizeCohortInput[];
+}
+
+export interface HarmonizeCohortsBody {
+  fileA: Blob;
+  fileB: Blob;
+  /** A HarmonizeCohortsSpec as a JSON string */
+  spec: string;
+}
+
+export interface HarmonizeManyBody {
+  /**
+   * @minItems 2
+   * @maxItems 12
+   */
+  files: Blob[];
+  /** A HarmonizeManySpec as a JSON string */
+  spec: string;
+}
+
+export type HarmonizeExampleRequestKind =
+  (typeof HarmonizeExampleRequestKind)[keyof typeof HarmonizeExampleRequestKind];
+
+export const HarmonizeExampleRequestKind = {
+  two_cohort: "two_cohort",
+  many_cohort: "many_cohort",
+} as const;
+
+export interface HarmonizeExampleRequest {
+  kind: HarmonizeExampleRequestKind;
+}
+
+export interface HarmonizeFromJobsRequest {
+  /** A finished mapping job's id (cohort A) */
+  jobA: string;
+  /** A finished mapping job's id (cohort B), of the same entity type */
+  jobB: string;
+  aLabel: string;
+  bLabel: string;
+  /** Also link resolved rows whose names match (off links by identifier only) */
+  linkByName?: boolean;
+}
+
+export interface HarmonizeCohortStatus {
+  label: string;
+  rows: number;
+}
+
+export interface HarmonizeJobOwner {
+  host?: string | null;
+  pid?: number | null;
+}
+
+export interface HarmonizeReviewCounts {
+  row: number;
+  link: number;
+  skippedNoNode: number;
+  candidatesCaptured: number;
+  candidatesNotCaptured: number;
+}
+
+/**
+ * The latest progress update of the running arm (and cohort, on two-cohort runs)
+ */
+export interface HarmonizeProgress {
+  function: string;
+  /** names_only, identifier or (two cohorts only) review */
+  arm: string;
+  cohort?: string | null;
+  cohorts?: string[];
+  entitiesDone: number;
+  entitiesTotal: number;
+}
+
+export type HarmonizeRunStatusState =
+  (typeof HarmonizeRunStatusState)[keyof typeof HarmonizeRunStatusState];
+
+export const HarmonizeRunStatusState = {
+  queued: "queued",
+  running: "running",
+  paused: "paused",
+  stalled: "stalled",
+  expired: "expired",
+  cancelled: "cancelled",
+  complete: "complete",
+  failed: "failed",
+  owned_elsewhere: "owned_elsewhere",
+  partial: "partial",
+  unknown: "unknown",
+} as const;
+
+export type HarmonizeRunStatusKind =
+  (typeof HarmonizeRunStatusKind)[keyof typeof HarmonizeRunStatusKind];
+
+export const HarmonizeRunStatusKind = {
+  harmonize_cohorts: "harmonize_cohorts",
+  harmonize_many: "harmonize_many",
+  harmonize_results: "harmonize_results",
+} as const;
+
+export type HarmonizeRunStatusStage =
+  (typeof HarmonizeRunStatusStage)[keyof typeof HarmonizeRunStatusStage];
+
+export const HarmonizeRunStatusStage = {
+  queued: "queued",
+  mapping: "mapping",
+  building: "building",
+  capture: "capture",
+  placing: "placing",
+  done: "done",
+} as const;
+
+export type HarmonizeRunStatusSummary = { [key: string]: unknown } | null;
+
+/**
+ * The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state "unknown", reason, kind, labels, entity and createdAt.
+ */
+export interface HarmonizeRunStatus {
+  jobId: string;
+  state: HarmonizeRunStatusState;
+  reason?: string | null;
+  kind: HarmonizeRunStatusKind;
+  labels: string[];
+  entity: string;
+  /** When this app recorded the run (UTC, ISO 8601) */
+  createdAt: string;
+  stage?: HarmonizeRunStatusStage;
+  cohorts?: HarmonizeCohortStatus[];
+  /** Job-wide estimate of the entities to map. Do not show entitiesMapped out of entitiesTotal as a fraction or percentage; use progress.entitiesDone out of progress.entitiesTotal for the current progress.arm instead. */
+  entitiesTotal?: number;
+  /** Job-wide estimate of the entities mapped so far. The package counts mappings per arm and across restarts, so this can exceed entitiesTotal (107 of 53 has been seen on a live run). It must not be shown as a fraction of entitiesTotal. The source of truth for progress is progress.arm with progress.entitiesDone out of progress.entitiesTotal. */
+  entitiesMapped?: number;
+  rowsErrored?: number;
+  etaS?: number | null;
+  kgBuild?: string;
+  kgVerified?: boolean;
+  owner?: HarmonizeJobOwner | null;
+  createdUtc?: string;
+  updatedUtc?: string;
+  summary?: HarmonizeRunStatusSummary;
+  reviewItems?: HarmonizeReviewCounts | null;
+  progress?: HarmonizeProgress | null;
+}
+
+export type HarmonizeReportKind =
+  (typeof HarmonizeReportKind)[keyof typeof HarmonizeReportKind];
+
+export const HarmonizeReportKind = {
+  harmonize_cohorts: "harmonize_cohorts",
+  harmonize_many: "harmonize_many",
+  harmonize_results: "harmonize_results",
+} as const;
+
+/**
+ * report.json as the package wrote it (snake_case keys)
+ */
+export interface HarmonizeReport {
+  schema_version: number;
+  kind: HarmonizeReportKind;
+  [key: string]: unknown;
+}
+
+export type HarmonizeItemKind =
+  (typeof HarmonizeItemKind)[keyof typeof HarmonizeItemKind];
+
+export const HarmonizeItemKind = {
+  link: "link",
+  group: "group",
+  review: "review",
+  unresolved: "unresolved",
+} as const;
+
+export type HarmonizeArm = (typeof HarmonizeArm)[keyof typeof HarmonizeArm];
+
+export const HarmonizeArm = {
+  names_only: "names_only",
+  identifier: "identifier",
+} as const;
+
+export interface HarmonizeItemMember {
+  cohort: string;
+  key: string;
+  /** Untrusted text from the cohort file */
+  name: string | null;
+  chosenKgId: string | null;
+}
+
+/**
+ * What the report gives for the item, camelCased (for example basis, ambiguous, oneToOne for a link; multiplicity, rowsPerCohort for a group; status or reason for a review entry; bucket and status for an unresolved or errored row), plus origin, the report list it came from
+ */
+export type HarmonizeItemDetail = { [key: string]: unknown };
+
+export type HarmonizeItemSource =
+  (typeof HarmonizeItemSource)[keyof typeof HarmonizeItemSource];
+
+export const HarmonizeItemSource = {
+  biomapper: "biomapper",
+  organizer: "organizer",
+} as const;
+
+export interface HarmonizeItem {
+  /** Stable across reloads, kind:arm:digest of the member rows */
+  ref: string;
+  kind: HarmonizeItemKind;
+  arm: HarmonizeArm;
+  members: HarmonizeItemMember[];
+  /** What the report gives for the item, camelCased (for example basis, ambiguous, oneToOne for a link; multiplicity, rowsPerCohort for a group; status or reason for a review entry; bucket and status for an unresolved or errored row), plus origin, the report list it came from */
+  detail: HarmonizeItemDetail;
+  /** Biomapper's own flag */
+  suggested: boolean;
+  /** The effective flag, the organizer's override if any, else suggested */
+  flagged: boolean;
+  source: HarmonizeItemSource;
+}
+
+export interface HarmonizeItemsPage {
+  total: number;
+  flaggedTotal: number;
+  items: HarmonizeItem[];
+}
+
+export interface HarmonizeFlagsRequest {
+  refs: string[];
+  flagged: boolean;
+}
+
+/**
+ * Every given field must match; a detail field matches only items that carry it. An empty filter matches every item of the run.
+ */
+export interface HarmonizeFlagFilter {
+  kind?: HarmonizeItemKind;
+  arm?: HarmonizeArm;
+  basis?: string;
+  ambiguous?: boolean;
+}
+
+export interface HarmonizeBulkFlagsRequest {
+  filter: HarmonizeFlagFilter;
+  flagged: boolean;
+}
+
+export interface HarmonizeFlagsResult {
+  updated: number;
+  flaggedTotal: number;
+}
+
+export interface HarmonizeResetFlagsRequest {
+  /** The items to reset; omitted means every item */
+  refs?: string[];
+}
+
+export interface HarmonizeResetFlagsResult {
+  flaggedTotal: number;
+}
+
+export type HarmonizeReviewItemSummaryKind =
+  (typeof HarmonizeReviewItemSummaryKind)[keyof typeof HarmonizeReviewItemSummaryKind];
+
+export const HarmonizeReviewItemSummaryKind = {
+  row: "row",
+  link: "link",
+} as const;
+
+export interface HarmonizeReviewItemSummary {
+  ref: string;
+  kind: HarmonizeReviewItemSummaryKind;
+  impact: number;
+  /** Untrusted text, the entity name or one name per side */
+  label: string;
+  reasons: string[];
+  engineChoice?: string | null;
+  nodes: string[];
+  nRows: number;
+  cohorts: string[];
+  evidence: string;
+  suggestion?: string | null;
+}
+
+/**
+ * Items per kind in the whole run, keyed row and link
+ */
+export type HarmonizeReviewItemsPageCounts = { [key: string]: number };
+
+export interface HarmonizeReviewItemsPage {
+  jobId: string;
+  total: number;
+  /** Items per kind in the whole run, keyed row and link */
+  counts: HarmonizeReviewItemsPageCounts;
+  skippedNoNode: number;
+  offset: number;
+  limit: number;
+  nextOffset?: number | null;
+  items: HarmonizeReviewItemSummary[];
+  note?: string;
+}
+
+export interface HarmonizeEntryRow {
+  cohort: string;
+  key: string;
+  name: string;
+}
+
+export interface HarmonizeRowDetail {
+  name?: string;
+  category?: string;
+  weakTrigger?: string | null;
+  engineChoice?: string | null;
+  certificateState?: string | null;
+  rows?: HarmonizeEntryRow[];
+  nRows?: number;
+  cohorts?: string[];
+  candidatesStatus?: string;
+  candidatesReason?: string | null;
+  supersedingRef?: string | null;
+}
+
+/**
+ * Rows per certificate state, keyed by state
+ */
+export type HarmonizeSideDetailCertificateStates = { [key: string]: number };
+
+/**
+ * Identifiers per vocabulary, keyed by vocabulary
+ */
+export type HarmonizeSideDetailIdentifiers = { [key: string]: string[] };
+
+export interface HarmonizeSideDetail {
+  node?: string | null;
+  nodeName?: string | null;
+  nodeNameStatus?: string;
+  rows?: HarmonizeEntryRow[];
+  nRows?: number;
+  /** Rows per certificate state, keyed by state */
+  certificateStates?: HarmonizeSideDetailCertificateStates;
+  /** Identifiers per vocabulary, keyed by vocabulary */
+  identifiers?: HarmonizeSideDetailIdentifiers;
+}
+
+export interface HarmonizeLinkDetail {
+  linkKind?: string;
+  basis?: string | null;
+  bases?: string[];
+  reviewReasons?: string[];
+  nRowPairs?: number;
+  cohorts?: string[];
+  question?: string;
+  a?: HarmonizeSideDetail;
+  b?: HarmonizeSideDetail;
+}
+
+export type HarmonizeReviewItemDetailKind =
+  (typeof HarmonizeReviewItemDetailKind)[keyof typeof HarmonizeReviewItemDetailKind];
+
+export const HarmonizeReviewItemDetailKind = {
+  row: "row",
+  link: "link",
+} as const;
+
+export interface HarmonizeReviewItemDetail {
+  ref: string;
+  kind: HarmonizeReviewItemDetailKind;
+  jobId: string;
+  impact: number;
+  suggestion?: string | null;
+  row?: HarmonizeRowDetail | null;
+  link?: HarmonizeLinkDetail | null;
+  nextStep: string;
+  note?: string;
+}
+
 export type CreateFlagParams = {
   /**
    * Metabolite name to flag
@@ -235,3 +705,48 @@ export type DeleteFlagParams = {
    */
   name: string;
 };
+
+export type ListHarmonizeReviewItemsParams = {
+  kind?: ListHarmonizeReviewItemsKind;
+  /**
+   * @minimum 0
+   */
+  offset?: number;
+  /**
+   * Page size, 1 to 50 (default 25)
+   * @minimum 1
+   * @maximum 50
+   */
+  limit?: number;
+};
+
+export type ListHarmonizeReviewItemsKind =
+  (typeof ListHarmonizeReviewItemsKind)[keyof typeof ListHarmonizeReviewItemsKind];
+
+export const ListHarmonizeReviewItemsKind = {
+  row: "row",
+  link: "link",
+} as const;
+
+export type ListHarmonizeItemsParams = {
+  kind?: HarmonizeItemKind;
+  arm?: HarmonizeArm;
+  flagged?: boolean;
+  /**
+   * @minimum 0
+   */
+  offset?: number;
+  /**
+   * Page size, 1 to 1000 (default 100)
+   * @minimum 1
+   * @maximum 1000
+   */
+  limit?: number;
+};
+
+export type ExportHarmonizeRunParams = {
+  table: HarmonizeExportTable;
+  format: HarmonizeExportFormat;
+};
+
+export type ExportHarmonizeRun200ThreeItem = { [key: string]: unknown };
