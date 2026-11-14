@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import {
   EXPORT_FORMATS,
   EXPORT_TABLES,
+  eitlPairs,
   errorMessage,
   plural,
   tableApplies,
@@ -16,11 +17,13 @@ import {
   type ExportTable,
 } from "@/lib/harmonize";
 import { fetchExport, saveFile } from "@/lib/harmonize-export";
-import { Note, Panel } from "./common";
+import { Mono, Note, Panel } from "./common";
+
+const PREVIEW_ROWS = 50;
 import { stageHref } from "./StageRail";
 
 const TABLE_TEXT: Record<(typeof EXPORT_TABLES)[number], { title: string; blurb: string }> = {
-  links: { title: "Links", blurb: "Every link between the two cohorts, in both arms." },
+  links: { title: "Links", blurb: "Every link between the two cohorts, one row per link per arm." },
   groups: { title: "Groups", blurb: "Every group of rows that share a node, in both arms." },
   review: { title: "Review", blurb: "Review entries: identifier checks, possible misses, withheld name matches, cross-node entries." },
   unresolved: { title: "Unresolved", blurb: "Rows that resolved to nothing or errored, per cohort." },
@@ -50,21 +53,16 @@ function useDownloader(jobId: string) {
   return { busy, error, skipped, download, env };
 }
 
-/** The pairs the EITL file would hold now, and how many flagged items it leaves out (read from the header). */
+/**
+ * The pairs the EITL file holds now (the JSON export itself, so it is exactly what a download gives), and how many
+ * flagged items it leaves out (read from the X-Harmonize-Skipped-One-Sided header). Refetched after any flag change.
+ */
 function useEitlPreview(jobId: string, env: string) {
   return useQuery({
     queryKey: ["harmonize-eitl-preview", jobId],
     queryFn: async () => {
       const file = await fetchExport(jobId, "eitl_pairs", "json", { env });
-      const text = await file.blob.text();
-      let pairs: number | null = null;
-      try {
-        const parsed = JSON.parse(text);
-        pairs = Array.isArray(parsed) ? parsed.length : Array.isArray(parsed?.rows) ? parsed.rows.length : null;
-      } catch {
-        pairs = null;
-      }
-      return { pairs, skipped: file.skipped };
+      return { pairs: eitlPairs(await file.blob.text()), skipped: file.skipped };
     },
     staleTime: 0,
   });
@@ -76,27 +74,59 @@ export function ExportStage({ run, flaggedTotal }: { run: HarmonizeRunStatus; fl
   const [eitlFormat, setEitlFormat] = useState<"json" | "csv">("json");
   const preview = useEitlPreview(run.jobId, env);
   const shownSkipped = skipped ?? preview.data?.skipped ?? null;
+  const pairs = preview.data?.pairs ?? null;
+  const twoCohort = run.kind !== "harmonize_many";
 
   return (
     <div className="space-y-6">
       <Panel
         id="eitl"
-        title="Pairs file for expert review (EITL)"
-        description="The flagged links and flagged groups, as pairs the expert-in-the-loop app reads. Upload it to an EITL campaign."
+        title="Pairs file for expert-in-the-loop (EITL), the expert review app"
+        description="The flagged links and flagged groups, as pairs EITL reads. Upload it to an EITL campaign."
       >
         <div className="space-y-4">
-          <div className="text-sm text-neutral-700" data-testid="eitl-preview" aria-live="polite">
+          <div className="space-y-1 text-sm text-neutral-700" data-testid="eitl-preview" aria-live="polite">
             {preview.isLoading ? (
               <span className="text-neutral-500">Counting the pairs</span>
             ) : preview.isError ? (
-              <span className="text-danger">{preview.error instanceof Error ? preview.error.message : "The pairs could not be counted."}</span>
+              <span className="text-danger">{errorMessage(preview.error, "The pairs could not be counted.")}</span>
             ) : (
               <>
-                {flaggedTotal != null && <span>{plural(flaggedTotal, "item")} flagged. </span>}
-                {preview.data?.pairs != null && <span>The file holds {plural(preview.data.pairs, "pair")}. </span>}
+                <p data-testid="eitl-counts">
+                  {flaggedTotal != null && <span>{plural(flaggedTotal, "item")} flagged in this run. </span>}
+                  {pairs && <span>The file holds {plural(pairs.length, "pair")}. </span>}
+                  {shownSkipped != null && shownSkipped > 0 && (
+                    <span>
+                      {plural(shownSkipped, "flagged item")} {shownSkipped === 1 ? "gives" : "give"} no pair.
+                    </span>
+                  )}
+                </p>
+                {flaggedTotal != null && flaggedTotal > 0 && pairs && (
+                  <p className="text-xs text-neutral-500" data-testid="eitl-counts-why">
+                    These numbers need not add up. A flagged link gives one pair, and a link found by both arms is
+                    written once. A flagged group gives one pair for each of its rows after the first. Flagged review
+                    entries, unresolved rows and groups of one row have no second side, so they give none.
+                  </p>
+                )}
               </>
             )}
           </div>
+          {pairs && pairs.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-neutral-700">
+                In the file now{pairs.length > PREVIEW_ROWS ? ` (the first ${PREVIEW_ROWS} of ${pairs.length.toLocaleString()})` : ""}
+              </p>
+              <ol className="scroll-visible max-h-64 divide-y divide-neutral-100 rounded border border-neutral-200 text-sm" data-testid="eitl-pairs-preview">
+                {pairs.slice(0, PREVIEW_ROWS).map((p, i) => (
+                  <li key={i} className="px-3 py-1.5">
+                    <span className="text-neutral-900">{p.sourceText}</span> <Mono className="text-neutral-500">{p.sourceDataset}</Mono>{" "}
+                    <span className="text-neutral-500">with</span> <span className="text-neutral-900">{p.targetText}</span>{" "}
+                    <Mono className="text-neutral-500">{p.targetDataset}</Mono>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
           {flaggedTotal === 0 && (
             <Note tone="info" title="Nothing is flagged yet" testId="eitl-empty">
               The pairs file holds only flagged links and groups, so it is empty for now.{" "}
@@ -164,6 +194,21 @@ export function ExportStage({ run, flaggedTotal }: { run: HarmonizeRunStatus; fl
 
       <Panel id="tables" title="Result tables" description="Every table carries the flag columns: flagged, flag_source and suggested.">
         <div className="space-y-3">
+          {twoCohort && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-neutral-200 bg-neutral-50 px-4 py-3" data-testid="matched-pairs">
+              <div className="min-w-0">
+                <p className="font-medium text-neutral-900">Matched pairs (links table)</p>
+                <p className="text-xs text-neutral-500">
+                  The list of matches: one row per link, with both rows' keys and names, its basis and its flag. A pair
+                  found by both arms appears once for each arm.
+                </p>
+              </div>
+              <Button onClick={() => download("links", "csv")} disabled={busy !== null}>
+                {busy === "links.csv" ? <Loader2 aria-hidden className="animate-spin motion-reduce:animate-none" /> : <Download aria-hidden />}
+                Download matched pairs (CSV)
+              </Button>
+            </div>
+          )}
           <div className="scroll-visible rounded border border-neutral-200">
             <table className="w-full text-sm">
               <caption className="sr-only">Result tables to download</caption>

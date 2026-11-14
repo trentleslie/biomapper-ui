@@ -67,7 +67,7 @@ export function stepViews(
           : "Available when the run is complete";
         break;
       case "export":
-        status = finished ? "EITL pairs and tables" : "Available when the run is complete";
+        status = finished ? "Pairs for expert review, and tables" : "Available when the run is complete";
         break;
     }
     const state: StepState = stage === current ? "current" : !reachable ? "locked" : done ? "done" : "open";

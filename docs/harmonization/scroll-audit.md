@@ -39,6 +39,7 @@ Checked by `artifacts/frontend/e2e/scroll.spec.ts` (run with `pnpm --filter @wor
 | Harmonize: item members table | `components/harmonize/FlagItems.tsx` (item detail) | Groups with many members; `max-h-64` | `scroll-visible` | covered by the shared class |
 | Harmonize: flag items table | `components/harmonize/FlagItems.tsx` (`items-table`) | 100 items per page; `max-h-[32rem]` | `scroll-visible` | harmonize test |
 | Harmonize: export tables list | `components/harmonize/ExportStage.tsx` | Wide on narrow windows (no height cap) | `scroll-visible` | covered by the shared class |
+| Harmonize: EITL pairs preview | `components/harmonize/ExportStage.tsx` (`eitl-pairs-preview`) | Up to 50 pairs shown; `max-h-64` | `scroll-visible` | covered by the shared class |
 
 ## Select
 

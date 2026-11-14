@@ -115,9 +115,11 @@ function runStubs(states: { state: string; progress: unknown; stage: string }[])
     [`/api/harmonize/runs/${JOB}/export`]: async (route: Route, url: URL) => {
       const table = url.searchParams.get("table");
       const format = url.searchParams.get("format");
-      const pairs = items.filter((i) => i.flagged && i.kind === "link").length;
+      const pairs = items
+        .filter((i) => i.flagged && i.kind === "link")
+        .map((i) => ({ source_text: i.members[0].name, source_id: i.members[0].key, source_dataset: i.members[0].cohort, target_text: i.members[1].name, target_id: i.members[1].key, target_dataset: i.members[1].cohort }));
       const skipped = items.filter((i) => i.flagged && i.kind !== "link").length;
-      const body = format === "json" ? JSON.stringify(Array.from({ length: table === "eitl_pairs" ? pairs : 0 }, () => ({ source_text: "x" }))) : "ref,arm\r\n";
+      const body = format === "json" ? JSON.stringify(table === "eitl_pairs" ? pairs : []) : "ref,arm\r\n";
       return route.fulfill({
         status: 200,
         body,
@@ -192,10 +194,16 @@ test.describe("harmonize @app", () => {
     await expect(page.getByText("20 of 20 entities (100%)")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole("link", { name: "Review results" })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByTestId("run-state").first()).toHaveText("Complete");
+    await expect(page.getByTestId("run-finished")).toContainText("Finished. Review the results.");
 
     await page.getByRole("link", { name: "Review results" }).click();
     await expect(page).toHaveURL(new RegExp(`/harmonize/runs/${JOB}/review$`));
     await expect(page.getByTestId("arm-names_only")).toContainText("Links");
+    await expect(page.getByTestId("flagged-now")).toContainText("Flagged now: 1 link, 1 review entry.");
+    await expect(page.getByTestId("arms-explained")).toContainText("The names-only arm maps every row by its name alone.");
+    await expect(page.getByTestId("arms-agree")).toHaveText("Both arms found the same 29 links.");
+    await expect(page.getByTestId("links-by-basis").first()).toHaveText("Links by basis: node 29, identifier none, name_exact none, name_casefold none");
+    await expect(page.getByTestId("glossary").first()).toContainText("What these terms mean");
     await expect(page.getByTestId("arm-identifier")).toContainText("Ambiguous");
     await expect(page.getByTestId("name-linking")).toContainText("Name links are on because the category is biolink:SmallMolecule.");
     await expect(page.getByTestId("warnings")).toContainText("KEGG is declared only for 'example_cohort_a'");
@@ -204,6 +212,7 @@ test.describe("harmonize @app", () => {
 
     await page.getByRole("tab", { name: "Results by arm" }).click();
     await expect(page.getByTestId("links-table")).toContainText("Creatinine");
+    await expect(page.getByTestId("links-table")).toContainText(/Creatinine with /);
     await expect(page.getByTestId("unresolved-table")).toContainText("a30");
 
     await page.getByRole("tab", { name: "Review queue" }).click();
@@ -211,11 +220,18 @@ test.describe("harmonize @app", () => {
     await page.getByRole("button", { name: "Open review item ###" }).click();
     await expect(page.getByTestId("review-item-detail")).toContainText("Certificate state");
     await expect(page.getByTestId("review-item-detail")).toContainText("unavailable");
+    await expect(page.getByTestId("certificate-gloss")).toHaveText("There was nothing to check against: unverifiable rather than wrong.");
+    await expect(page.getByTestId("review-item-why")).toContainText("Unresolved");
     await page.keyboard.press("Escape");
 
     await page.getByRole("tab", { name: "Flag items" }).click();
     const totals = page.getByTestId("item-totals");
     await expect(totals).toContainText("4 items");
+    await expect(page.getByTestId("item-totals-help")).toContainText("Review items, on the Review queue tab, are a separate list");
+    await page.getByRole("button", { name: /^Details: Link, example_cohort_a a13/ }).click();
+    await expect(page.getByTestId("item-suggestion")).toContainText("biomapper suggests a flag: the link is ambiguous");
+    await expect(page.getByTestId("item-pair")).toContainText("name a13 (example_cohort_a) with name b13 (example_cohort_b)");
+    await page.keyboard.press("Escape");
     await expect(totals).toContainText("2 flagged in this run");
     // Flag an unflagged link: the total rises by one and its source reads Organizer.
     await page.getByRole("checkbox", { name: /^Flag: Link, example_cohort_a a01/ }).click();
@@ -246,6 +262,11 @@ test.describe("harmonize @app", () => {
     await expect(page.getByRole("radio", { name: "JSON (recommended)" })).toBeChecked();
     await expect(page.getByRole("button", { name: "Send to EITL" })).toBeDisabled();
     await expect(page.getByTestId("eitl-skipped")).toContainText("1 flagged item is left out");
+    await expect(page.getByTestId("eitl-counts")).toHaveText("2 items flagged in this run. The file holds 1 pair. 1 flagged item gives no pair.");
+    await expect(page.getByTestId("eitl-counts-why")).toContainText("a link found by both arms is written once");
+    await expect(page.getByTestId("eitl-pairs-preview")).toContainText("name a13 example_cohort_a with name b13 example_cohort_b");
+    await expect(page.getByRole("heading", { name: "Pairs file for expert-in-the-loop (EITL), the expert review app" })).toBeVisible();
+    await expect(page.getByTestId("matched-pairs")).toContainText("Matched pairs (links table)");
     const download = page.waitForEvent("download");
     await page.getByRole("button", { name: "Download EITL pairs (JSON)" }).click();
     expect((await download).suggestedFilename()).toBe("harmonize_cohorts_example_cohort_a_example_cohort_b_eitl_pairs.json");
@@ -276,6 +297,8 @@ test.describe("harmonize @app", () => {
     await expect(page.getByTestId("run-state").first()).toHaveText("Cancelled");
     await expect(page.getByTestId("run-reason")).toContainText("Cancelled. What was mapped is kept; resume continues it.");
     await expect(page.getByRole("button", { name: "Resume run" })).toBeVisible();
+    await expect(page.getByText("Stopped here")).toBeVisible();
+    await expect(page.getByText("Now", { exact: true })).toHaveCount(0);
     // Review is locked until the run finishes; asking for it shows the progress instead.
     await goto(page, `/harmonize/runs/${JOB}/review`);
     await expect(page.getByText("Review and flag opens when the run is complete")).toBeVisible();
@@ -524,5 +547,31 @@ test.describe("harmonize @app", () => {
     await page.getByRole("tab", { name: "Summary" }).click();
     await page.locator("summary", { hasText: "Found only by the names-only arm" }).click();
     await expect(page.getByText(/Showing 1 to 100 of 1,000 (rows|links)/)).toBeVisible();
+  });
+
+  test("two-cohort setup takes both files at once, labels same-stem files apart, and offers many-cohort mode for more", async ({ page }) => {
+    await isolate(page, {
+      "/api/harmonize/runs": [],
+      "/api/harmonize/inspect": { columns: ["id", "name", "hmdb"], rowCount: 4 },
+    });
+    await goto(page, "/harmonize");
+    await expect(page.getByTestId("page-intro")).toContainText("Find which rows in two or more datasets are the same thing.");
+    const tsv = (name: string) => ({ name, mimeType: "text/tab-separated-values", buffer: Buffer.from("id\tname\thmdb\n1\tGlucose\tHMDB0000122\n") });
+    await page.getByLabel("Choose both cohort files", { exact: true }).setInputFiles([tsv("panel.tsv"), tsv("panel.tsv")]);
+    await expect(page.getByRole("textbox", { name: "Label for Cohort A" })).toHaveValue("panel");
+    await expect(page.getByRole("textbox", { name: "Label for Cohort B" })).toHaveValue("panel_2");
+    await expect(page.getByTestId("inspect-summary")).toHaveCount(2);
+
+    // Two files dropped on one cohort fill both, as the shared picker does.
+    await page.getByLabel("Replace file for Cohort A", { exact: true }).setInputFiles([tsv("x.tsv"), tsv("y.tsv")]);
+    await expect(page.getByRole("textbox", { name: "Label for Cohort A" })).toHaveValue("x");
+    await expect(page.getByRole("textbox", { name: "Label for Cohort B" })).toHaveValue("y");
+
+    await page.getByLabel("Choose both cohort files", { exact: true }).setInputFiles([tsv("c1.tsv"), tsv("c2.tsv"), tsv("c3.tsv")]);
+    await expect(page.getByTestId("two-pick-too-many")).toContainText("You chose 3 files");
+    await page.getByRole("button", { name: "Switch to many cohorts with these 3 files" }).click();
+    await expect(page.getByRole("radio", { name: /Many cohort files/ })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByTestId("cohort-editor")).toHaveCount(3);
+    await expect(page.getByRole("textbox", { name: "Label for Cohort 3" })).toHaveValue("c3");
   });
 });
