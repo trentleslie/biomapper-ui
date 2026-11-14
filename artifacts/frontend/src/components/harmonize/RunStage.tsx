@@ -96,16 +96,19 @@ export function RunStage({ run }: { run: HarmonizeRunStatus }) {
           </>
         }
       >
-        <div className="space-y-5" aria-live="polite">
-          <div className="flex flex-wrap items-center gap-3">
-            <StateBadge state={run.state} className="text-sm" />
-            {info.meaning && !run.reason && <p className="text-sm text-neutral-600">{info.meaning}</p>}
+        <div className="space-y-5">
+          {/* Only the state and its reason are announced; progress and times change every poll. */}
+          <div className="space-y-5" aria-live="polite" data-testid="run-live">
+            <div className="flex flex-wrap items-center gap-3">
+              <StateBadge state={run.state} className="text-sm" />
+              {info.meaning && !run.reason && <p className="text-sm text-neutral-600">{info.meaning}</p>}
+            </div>
+            {run.reason && (
+              <Note tone={run.state === "failed" ? "danger" : "info"} title="Reason" testId="run-reason">
+                {run.reason}
+              </Note>
+            )}
           </div>
-          {run.reason && (
-            <Note tone={run.state === "failed" ? "danger" : "info"} title="Reason" testId="run-reason">
-              {run.reason}
-            </Note>
-          )}
           {run.stage && (
             <p className="text-sm text-neutral-600">
               <span className="font-medium text-neutral-900">Step: </span>

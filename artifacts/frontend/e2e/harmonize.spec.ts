@@ -183,6 +183,12 @@ test.describe("harmonize @app", () => {
     await expect(page).toHaveURL(new RegExp(`/harmonize/runs/${JOB}/run$`));
     const bar = page.getByRole("progressbar", { name: "Names-only arm progress" });
     await expect(bar).toHaveAttribute("aria-valuetext", "5 of 30 entities");
+    // Progress changes every poll, so it sits outside every live region; the state is announced.
+    const inLiveRegion = (el: Element) => !!el.closest('[aria-live]:not([aria-live="off"]), [role="status"], [role="alert"], [role="log"]');
+    expect(await page.getByTestId("arm-progress").evaluate(inLiveRegion)).toBe(false);
+    expect(await page.getByTestId("cohort-progress").evaluate(inLiveRegion)).toBe(false);
+    await expect(page.getByTestId("run-live")).toHaveAttribute("aria-live", "polite");
+    await expect(page.getByTestId("run-live")).toContainText("Running");
     await expect(page.getByText("Mapping cohort: example_cohort_a")).toBeVisible();
     // A later update past its total still reads 100 percent at most.
     await expect(page.getByText("20 of 20 entities (100%)")).toBeVisible({ timeout: 10_000 });
