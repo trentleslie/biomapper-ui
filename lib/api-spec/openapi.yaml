@@ -874,7 +874,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/HarmonizeFlagsResult"
         "400":
-          description: Missing user ID header, or a ref that matches no item (named)
+          description: >-
+            Missing user ID header, or refs that match no item (the first 10 named, then how
+            many more)
           content:
             application/json:
               schema:
@@ -960,7 +962,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/HarmonizeResetFlagsResult"
         "400":
-          description: Missing user ID header, or a ref that matches no item (named)
+          description: >-
+            Missing user ID header, or refs that match no item (the first 10 named, then how
+            many more)
           content:
             application/json:
               schema:
@@ -1618,8 +1622,9 @@ components:
           type: object
           description: >-
             What the report gives for the item, camelCased (for example basis, ambiguous,
-            oneToOne for a link; multiplicity, rowsPerCohort for a group; status for a review
-            entry; bucket for an unresolved row), plus origin, the report list it came from
+            oneToOne for a link; multiplicity, rowsPerCohort for a group; status or reason for a
+            review entry; bucket and status for an unresolved or errored row), plus origin, the
+            report list it came from
           additionalProperties: true
         suggested:
           type: boolean
@@ -1671,7 +1676,9 @@ components:
 
     HarmonizeFlagFilter:
       type: object
-      description: Every given field must match; a detail field matches only items that carry it
+      description: >-
+        Every given field must match; a detail field matches only items that carry it. An empty
+        filter matches every item of the run.
       properties:
         kind:
           $ref: "#/components/schemas/HarmonizeItemKind"

@@ -576,25 +576,25 @@ class Database:
     async def write_harmonize_flags(
         self, job_id: str, user_id: str, *, upsert: dict[str, bool], delete: list[str],
     ) -> None:
-        """Store the ``upsert`` overrides and drop the ``delete`` ones, in one transaction."""
-        try:
-            if upsert:
-                await self._conn.executemany(
-                    """INSERT INTO harmonize_flags (job_id, user_id, item_ref, flagged)
-                       VALUES (?, ?, ?, ?)
-                       ON CONFLICT (job_id, user_id, item_ref)
-                       DO UPDATE SET flagged = excluded.flagged""",
-                    [(job_id, user_id, ref, int(flag)) for ref, flag in upsert.items()],
-                )
-            if delete:
-                await self._conn.executemany(
-                    "DELETE FROM harmonize_flags WHERE job_id = ? AND user_id = ? AND item_ref = ?",
-                    [(job_id, user_id, ref) for ref in delete],
-                )
-            await self._conn.commit()
-        except Exception:
-            await self._conn.rollback()
-            raise
+        """Store the ``upsert`` overrides and drop the ``delete`` ones, then commit once.
+
+        Like the rest of this class there is no rollback: the connection is shared, and a
+        rollback would also discard another coroutine's uncommitted statements.
+        """
+        if upsert:
+            await self._conn.executemany(
+                """INSERT INTO harmonize_flags (job_id, user_id, item_ref, flagged)
+                   VALUES (?, ?, ?, ?)
+                   ON CONFLICT (job_id, user_id, item_ref)
+                   DO UPDATE SET flagged = excluded.flagged""",
+                [(job_id, user_id, ref, int(flag)) for ref, flag in upsert.items()],
+            )
+        if delete:
+            await self._conn.executemany(
+                "DELETE FROM harmonize_flags WHERE job_id = ? AND user_id = ? AND item_ref = ?",
+                [(job_id, user_id, ref) for ref in delete],
+            )
+        await self._conn.commit()
 
     async def reset_harmonize_flags(
         self, job_id: str, user_id: str, refs: list[str] | None = None,

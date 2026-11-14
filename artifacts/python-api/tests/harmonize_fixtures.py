@@ -116,7 +116,16 @@ _ANSWERS: dict[str, tuple[str, dict[str, list[str]]]] = {
     # Same HMDB on two different chosen nodes: an identifier link across nodes (cross-node).
     "Lactate": ("CHEBI:24996", {"HMDB": ["HMDB0000190"]}),
     "L-Lactic acid": ("CHEBI:422", {"HMDB": ["HMDB0000190"]}),
+    # Short names equal only ignoring case, on different nodes: a withheld name pair.
+    "Co": ("CHEBI:27638", {}),
+    "CO": ("CHEBI:17245", {}),
+    # Resolved, linked to nothing, and carrying an engine review flag: a possible miss.
+    "Hexose": ("CHEBI:18133", {}),
 }
+# chosen_kg_id_review values the fake engine reports, by name.
+_REVIEW_FLAGS: dict[str, str] = {"Hexose": "divergent_refmet"}
+# Names whose mapping call fails (an errored row).
+_ERRORS: dict[str, str] = {"Broken row": "simulated mapping failure"}
 # What a one-sided code resolves to on its own (the two-cohort review pass): a different node.
 _CODE_ANSWERS: dict[str, tuple[str, dict[str, list[str]]]] = {
     "C00031": ("CHEBI:17634", {"KEGG": ["C00031"]}),
@@ -131,6 +140,9 @@ def fake_mapper(records: list[dict[str, Any]], *, entity_type: str,
     out = []
     for rec in records:
         name = rec["name"]
+        if name in _ERRORS:
+            out.append(MappingResult(query_name=name, error=_ERRORS[name]))
+            continue
         codes = [c for cs in (rec.get("identifiers") or {}).values() for c in cs]
         hit = None
         if annotation_mode == "none" and codes:
@@ -142,7 +154,8 @@ def fake_mapper(records: list[dict[str, Any]], *, entity_type: str,
         else:
             node, equivalents = hit
             out.append(MappingResult(query_name=name, resolved=True, primary_curie=node,
-                                     chosen_kg_id=node, kg_equivalent_ids=equivalents))
+                                     chosen_kg_id=node, kg_equivalent_ids=equivalents,
+                                     chosen_kg_id_review=_REVIEW_FLAGS.get(name)))
     return out
 
 
@@ -158,7 +171,8 @@ def make_two_cohort_report(*, shared_vocabulary: bool = True) -> dict[str, Any]:
     ``shared_vocabulary`` is False, which skips the identifier arm: ``arms.identifier`` is
     ``None``). It holds a one-to-one link (Glucose), two ambiguous links (Leucine and
     Isoleucine both to Leucine/Isoleucine), a review-queue item (a's KEGG code disagrees with
-    its name) and one unresolved row per cohort.
+    its name), one unresolved row per cohort, an errored row in ``b``, a withheld name pair
+    (Co vs CO) and a possible miss (``a``'s Hexose, unlinked with an engine review flag).
     """
     from biomapper import harmonize_cohorts
 
@@ -167,11 +181,15 @@ def make_two_cohort_report(*, shared_vocabulary: bool = True) -> dict[str, Any]:
         {"id": "a2", "name": "Leucine", "hmdb": "HMDB0000687", "kegg": ""},
         {"id": "a3", "name": "Isoleucine", "hmdb": "", "kegg": ""},
         {"id": "a4", "name": "Mystery peak 12", "hmdb": "", "kegg": ""},
+        {"id": "a5", "name": "Co", "hmdb": "", "kegg": ""},
+        {"id": "a6", "name": "Hexose", "hmdb": "", "kegg": ""},
     ]
     b = [
         {"id": "b1", "name": "D-Glucose", "hmdb": "HMDB0000122"},
         {"id": "b2", "name": "Leucine/Isoleucine", "hmdb": ""},
         {"id": "b3", "name": "Unknown 7", "hmdb": ""},
+        {"id": "b4", "name": "CO", "hmdb": ""},
+        {"id": "b5", "name": "Broken row", "hmdb": ""},
     ]
     with warnings.catch_warnings():
         # The package warns about every one-sided vocabulary; that is the point of this input.
@@ -191,8 +209,9 @@ def make_many_cohort_report() -> dict[str, Any]:
     Every cohort declares HMDB, so both arms run. It holds a plain group (Glucose in all
     three), a group with multiplicity (Leucine and Isoleucine in ``a``), a cross-node entry
     (Lactate in ``a`` and L-Lactic acid in ``b`` share an HMDB on different nodes), an
-    identifier check that does not confirm (``c``'s Glucose declares the wrong HMDB) and a
-    row that is not grouped (``c``'s unresolved name).
+    identifier check that does not confirm (``c``'s Glucose declares the wrong HMDB), rows
+    that are not grouped (``c``'s unresolved name and errored row) and a withheld name pair
+    (``a``'s Co vs ``c``'s CO).
     """
     from biomapper import harmonize_many
 
@@ -200,12 +219,15 @@ def make_many_cohort_report() -> dict[str, Any]:
         "a": [{"id": "a1", "name": "Glucose", "hmdb": "HMDB0000122"},
               {"id": "a2", "name": "Leucine", "hmdb": ""},
               {"id": "a3", "name": "Isoleucine", "hmdb": ""},
-              {"id": "a4", "name": "Lactate", "hmdb": "HMDB0000190"}],
+              {"id": "a4", "name": "Lactate", "hmdb": "HMDB0000190"},
+              {"id": "a5", "name": "Co", "hmdb": ""}],
         "b": [{"id": "b1", "name": "D-Glucose", "hmdb": "HMDB0000122"},
               {"id": "b2", "name": "Leucine", "hmdb": ""},
               {"id": "b3", "name": "L-Lactic acid", "hmdb": "HMDB0000190"}],
         "c": [{"id": "c1", "name": "Glucose", "hmdb": "HMDB0000999"},
-              {"id": "c2", "name": "Mystery peak 12", "hmdb": ""}],
+              {"id": "c2", "name": "Mystery peak 12", "hmdb": ""},
+              {"id": "c3", "name": "CO", "hmdb": ""},
+              {"id": "c4", "name": "Broken row", "hmdb": ""}],
     }
     report = harmonize_many(
         cohorts, entity="metabolites", key_columns={k: "id" for k in cohorts},

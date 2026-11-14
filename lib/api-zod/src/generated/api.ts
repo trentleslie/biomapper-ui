@@ -1356,7 +1356,7 @@ export const ListHarmonizeItemsResponse = zod.object({
       detail: zod
         .record(zod.string(), zod.unknown())
         .describe(
-          "What the report gives for the item, camelCased (for example basis, ambiguous, oneToOne for a link; multiplicity, rowsPerCohort for a group; status for a review entry; bucket for an unresolved row), plus origin, the report list it came from",
+          "What the report gives for the item, camelCased (for example basis, ambiguous, oneToOne for a link; multiplicity, rowsPerCohort for a group; status or reason for a review entry; bucket and status for an unresolved or errored row), plus origin, the report list it came from",
         ),
       suggested: zod.boolean().describe("Biomapper's own flag"),
       flagged: zod
@@ -1403,7 +1403,7 @@ export const BulkHarmonizeFlagsBody = zod.object({
       ambiguous: zod.boolean().optional(),
     })
     .describe(
-      "Every given field must match; a detail field matches only items that carry it",
+      "Every given field must match; a detail field matches only items that carry it. An empty filter matches every item of the run.",
     ),
   flagged: zod.boolean(),
 });

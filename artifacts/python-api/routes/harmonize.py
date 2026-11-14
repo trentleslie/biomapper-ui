@@ -30,6 +30,7 @@ import logging
 import os
 import re
 import tempfile
+from collections import OrderedDict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
@@ -37,6 +38,7 @@ from typing import Any, Literal
 from biomapper.jobs import FINISHED_STATES, CohortSpec, HarmonizeStatus, JobError
 from biomapper.mcp.config import ServerConfig
 from fastapi import APIRouter, File, Form, Header, HTTPException, Query, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, ValidationError
 from pydantic.alias_generators import to_camel
 
@@ -523,6 +525,7 @@ ItemKind = Literal["link", "group", "review", "unresolved"]
 ItemArm = Literal["names_only", "identifier"]
 ITEMS_PAGE_DEFAULT = 100
 ITEMS_PAGE_MAX = 1000
+UNKNOWN_REFS_SHOWN = 10
 
 
 class FlagsRequest(_CamelModel):
@@ -553,20 +556,49 @@ class ResetFlagsRequest(_CamelModel):
     refs: list[str] | None = None
 
 
+# Items of recently used finished runs. A finished run's report.json never changes (a partial
+# or complete job cannot be resumed), so its items are built once; the bound keeps memory small
+# at the package's limits (12 cohorts of 20,000 rows). Unfinished runs are never cached: their
+# load_report raises before anything is stored.
+ITEMS_CACHE_RUNS = 4
+_items_cache: OrderedDict[str, list[Item]] = OrderedDict()
+
+
+def clear_items_cache() -> None:
+    _items_cache.clear()
+
+
+def _build_items(backend: HarmonizeBackend, job_id: str) -> list[Item]:
+    return items_from_report(backend.load_report(job_id))
+
+
 async def _run_items(job_id: str) -> list[Item]:
+    """The finished run's items, built off the event loop and cached per run."""
+    cached = _items_cache.get(job_id)
+    if cached is not None:
+        _items_cache.move_to_end(job_id)
+        return cached
     backend = get_backend()
     try:
-        report = backend.load_report(job_id)
+        items = await run_in_threadpool(_build_items, backend, job_id)
     except JobError as exc:
         raise await _finished_or_409(backend, job_id, exc) from None
-    try:
-        return items_from_report(report)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=_message(exc)) from None
+    _items_cache[job_id] = items
+    _items_cache.move_to_end(job_id)
+    while len(_items_cache) > ITEMS_CACHE_RUNS:
+        _items_cache.popitem(last=False)
+    return items
+
+
+# Passes over every item of a run (up to hundreds of thousands at the package's limits) run in
+# the threadpool, so a flag toggle never holds the event loop for one of them.
 
 
 async def _flagged_items(job_id: str, user_id: str, items: list[Item]) -> list[FlaggedItem]:
-    return with_flags(items, await database.list_harmonize_flags(job_id, user_id))
+    overrides = await database.list_harmonize_flags(job_id, user_id)
+    return await run_in_threadpool(with_flags, items, overrides)
 
 
 def _flagged_total(flagged: list[FlaggedItem]) -> int:
@@ -586,8 +618,11 @@ def _known_refs(items: list[Item], refs: list[str]) -> list[str]:
     wanted = list(dict.fromkeys(refs))
     unknown = [r for r in wanted if r not in known]
     if unknown:
-        raise HTTPException(status_code=400,
-                            detail=f"No item in this run has ref {', '.join(unknown)}.")
+        shown = ", ".join(unknown[:UNKNOWN_REFS_SHOWN])
+        more = len(unknown) - UNKNOWN_REFS_SHOWN
+        if more > 0:
+            shown += f" and {more} more"
+        raise HTTPException(status_code=400, detail=f"No item in this run has ref {shown}.")
     return wanted
 
 
@@ -600,8 +635,9 @@ async def _set_flags(job_id: str, user_id: str, items: list[Item], chosen: list[
         upsert={i.ref: flagged for i in chosen if i.suggested != flagged},
         delete=[i.ref for i in chosen if i.suggested == flagged],
     )
-    total = _flagged_total(await _flagged_items(job_id, user_id, items))
-    return {"updated": len(chosen), "flaggedTotal": total}
+    flagged_now = await _flagged_items(job_id, user_id, items)
+    return {"updated": len(chosen),
+            "flaggedTotal": await run_in_threadpool(_flagged_total, flagged_now)}
 
 
 @router.get("/runs/{job_id}/items")
@@ -622,11 +658,15 @@ async def list_items(
     user_id = _require_user(x_clerk_user_id)
     await _owned_run(job_id, user_id)
     every = await _flagged_items(job_id, user_id, await _run_items(job_id))
-    chosen = [f for f in every
-              if (kind is None or f.item.kind == kind) and (arm is None or f.item.arm == arm)
-              and (flagged is None or f.flagged == flagged)]
-    return {"total": len(chosen), "flaggedTotal": _flagged_total(every),
-            "items": [_item_json(f) for f in chosen[offset: offset + limit]]}
+
+    def page() -> dict[str, Any]:
+        chosen = [f for f in every
+                  if (kind is None or f.item.kind == kind) and (arm is None or f.item.arm == arm)
+                  and (flagged is None or f.flagged == flagged)]
+        return {"total": len(chosen), "flaggedTotal": _flagged_total(every),
+                "items": [_item_json(f) for f in chosen[offset: offset + limit]]}
+
+    return await run_in_threadpool(page)
 
 
 @router.put("/runs/{job_id}/flags")
@@ -637,9 +677,9 @@ async def set_flags(
     user_id = _require_user(x_clerk_user_id)
     await _owned_run(job_id, user_id)
     items = await _run_items(job_id)
-    wanted = set(_known_refs(items, body.refs))
-    return await _set_flags(job_id, user_id, items, [i for i in items if i.ref in wanted],
-                            body.flagged)
+    wanted = set(await run_in_threadpool(_known_refs, items, body.refs))
+    chosen = await run_in_threadpool(lambda: [i for i in items if i.ref in wanted])
+    return await _set_flags(job_id, user_id, items, chosen, body.flagged)
 
 
 @router.post("/runs/{job_id}/flags/bulk")
@@ -650,8 +690,8 @@ async def bulk_flags(
     user_id = _require_user(x_clerk_user_id)
     await _owned_run(job_id, user_id)
     items = await _run_items(job_id)
-    return await _set_flags(job_id, user_id, items, [i for i in items if body.filter.matches(i)],
-                            body.flagged)
+    chosen = await run_in_threadpool(lambda: [i for i in items if body.filter.matches(i)])
+    return await _set_flags(job_id, user_id, items, chosen, body.flagged)
 
 
 @router.post("/runs/{job_id}/flags/reset")
@@ -664,6 +704,8 @@ async def reset_flags(
     user_id = _require_user(x_clerk_user_id)
     await _owned_run(job_id, user_id)
     items = await _run_items(job_id)
-    refs = None if body is None or body.refs is None else _known_refs(items, body.refs)
+    refs = (None if body is None or body.refs is None
+            else await run_in_threadpool(_known_refs, items, body.refs))
     await database.reset_harmonize_flags(job_id, user_id, refs)
-    return {"flaggedTotal": _flagged_total(await _flagged_items(job_id, user_id, items))}
+    flagged_now = await _flagged_items(job_id, user_id, items)
+    return {"flaggedTotal": await run_in_threadpool(_flagged_total, flagged_now)}

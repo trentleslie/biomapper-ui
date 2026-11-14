@@ -458,7 +458,7 @@ export interface HarmonizeItemMember {
 }
 
 /**
- * What the report gives for the item, camelCased (for example basis, ambiguous, oneToOne for a link; multiplicity, rowsPerCohort for a group; status for a review entry; bucket for an unresolved row), plus origin, the report list it came from
+ * What the report gives for the item, camelCased (for example basis, ambiguous, oneToOne for a link; multiplicity, rowsPerCohort for a group; status or reason for a review entry; bucket and status for an unresolved or errored row), plus origin, the report list it came from
  */
 export type HarmonizeItemDetail = { [key: string]: unknown };
 
@@ -476,7 +476,7 @@ export interface HarmonizeItem {
   kind: HarmonizeItemKind;
   arm: HarmonizeArm;
   members: HarmonizeItemMember[];
-  /** What the report gives for the item, camelCased (for example basis, ambiguous, oneToOne for a link; multiplicity, rowsPerCohort for a group; status for a review entry; bucket for an unresolved row), plus origin, the report list it came from */
+  /** What the report gives for the item, camelCased (for example basis, ambiguous, oneToOne for a link; multiplicity, rowsPerCohort for a group; status or reason for a review entry; bucket and status for an unresolved or errored row), plus origin, the report list it came from */
   detail: HarmonizeItemDetail;
   /** Biomapper's own flag */
   suggested: boolean;
@@ -497,7 +497,7 @@ export interface HarmonizeFlagsRequest {
 }
 
 /**
- * Every given field must match; a detail field matches only items that carry it
+ * Every given field must match; a detail field matches only items that carry it. An empty filter matches every item of the run.
  */
 export interface HarmonizeFlagFilter {
   kind?: HarmonizeItemKind;

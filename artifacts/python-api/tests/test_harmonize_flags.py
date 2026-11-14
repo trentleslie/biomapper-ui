@@ -29,6 +29,15 @@ def app_factory(tmp_path, monkeypatch, real_recording_dir):
     return lambda: TestClient(app)
 
 
+@pytest.fixture(autouse=True)
+def _fresh_items_cache():
+    from routes.harmonize import clear_items_cache
+
+    clear_items_cache()
+    yield
+    clear_items_cache()
+
+
 @pytest.fixture
 def client(app_factory):
     with app_factory() as c:
@@ -170,13 +179,19 @@ def test_flags_are_per_user_and_survive_restart(app_factory, two_cohort_report, 
 
     import routes.harmonize as harmonize_routes
 
+    # A new process: no cached items, and a backend that only knows the report.
+    harmonize_routes.clear_items_cache()
     monkeypatch.setattr(harmonize_routes, "get_backend",
                         lambda: _ReportOnlyBackend(two_cohort_report))
     with app_factory() as c:
         it = get_item(c, job, ref)
         assert (it["flagged"], it["source"]) == (True, "organizer")
-        # Another user cannot see the run at all, and holds no flags on it.
+        assert c.portal.call(flags_of, "user-1") == {ref: True}
+        # Another user cannot see the run, and a write from them stores nothing for anyone.
         assert c.get(f"/harmonize/runs/{job}/items", headers=U2).status_code == 404
+        r = c.put(f"/harmonize/runs/{job}/flags", json={"refs": [ref], "flagged": False},
+                  headers=U2)
+        assert r.status_code == 404
         assert c.portal.call(flags_of, "user-2") == {}
         assert c.portal.call(flags_of, "user-1") == {ref: True}
 
@@ -241,21 +256,22 @@ def test_items_409_until_finished(tmp_path, monkeypatch, real_recording_dir):
     monkeypatch.setattr(database, "_path", tmp_path / "slow.db")
     from main import app
 
+    import routes.harmonize as harmonize_routes
+
     with TestClient(app) as c:
         job = submit_two(c)
-        r = c.get(f"/harmonize/runs/{job}/items", headers=U1)
-        assert r.status_code == 409
-        r = c.put(f"/harmonize/runs/{job}/flags", json={"refs": [], "flagged": True}, headers=U1)
-        assert r.status_code == 409
+        base = f"/harmonize/runs/{job}"
+        assert c.get(f"{base}/items", headers=U1).status_code == 409
+        assert c.put(f"{base}/flags", json={"refs": [], "flagged": True},
+                     headers=U1).status_code == 409
+        assert c.post(f"{base}/flags/bulk", json={"filter": {}, "flagged": True},
+                      headers=U1).status_code == 409
+        assert c.post(f"{base}/flags/reset", json={}, headers=U1).status_code == 409
+        assert job not in harmonize_routes._items_cache  # nothing cached for an unfinished run
 
 
 def test_many_cohort_run_items(client):
-    files = [("files", (f"c{i}.tsv", A_TSV, "text/tab-separated-values")) for i in range(3)]
-    r = client.post("/harmonize/many", files=files, data={"spec": json.dumps(SPEC_MANY)},
-                    headers=U1)
-    assert r.status_code == 200, r.text
-    job = r.json()["jobId"]
-    wait_complete(client, job)
+    job = submit_many(client)
     body = items(client, job)
     assert {i["kind"] for i in body["items"]} == {"group", "review", "unresolved"}
     group = next(i for i in body["items"] if i["kind"] == "group" and i["detail"]["multiplicity"])
@@ -265,3 +281,64 @@ def test_many_cohort_run_items(client):
     r = client.post(f"/harmonize/runs/{job}/flags/bulk",
                     json={"filter": {"kind": "group"}, "flagged": True}, headers=U1)
     assert r.json()["updated"] == sum(i["kind"] == "group" for i in body["items"])
+
+
+def submit_many(client):
+    files = [("files", (f"c{i}.tsv", A_TSV, "text/tab-separated-values")) for i in range(3)]
+    r = client.post("/harmonize/many", files=files, data={"spec": json.dumps(SPEC_MANY)},
+                    headers=U1)
+    assert r.status_code == 200, r.text
+    job = r.json()["jobId"]
+    wait_complete(client, job)
+    return job
+
+
+def test_ref_from_another_run_is_400(client, finished_job):
+    many_job = submit_many(client)
+    group_ref = next(i["ref"] for i in items(client, many_job)["items"] if i["kind"] == "group")
+    r = client.put(f"/harmonize/runs/{finished_job}/flags",
+                   json={"refs": [group_ref], "flagged": True}, headers=U1)
+    assert r.status_code == 400 and group_ref in r.json()["detail"]
+
+
+def test_unknown_ref_message_names_at_most_ten(client, finished_job):
+    refs = [f"link:names_only:bad{n:02d}" for n in range(13)]
+    r = client.put(f"/harmonize/runs/{finished_job}/flags", json={"refs": refs, "flagged": True},
+                   headers=U1)
+    detail = r.json()["detail"]
+    assert r.status_code == 400
+    assert all(ref in detail for ref in refs[:10]) and "bad10" not in detail
+    assert detail.endswith("and 3 more.")
+
+
+def test_items_are_built_once_per_finished_run(client, finished_job, monkeypatch):
+    import routes.harmonize as harmonize_routes
+
+    real = harmonize_routes.get_backend()
+    calls = []
+
+    class Counting:
+        def load_report(self, job_id):
+            calls.append(job_id)
+            return real.load_report(job_id)
+
+        async def status(self, job_id):
+            return await real.status(job_id)
+
+    monkeypatch.setattr(harmonize_routes, "get_backend", lambda: Counting())
+    ref = items(client, finished_job)["items"][0]["ref"]
+    items(client, finished_job, kind="link")
+    client.put(f"/harmonize/runs/{finished_job}/flags", json={"refs": [ref], "flagged": True},
+               headers=U1)
+    client.post(f"/harmonize/runs/{finished_job}/flags/reset", json={}, headers=U1)
+    assert calls == [finished_job]
+
+
+def test_items_cache_is_bounded(client):
+    import routes.harmonize as harmonize_routes
+
+    jobs = [submit_two(client) for _ in range(harmonize_routes.ITEMS_CACHE_RUNS + 1)]
+    for job in jobs:
+        wait_complete(client, job)
+        items(client, job)
+    assert list(harmonize_routes._items_cache) == jobs[1:]

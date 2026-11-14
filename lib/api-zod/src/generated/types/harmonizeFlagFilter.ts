@@ -9,7 +9,7 @@ import type { HarmonizeArm } from "./harmonizeArm";
 import type { HarmonizeItemKind } from "./harmonizeItemKind";
 
 /**
- * Every given field must match; a detail field matches only items that carry it
+ * Every given field must match; a detail field matches only items that carry it. An empty filter matches every item of the run.
  */
 export interface HarmonizeFlagFilter {
   kind?: HarmonizeItemKind;
