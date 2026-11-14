@@ -787,7 +787,7 @@ export default function UploadPage() {
                     </p>
                   ) : (
                     <div
-                      className={`grid grid-cols-2 gap-2 ${showAllVocabs ? "max-h-64 overflow-y-auto pr-2" : ""}`}
+                      className={`grid grid-cols-2 gap-2 ${showAllVocabs ? "max-h-64 scroll-visible pr-2" : ""}`}
                       data-testid="vocab-checkboxes"
                     >
                       {visibleVocabs.map(v => (

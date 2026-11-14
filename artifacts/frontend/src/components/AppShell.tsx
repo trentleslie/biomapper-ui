@@ -138,9 +138,12 @@ export function ShellFrame({
         >
           <div
             data-testid="app-nav-panel"
+            // The rail clips sideways on purpose: collapsed, it is an icon strip and labels are not drawn. Only its
+            // vertical overflow (a short window) scrolls, and that axis carries the visible bar.
+            data-clip-x="intended"
             className={cn(
               // z-40: above page content, below dialogs and popovers (z-50).
-              "absolute inset-y-0 left-0 z-40 flex flex-col overflow-y-auto overflow-x-hidden border-r border-rule-on-chrome bg-surface-chrome px-2 py-3 transition-[width] duration-150 ease-out motion-reduce:transition-none",
+              "absolute inset-y-0 left-0 z-40 flex flex-col scroll-visible [scrollbar-gutter:auto]! overflow-x-hidden border-r border-rule-on-chrome bg-surface-chrome px-2 py-3 transition-[width] duration-150 ease-out motion-reduce:transition-none",
               expanded ? "w-60" : "w-14",
             )}
           >
@@ -167,7 +170,7 @@ export function ShellFrame({
         </aside>
         {/* `relative` keeps absolutely positioned descendants (sr-only text included) inside this scroll context
             instead of extending the document; this element is the app's only vertical scroll. */}
-        <main className="relative min-w-0 flex-1 overflow-y-auto bg-background text-foreground">
+        <main className="relative min-w-0 flex-1 scroll-visible bg-background text-foreground">
           <div className="mx-auto max-w-screen-2xl px-6 py-8 lg:px-8">{children}</div>
         </main>
       </div>

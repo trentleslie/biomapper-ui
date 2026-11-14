@@ -187,3 +187,55 @@
     @apply outline-none ring-2 ring-ph-navy ring-offset-2 ring-offset-background;
   }
 }
+
+/* ── Visible scroll bars ──
+   Any box with a bounded height or width whose content can exceed it carries `scroll-visible`. The bar is always
+   drawn while the content overflows, not only on hover or while scrolling: macOS overlay bars hide themselves, so
+   the ::-webkit-scrollbar rules (Chromium, Safari) opt the element out of overlay mode, and scrollbar-width with
+   scrollbar-color does the same job in Firefox. Chromium 121+ ignores the ::-webkit-scrollbar rules on an element
+   that sets the standard properties, so those are fenced to engines without the WebKit pseudo-element. Track and
+   thumb use the neutral tokens. Do not put it on elements that never overflow, and not on body: the shell's main region is
+   the page's only scroller. */
+@utility scroll-visible {
+  overflow: auto;
+  scrollbar-gutter: stable;
+
+  @supports not selector(::-webkit-scrollbar) {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-neutral-300) var(--color-neutral-100);
+  }
+
+  &::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+    background: var(--color-neutral-100);
+  }
+  &::-webkit-scrollbar-track {
+    background: var(--color-neutral-100);
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--color-neutral-300);
+    border: 2px solid var(--color-neutral-100);
+    border-radius: 9999px;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background: var(--color-neutral-400);
+  }
+  &::-webkit-scrollbar-corner {
+    background: var(--color-neutral-100);
+  }
+}
+
+/* Radix Select injects a rule that hides the scroll bar on its viewport (`scrollbar-width: none` and
+   `::-webkit-scrollbar { display: none }`). The doubled class selector outranks it so the viewport keeps the bar. */
+[data-radix-select-viewport].scroll-visible::-webkit-scrollbar {
+  display: block;
+}
+[data-radix-select-viewport].scroll-visible {
+  scrollbar-width: auto; /* "auto" keeps the ::-webkit-scrollbar rules above in force in Chromium */
+}
+@supports not selector(::-webkit-scrollbar) {
+  [data-radix-select-viewport].scroll-visible {
+    scrollbar-width: thin;
+  }
+}

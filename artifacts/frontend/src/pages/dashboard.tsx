@@ -859,7 +859,7 @@ export default function DashboardPage() {
                   {/* Vocabulary Coverage */}
                   <div>
                     <h4 className="text-sm font-semibold mb-2">Vocabulary Coverage</h4>
-                    <div className="max-h-[200px] overflow-y-auto">
+                    <div className="max-h-[200px] scroll-visible">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b text-neutral-500"><th className="py-1 text-left font-normal">Vocabulary</th><th className="py-1 text-right font-normal">Hits</th></tr>

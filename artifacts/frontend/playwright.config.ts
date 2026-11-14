@@ -35,20 +35,23 @@ export default defineConfig({
   use: {
     viewport: { width: 1440, height: 900 },
     trace: "off",
+    // Playwright's headless Chromium passes --hide-scrollbars, which would make every scroll bar invisible and the
+    // scroll.spec.ts checks meaningless. Real users see bars, so the tests must too.
+    launchOptions: { ignoreDefaultArgs: ["--hide-scrollbars"] },
   },
   projects: [
     {
       // The unauthenticated surface: /demo renders DemoShell with no sign-in.
       name: "app",
       use: { baseURL: `http://localhost:${APP_PORT}` },
-      testMatch: /shell\.spec\.ts/,
+      testMatch: /(shell|scroll)\.spec\.ts/,
       grep: /@demo/,
     },
     {
       // The signed-in surface: the dev-only auth bypass in App.tsx renders AppShell without a Clerk session.
       name: "bypass",
       use: { baseURL: `http://localhost:${BYPASS_PORT}` },
-      testMatch: /shell\.spec\.ts/,
+      testMatch: /(shell|scroll)\.spec\.ts/,
       grep: /@app/,
     },
   ],

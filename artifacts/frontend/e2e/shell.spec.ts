@@ -1,49 +1,10 @@
 import path from "node:path";
 import { test, expect, type Page } from "@playwright/test";
+import { isolate, JOBS } from "./helpers";
 
 // Screenshots for the PR are written only on request (SHELL_SCREENSHOTS=1), so a normal run never edits the repo.
 const SCREENSHOT_DIR = path.resolve(import.meta.dirname, "../../../docs/harmonization/screenshots");
 const TAKE_SCREENSHOTS = process.env.SHELL_SCREENSHOTS === "1";
-
-const JOBS = [
-  { jobId: "aaaaaaaa-0000-0000-0000-000000000001", displayName: "Arivale metabolon panel", status: "completed", total: 10, completed: 10, errorCount: 0, env: "production", createdAt: 1_700_000_000, updatedAt: 1_700_000_100 },
-  { jobId: "bbbbbbbb-0000-0000-0000-000000000002", displayName: null, status: "running", total: 10, completed: 4, errorCount: 0, env: "production", createdAt: 1_700_000_200, updatedAt: 1_700_000_300 },
-];
-
-/**
- * No backend and no network: the app's own /api calls get canned answers, Google Fonts requests are recorded and
- * answered with an empty stylesheet (so the test can assert none of them asks for Inter), and every other
- * non-local request (Clerk's script, gstatic) is aborted.
- */
-async function isolate(page: Page) {
-  const googleFontRequests: string[] = [];
-  await page.route("**/*", async (route) => {
-    const url = new URL(route.request().url());
-    if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
-      if (!url.pathname.startsWith("/api/")) return route.continue();
-      if (url.pathname === "/api/jobs") return route.fulfill({ json: JOBS });
-      if (url.pathname === "/api/discovery/entity-types") {
-        return route.fulfill({ json: [{ type: "metabolite", defaultPrefixes: ["HMDB", "CHEBI", "PUBCHEM.COMPOUND"] }] });
-      }
-      if (url.pathname === "/api/discovery/annotators") {
-        return route.fulfill({ json: [{ slug: "kestrel", name: "Kestrel" }] });
-      }
-      if (url.pathname === "/api/discovery/vocabularies") {
-        return route.fulfill({ json: [{ prefix: "HMDB" }, { prefix: "CHEBI" }, { prefix: "PUBCHEM.COMPOUND" }] });
-      }
-      if (url.pathname === "/api/map/demo") {
-        return route.fulfill({ json: { count: 100, categories: { "amino acid": 40, lipid: 60 }, entity_type: "metabolite" } });
-      }
-      return route.fulfill({ json: {} });
-    }
-    if (url.hostname === "fonts.googleapis.com") {
-      googleFontRequests.push(url.toString());
-      return route.fulfill({ status: 200, contentType: "text/css", body: "" });
-    }
-    return route.abort();
-  });
-  return googleFontRequests;
-}
 
 async function expectRailExpandsWithoutReflow(page: Page) {
   const shell = page.getByTestId("app-shell");

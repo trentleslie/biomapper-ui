@@ -117,7 +117,7 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="overflow-y-auto max-h-[85vh]">
+      <DialogContent className="max-h-[85vh]">
         <DialogHeader>
           <DialogTitle>Submit Feedback</DialogTitle>
           <DialogDescription>
@@ -181,7 +181,7 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
             </label>
             <textarea
               id="feedback-description"
-              className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1 min-h-[100px] resize-y"
+              className="mt-1 w-full scroll-visible [scrollbar-gutter:auto]! rounded-md border border-neutral-300 px-3 py-2 text-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1 min-h-[100px] resize-y"
               placeholder={
                 category === "annotation_issue"
                   ? "Describe the mapping issue you found..."
@@ -221,7 +221,7 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
                 </label>
                 <textarea
                   id="expected-result"
-                  className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1 min-h-[60px] resize-y"
+                  className="mt-1 w-full scroll-visible [scrollbar-gutter:auto]! rounded-md border border-neutral-300 px-3 py-2 text-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1 min-h-[60px] resize-y"
                   placeholder="What should the correct mapping be?"
                   value={expectedResult}
                   onChange={(e) => setExpectedResult(e.target.value)}
@@ -263,7 +263,7 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
               </label>
               <textarea
                 id="steps-to-reproduce"
-                className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1 min-h-[60px] resize-y"
+                className="mt-1 w-full scroll-visible [scrollbar-gutter:auto]! rounded-md border border-neutral-300 px-3 py-2 text-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1 min-h-[60px] resize-y"
                 placeholder="1. Go to... 2. Click on... 3. See error..."
                 value={stepsToReproduce}
                 onChange={(e) => setStepsToReproduce(e.target.value)}
