@@ -45,6 +45,7 @@ export function Note({
   action,
   className,
   testId,
+  quiet = false,
 }: {
   tone?: keyof typeof NOTE_TONES;
   title?: ReactNode;
@@ -52,11 +53,13 @@ export function Note({
   action?: ReactNode;
   className?: string;
   testId?: string;
+  /** Not a live region: for standing text whose numbers change with other announced actions. */
+  quiet?: boolean;
 }) {
   const Icon = NOTE_ICONS[tone];
   return (
     <div
-      role={tone === "danger" ? "alert" : "status"}
+      role={quiet ? undefined : tone === "danger" ? "alert" : "status"}
       data-testid={testId}
       className={cn("flex gap-3 rounded border p-4", NOTE_TONES[tone], className)}
     >
@@ -271,5 +274,104 @@ export function Pager({
         </div>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Glossary: the package's terms in plain words. Every sentence restates the installed biomapper's own wording;
+// the source is named beside each entry so it can be checked.
+// ---------------------------------------------------------------------------
+
+export const GLOSSARY = {
+  // biomapper/harmonize/linking.py, harmonize() and BASIS_ORDER
+  basis: {
+    term: "Basis",
+    text: "Why two rows were linked. node: they share an identifier and both resolved to the same knowledge graph node. identifier: they share an identifier (structure identifiers are not counted). name_exact: their names are equal once spacing is tidied. name_casefold: their names are equal only when letter case is ignored.",
+  },
+  // linking.py module docstring and Link.to_dict ("one_to_one is not ambiguous")
+  ambiguity: {
+    term: "One-to-one and ambiguous",
+    text: "A link is ambiguous when either of its rows has more than one partner: several rows landed on the same entry, so the pair is a candidate for review rather than a confident match. Every other link is one-to-one.",
+  },
+  // linking.py, NAME_CASEFOLD_MIN_LENGTH_EXCLUSIVE and harmonize()
+  withheld: {
+    term: "Withheld name match",
+    text: "Two names that are equal only when letter case is ignored, where either name is 4 characters or shorter, are not linked and are listed here instead (Co, cobalt, against CO, carbon monoxide).",
+  },
+  // linking.py, PossibleMiss
+  possibleMiss: {
+    term: "Possible miss",
+    text: "A row in no link whose mapping carries a review signal: an engine review value, a contradicted certificate, or a mixture name. It may be a missed match rather than a row only one cohort has.",
+  },
+  // biomapper/harmonize/nway.py module docstring
+  multiplicity: {
+    term: "Multiplicity",
+    text: "A group has multiplicity when one cohort gives it two or more rows.",
+  },
+  broad: {
+    term: "Broad",
+    text: "A group is broad when one of its rows resolved to a class-level entry.",
+  },
+  clean: {
+    term: "Clean",
+    text: "A group is clean when each cohort in it gives exactly one row and none of its rows resolved to a class-level entry.",
+  },
+  crossNode: {
+    term: "Cross-node entry",
+    text: "Links between rows that resolved to different nodes. They are never merged into one group; they are listed by node pair for review.",
+  },
+  // biomapper/harmonize/idcheck.py module docstring
+  idCheck: {
+    term: "Identifier check",
+    text: "Each grouped row's declared identifiers compared with its node. Not confirmed means none of them is among the node's identifiers. It does not mean contradicted: the node may simply lack that cross-reference.",
+  },
+  // biomapper/cohorts.py module docstring (step 3) and CohortHarmonizationReport
+  oneSided: {
+    term: "One-sided identifier check",
+    text: "A vocabulary only one cohort declares is not used for mapping. Each of its codes is resolved on its own and compared with the row's names-only result; every result other than agree is queued for a person to judge.",
+  },
+  // biomapper/models.py, ResolutionCertificate
+  certificate: {
+    term: "Certificate state",
+    text: "What independent evidence says about the node chosen for a row: corroborated, uncorroborated, contradicted, unavailable or not applicable. Contradicted means a person should look, never that the resolver is wrong. Unavailable means there was nothing to check against: unverifiable rather than wrong.",
+  },
+  // biomapper/many_cohorts.py, where status is set
+  status: {
+    term: "Status",
+    text: "ok when no row errored while mapping, partial when some rows errored, failed when every row errored.",
+  },
+  // many_cohorts.py module docstring
+  grade: {
+    term: "Grade",
+    text: "A run that reused any saved mapping is iteration-grade, not for publication: reuse cannot detect engine changes on one knowledge graph build. Only a run that remapped every row on a verified build is publishable.",
+  },
+  // cohorts.py, read_cohort and harmonize_cohorts (a_key_column)
+  keyColumn: {
+    term: "Key column",
+    text: "A column holding a unique value per row, used as the row's key. Blank or repeated keys are refused. Without one, a row's key is its row number and name.",
+  },
+  // cohorts.py, resolve_category, harmonize_cohorts (category) and name_linking_info
+  category: {
+    term: "Category override",
+    text: "Sent instead of the category the entity type resolves to. It must be a Biolink category (biolink: and a name). The category also decides whether name links are on.",
+  },
+} as const;
+
+export type GlossaryKey = keyof typeof GLOSSARY;
+
+/** "What these terms mean": an expandable list of the package terms a stage uses. */
+export function Glossary({ terms, className }: { terms: GlossaryKey[]; className?: string }) {
+  return (
+    <details className={cn("rounded border border-neutral-200 bg-white", className)} data-testid="glossary">
+      <summary className="cursor-pointer px-4 py-2 text-sm font-medium text-neutral-900">What these terms mean</summary>
+      <dl className="space-y-2 px-4 pb-3 text-sm">
+        {terms.map((k) => (
+          <div key={k}>
+            <dt className="font-medium text-neutral-900">{GLOSSARY[k].term}</dt>
+            <dd className="text-neutral-700">{GLOSSARY[k].text}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
   );
 }

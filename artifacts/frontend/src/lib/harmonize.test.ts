@@ -18,6 +18,10 @@ import {
   guessKeyColumn,
   guessNameColumn,
   guessVocabulary,
+  certificateGloss,
+  eitlPairs,
+  kindCounts,
+  suggestionReason,
   headerColumns,
   headerProblems,
   hasResults,
@@ -270,5 +274,36 @@ describe("items and exports", () => {
     expect(errorMessage(new TypeError("Failed to fetch"))).toBe("Could not reach the server. Check your connection, then try again.");
     // A short plain-text body is still shown as the server wrote it.
     expect(errorMessage({ status: 400, data: "Unknown job id." })).toBe("Unknown job id.");
+  });
+
+  it("says why biomapper suggests a flag or not, by the suggestion rule", () => {
+    expect(suggestionReason("link", true, { ambiguous: true })).toContain("ambiguous");
+    expect(suggestionReason("link", false, { oneToOne: true })).toBe("biomapper does not suggest a flag: the link is one-to-one.");
+    expect(suggestionReason("group", true, { multiplicity: true })).toContain("multiplicity");
+    expect(suggestionReason("review", true, { origin: "possible_missed" })).toBe(
+      "biomapper suggests a flag: every review entry starts flagged (this one: Possible miss).",
+    );
+    expect(suggestionReason("unresolved", false, {})).toBe("biomapper does not suggest a flag: unresolved rows start unflagged.");
+  });
+
+  it("glosses only the certificate states the package explains", () => {
+    expect(certificateGloss("contradicted")).toBe("A person should look. Contradicted never means the resolver is wrong.");
+    expect(certificateGloss("unavailable")).toContain("unverifiable rather than wrong");
+    expect(certificateGloss("corroborated")).toBeNull();
+    expect(certificateGloss(null)).toBeNull();
+  });
+
+  it("lists flagged counts by kind, skipping zeros", () => {
+    expect(kindCounts([["link", 2], ["review", 1], ["unresolved", 0]])).toBe("2 links, 1 review entry");
+    expect(kindCounts([["group", 0], ["review", 0]])).toBeNull();
+  });
+
+  it("reads the pairs of an EITL JSON file", () => {
+    const text = JSON.stringify([
+      { source_text: "Creatinine", source_id: "a01", source_dataset: "a", target_text: "creatinine", target_id: "b01", target_dataset: "b" },
+    ]);
+    expect(eitlPairs(text)).toEqual([{ sourceText: "Creatinine", sourceDataset: "a", targetText: "creatinine", targetDataset: "b" }]);
+    expect(eitlPairs("[]")).toEqual([]);
+    expect(eitlPairs("<html>")).toBeNull();
   });
 });

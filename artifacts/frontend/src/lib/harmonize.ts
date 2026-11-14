@@ -650,6 +650,48 @@ export function itemSummary(kind: string, detail: Record<string, unknown>): stri
   return parts.filter(Boolean);
 }
 
+/**
+ * Why biomapper's suggestion flags this item or not. The rule (services/harmonize_items.py): every review entry, a
+ * link with ambiguous true and a group with multiplicity true are suggested; nothing else is.
+ */
+export function suggestionReason(kind: string, suggested: boolean, detail: Record<string, unknown>): string {
+  if (suggested) {
+    if (kind === "link") return "biomapper suggests a flag: the link is ambiguous, so one of its rows has more than one partner.";
+    if (kind === "group") return "biomapper suggests a flag: one cohort gives this group two or more rows (multiplicity).";
+    if (kind === "review") {
+      const origin = originLabel(detail.origin);
+      return `biomapper suggests a flag: every review entry starts flagged${origin ? ` (this one: ${origin})` : ""}.`;
+    }
+    return "biomapper suggests a flag.";
+  }
+  if (kind === "link") return "biomapper does not suggest a flag: the link is one-to-one.";
+  if (kind === "group") return "biomapper does not suggest a flag: no cohort gives this group more than one row.";
+  if (kind === "unresolved") return "biomapper does not suggest a flag: unresolved rows start unflagged.";
+  return "biomapper does not suggest a flag.";
+}
+
+/** A one-line gloss of a certificate state, in the package's own terms (biomapper.models.ResolutionCertificate). */
+export function certificateGloss(state: string | null | undefined): string | null {
+  if (state === "contradicted") return "A person should look. Contradicted never means the resolver is wrong.";
+  if (state === "unavailable") return "There was nothing to check against: unverifiable rather than wrong.";
+  return null;
+}
+
+export const ITEM_KIND_PLURAL: Record<string, [string, string]> = {
+  link: ["link", "links"],
+  group: ["group", "groups"],
+  review: ["review entry", "review entries"],
+  unresolved: ["unresolved row", "unresolved rows"],
+};
+
+/** "2 links, 1 review entry" from per-kind counts, skipping zeros; null when every count is zero. */
+export function kindCounts(counts: [string, number][]): string | null {
+  const parts = counts
+    .filter(([, n]) => n > 0)
+    .map(([k, n]) => plural(n, ITEM_KIND_PLURAL[k]?.[0] ?? k, ITEM_KIND_PLURAL[k]?.[1]));
+  return parts.length ? parts.join(", ") : null;
+}
+
 // ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
@@ -680,6 +722,34 @@ export function skippedFromHeader(header: string | null | undefined): number | n
   if (header == null || header.trim() === "") return null;
   const n = Number(header);
   return Number.isInteger(n) && n >= 0 ? n : null;
+}
+
+export interface EitlPair {
+  sourceText: string;
+  sourceDataset: string;
+  targetText: string;
+  targetDataset: string;
+}
+
+/** The pairs in an EITL pairs JSON file (a list of rows with source_* and target_* columns), or null if unreadable. */
+export function eitlPairs(text: string): EitlPair[] | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  const rows = Array.isArray(parsed) ? parsed : Array.isArray(asObject(parsed)?.rows) ? (asObject(parsed)!.rows as unknown[]) : null;
+  if (!rows) return null;
+  return rows.map((r) => {
+    const o = asObject(r) ?? {};
+    return {
+      sourceText: String(o.source_text ?? ""),
+      sourceDataset: String(o.source_dataset ?? ""),
+      targetText: String(o.target_text ?? ""),
+      targetDataset: String(o.target_dataset ?? ""),
+    };
+  });
 }
 
 /** Which tables hold rows on a run of this kind. */
