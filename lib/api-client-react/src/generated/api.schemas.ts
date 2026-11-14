@@ -343,6 +343,7 @@ export type HarmonizeExampleRequestKind =
 
 export const HarmonizeExampleRequestKind = {
   two_cohort: "two_cohort",
+  many_cohort: "many_cohort",
 } as const;
 
 export interface HarmonizeExampleRequest {

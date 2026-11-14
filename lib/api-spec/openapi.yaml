@@ -495,7 +495,7 @@ paths:
     post:
       operationId: submitHarmonizeExample
       tags: [harmonize]
-      summary: Start a run on the built-in example dataset
+      summary: Start a run on a built-in example dataset (two-cohort or many-cohort)
       requestBody:
         required: true
         content:
@@ -1581,7 +1581,7 @@ components:
       properties:
         kind:
           type: string
-          enum: [two_cohort]
+          enum: [two_cohort, many_cohort]
       required:
         - kind
 

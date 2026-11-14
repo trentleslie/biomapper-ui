@@ -1,7 +1,8 @@
 """Replay a recorded harmonization run without calling BioMapper.
 
-A recordings directory holds ``two_cohort/`` (for ``submit_cohorts``) and ``many_cohort/`` (for
-``submit_many``), each with:
+A recordings directory holds ``two_cohort/recording/`` (for ``submit_cohorts``) and
+``many_cohort/recording/`` (for ``submit_many``), so ``data/harmonize_examples`` (the built-in
+examples, each beside its recording) is one. Each recording holds:
 
 * ``status.json``: a finished ``HarmonizeStatus`` dump (``status.model_dump(mode="json")``).
 * ``progress.jsonl``: one ``HarmonizeProgress.to_dict()`` per line, in the order they arrived.
@@ -40,6 +41,7 @@ REPORT_FILENAME = "report.json"
 REVIEW_PAGE_DEFAULT = 25
 REVIEW_PAGE_MAX = 50
 _RECORDING_OF = {"harmonize_cohorts": "two_cohort", "harmonize_many": "many_cohort"}
+RECORDING_SUBDIR = "recording"
 _RESUMABLE = frozenset({"stalled", "paused", "expired", "cancelled"})
 
 
@@ -121,7 +123,7 @@ class ReplayBackend:
     # -- submit ------------------------------------------------------------
 
     def _recording(self, kind: str) -> _Recording:
-        return _Recording.load(self._recordings / _RECORDING_OF[kind])
+        return _Recording.load(self._recordings / _RECORDING_OF[kind] / RECORDING_SUBDIR)
 
     def _submit(self, kind: str, output_dir: Path | None) -> HarmonizeStatus:
         if not self._running:

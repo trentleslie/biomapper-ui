@@ -1,0 +1,163 @@
+{
+ "job_id": "80c858f697d26058",
+ "state": "complete",
+ "reason": null,
+ "kind": "harmonize_cohorts",
+ "stage": "done",
+ "cohorts": [
+  {
+   "label": "example_cohort_a",
+   "path": "inputs/a.tsv",
+   "rows": 30
+  },
+  {
+   "label": "example_cohort_b",
+   "path": "inputs/b.tsv",
+   "rows": 30
+  }
+ ],
+ "entity": "metabolites",
+ "output_dir": "report",
+ "store_dir": null,
+ "entities_total": 53,
+ "entities_mapped": 107,
+ "rows_errored": 0,
+ "eta_s": null,
+ "kg_build": "2.3.0 (3dd08a5b)",
+ "kg_verified": true,
+ "owner": null,
+ "created_utc": "2026-11-14T04:42:42.912577+00:00",
+ "updated_utc": "2026-11-14T04:44:04.724921+00:00",
+ "summary": {
+  "status": "ok",
+  "labels": [
+   "example_cohort_a",
+   "example_cohort_b"
+  ],
+  "arms": {
+   "names_only": {
+    "n_links": 29,
+    "links_by_basis": {
+     "node": 29,
+     "identifier": 0,
+     "name_exact": 0,
+     "name_casefold": 0
+    },
+    "n_name_only_links": 0,
+    "n_name_match_withheld": 0,
+    "n_one_to_one_links": 27,
+    "n_ambiguous_links": 2,
+    "n_id_confidence_differs": 0,
+    "n_mixture_links": 0,
+    "n_needs_review": 2,
+    "n_possible_missed": 0,
+    "example_cohort_a": {
+     "total": 30,
+     "comparable": 29,
+     "unresolved": 1,
+     "errors": 0,
+     "linked": 29,
+     "link_rate": 1.0,
+     "possible_missed": 0
+    },
+    "example_cohort_b": {
+     "total": 30,
+     "comparable": 29,
+     "unresolved": 1,
+     "errors": 0,
+     "linked": 28,
+     "link_rate": 0.9655172413793104,
+     "possible_missed": 0
+    }
+   },
+   "identifier": {
+    "n_links": 29,
+    "links_by_basis": {
+     "node": 29,
+     "identifier": 0,
+     "name_exact": 0,
+     "name_casefold": 0
+    },
+    "n_name_only_links": 0,
+    "n_name_match_withheld": 0,
+    "n_one_to_one_links": 27,
+    "n_ambiguous_links": 2,
+    "n_id_confidence_differs": 0,
+    "n_mixture_links": 0,
+    "n_needs_review": 2,
+    "n_possible_missed": 0,
+    "example_cohort_a": {
+     "total": 30,
+     "comparable": 29,
+     "unresolved": 1,
+     "errors": 0,
+     "linked": 29,
+     "link_rate": 1.0,
+     "possible_missed": 0
+    },
+    "example_cohort_b": {
+     "total": 30,
+     "comparable": 29,
+     "unresolved": 1,
+     "errors": 0,
+     "linked": 28,
+     "link_rate": 0.9655172413793104,
+     "possible_missed": 0
+    }
+   }
+  },
+  "identifier_arm_skipped": null,
+  "diff": {
+   "names_only_only": 0,
+   "identifier_only": 0,
+   "both": 29
+  },
+  "one_sided_code_review": {
+   "by_status": {
+    "agree": 2,
+    "disagree": 1,
+    "code_unresolved": 0,
+    "name_unresolved_code_resolved": 0,
+    "errored": 0
+   },
+   "n_listed": 1
+  },
+  "vocabularies": {
+   "shared": [
+    "HMDB"
+   ],
+   "one_sided": {
+    "KEGG": "example_cohort_a"
+   }
+  },
+  "warnings": [
+   "KEGG is declared only for 'example_cohort_a', not for 'example_cohort_b', so it is not supplied as mapping input: supplying one cohort's codes moves that cohort onto code-specific entries the other cohort cannot reach by name, and lowers matches. Its codes are compared with the name results in the review queue instead."
+  ],
+  "name_linking": {
+   "enabled": true,
+   "category": "biolink:SmallMolecule",
+   "decided_by": "category",
+   "enabled_for_categories": [
+    "biolink:SmallMolecule"
+   ],
+   "overridable": false,
+   "reason": "Name links are on because the category is biolink:SmallMolecule. Two resolved rows whose names are equal (exactly, or ignoring case when both names are longer than 4 characters) are linked even when they resolved to different nodes, and each such link says so in its basis (name_exact or name_casefold)."
+  },
+  "output_dir": "report"
+ },
+ "review_items": {
+  "row": 4,
+  "link": 2,
+  "skipped_no_node": 0,
+  "candidates_captured": 4,
+  "candidates_not_captured": 0
+ },
+ "progress": {
+  "function": "harmonize_cohorts",
+  "arm": "review",
+  "cohort": "example_cohort_a",
+  "cohorts": [],
+  "entities_done": 3,
+  "entities_total": 3
+ }
+}

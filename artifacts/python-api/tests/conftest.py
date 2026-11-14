@@ -44,7 +44,7 @@ def _isolated_harmonize(request, tmp_path, monkeypatch):
 
 @pytest.fixture
 def recording_dir(tmp_path):
-    """A synthetic ReplayBackend recordings dir (two_cohort/ and many_cohort/)."""
+    """A synthetic ReplayBackend recordings dir (two_cohort/recording/ and many_cohort/recording/)."""
     from tests.harmonize_fixtures import write_recording
 
     return write_recording(tmp_path / "recordings")

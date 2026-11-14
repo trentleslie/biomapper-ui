@@ -1,7 +1,7 @@
 """Reusable harmonization test helpers: a synthetic replay recording and a local mapping API stub.
 
 ``write_recording(root)`` builds a recordings directory in the layout ``ReplayBackend`` reads:
-``two_cohort/`` and ``many_cohort/``, each with ``report.json``, ``status.json`` (a finished
+``two_cohort/recording/`` and ``many_cohort/recording/``, each with ``report.json``, ``status.json`` (a finished
 ``HarmonizeStatus`` dump), ``progress.jsonl`` (one ``HarmonizeProgress.to_dict()`` per line) and
 ``review_items.json`` (``{"skipped_no_node", "items": [ReviewItemSummary], "details": {ref:
 ReviewItemDetail}}``). The ``recording_dir`` and ``stub_api`` fixtures in ``conftest.py`` wrap
@@ -270,7 +270,7 @@ def write_recording(root: Path, *, two_cohort_report: dict[str, Any] | None = No
     reports = {"two_cohort": two_cohort_report, "many_cohort": many_cohort_report}
     for sub, kind, labels in (("two_cohort", "harmonize_cohorts", ["a", "b"]),
                               ("many_cohort", "harmonize_many", ["a", "b", "c"])):
-        d = root / sub
+        d = root / sub / "recording"
         d.mkdir(parents=True, exist_ok=True)
         status = _status(kind, labels)
         HarmonizeStatus.model_validate(status)  # the recording must be a real status

@@ -1,0 +1,15 @@
+{
+  "entity": "metabolites",
+  "cohorts": [
+    {"label": "example_cohort_a", "nameColumn": "name", "keyColumn": "id",
+     "vocabularies": {"HMDB": ["hmdb"]}},
+    {"label": "example_cohort_b", "nameColumn": "name", "keyColumn": "id",
+     "vocabularies": {"HMDB": ["hmdb"]}},
+    {"label": "example_cohort_c", "nameColumn": "name", "keyColumn": "id",
+     "vocabularies": {"HMDB": ["hmdb"], "KEGG": ["kegg"]}},
+    {"label": "example_cohort_d", "nameColumn": "name", "keyColumn": "id",
+     "vocabularies": {"HMDB": ["hmdb"], "KEGG": ["kegg"]}},
+    {"label": "example_cohort_e", "nameColumn": "name", "keyColumn": "id",
+     "vocabularies": {"HMDB": ["hmdb"]}}
+  ]
+}

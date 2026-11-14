@@ -9,7 +9,7 @@ Conventions the checker needs:
 - Routes are under `/harmonize`. Every route takes the `x-clerk-user-id` header (400 when missing); a run owned by another user is a 404.
 - Report fields are written as they appear in `GET /harmonize/runs/{jobId}/report` (snake_case). Run status and items are camelCase.
 - A "run" is two-cohort (`POST /harmonize/cohorts`, report `kind` `harmonize_cohorts`), many-cohort (`POST /harmonize/many`, report `kind` `harmonize_many`) or from finished jobs (`POST /harmonize/from-jobs`, report `kind` `harmonize_results`). A from-jobs run is complete as soon as it starts; it has no review items and cannot be resumed or cancelled. Its result sits under `arms.names_only` and `arms.identifier` is null, so the run, items, flags and exports lines read it the same way.
-- Inputs are panel metadata only (names and identifier columns). Data rule, stated once and referenced elsewhere: when a recorded run for that kind (two-cohort or many-cohort) is installed, the checker may use the replay backend; until then the checker supplies its own panel-metadata files (2 for two-cohort, 3 to 12 for many-cohort) against a live backend. No recorded run is committed yet (see P-02 and P-03).
+- Inputs are panel metadata only (names and identifier columns). Data rule, stated once and referenced elsewhere: recorded runs for both kinds are installed. `artifacts/python-api/data/harmonize_examples/two_cohort/` (two cohorts of 30 rows) and `many_cohort/` (five cohorts of 16 rows) hold invented example cohorts built from public metabolite names and identifiers (see each folder's `SOURCE.md`), each with `recording/`, one real run of it against the hosted BioMapper API. To run the app on them, start the API with `BIOMAPPER_HARMONIZE_REPLAY_DIR` set to that `data/harmonize_examples` folder; every two-cohort run then replays the two-cohort recording and every many-cohort run the many-cohort recording, whatever files were picked. `BIOMAPPER_HARMONIZE_REPLAY_PACE` (seconds per progress update, default 0) slows the replay so a run can be watched while it goes. A checker who wants other data supplies its own panel-metadata files (2 for two-cohort, 3 to 12 for many-cohort) against a live backend.
 
 ## Start a run
 
@@ -29,6 +29,8 @@ Conventions the checker needs:
 | H-60 | Start a from-jobs run by choosing two of the user's own finished mapping jobs of the same entity type, and set each side's label. Only finished jobs can be chosen; two jobs of different entity types are refused with the message as written. The screen then shows the new run as complete. | mapping jobs from `GET /jobs` (`status`), each job's entity type from `GET /jobs/{jobId}` (`config.entity_type`); `POST /harmonize/from-jobs` (`jobA`, `jobB`, `aLabel`, `bLabel`); 400 for different entity types, 409 for an unfinished job |
 | H-61 | On a from-jobs run, turn link-by-name on or off before starting (off by default), and see the choice and its reason on the run afterwards. | `POST /harmonize/from-jobs` `linkByName`; report `name_linking.enabled`, `name_linking.decided_by` (`user`), `name_linking.reason` |
 | H-62 | Be told, when a chosen job was mapped before harmonizing finished jobs was supported: "This job was mapped before harmonizing finished jobs was supported. Map the file again, then harmonize." | `POST /harmonize/from-jobs` 400 |
+| H-63 | Start a run on a built-in example from the screen, without picking files: the two-cohort example and the many-cohort example are each one action. The screen then shows the new run, labelled `example_cohort_a` and `example_cohort_b` (two-cohort) or `example_cohort_a` to `example_cohort_e` (many-cohort). | `POST /harmonize/example` (`kind`: `two_cohort` or `many_cohort`); 400 "The example dataset is not installed." when the files are absent |
+| H-64 | On a finished many-cohort run, see its groups (including one with more than one row from a cohort), its review entries and its rows that were not grouped, on the recorded many-cohort run or a live one. | many-cohort report `arms.<arm>.groups` (`multiplicity`), `cross_node`, `id_check_review`, `withheld`, `not_grouped`; `GET /harmonize/runs/{jobId}/items` |
 
 How to check H-05 to H-07: use a file whose header has unusual column names; the pickers must offer exactly those names.
 
@@ -148,6 +150,7 @@ Reviewers check these in the diff, not the checker:
 - A harmonization screen is not required to show a Sankey. If a team's screen includes one, it must use the shared Sankey component with the user's selected vocabularies.
 - Id H-35 is unused (withdrawn); ids were not renumbered.
 - P-01 (harmonize two finished mapping jobs) joined the gate as H-60 to H-62.
+- P-02 (built-in example) joined the gate as H-63, and P-03 (many-cohort data) as H-64.
 
 ## Pending owner decision (not part of the gate until resolved)
 
@@ -155,8 +158,6 @@ These are not gate lines. They have no backing yet. They join the gate only when
 
 | Id | Capability | Why pending |
 |---|---|---|
-| P-02 | Load the built-in example from the screen. | `POST /harmonize/example` exists but answers 400 "The example dataset is not installed." No example data is committed yet. |
-| P-03 | Any many-cohort check that needs a recorded many-cohort run on real panel metadata. | The many-cohort routes exist and H-02, H-10 and the many-cohort lines are gate lines, but no many-cohort test data or recording is available yet. Until one is installed, the checker follows the data rule in Conventions: its own 3 to 12 files against a live backend. |
 | P-04 | Many-cohort "remap all" having an observable effect. | Each run has its own store, so remap all has no earlier mappings to reuse and its effect cannot be seen. Whether runs should share a per-user store is an owner decision. H-10 stays as "the option exists and the run starts". |
 
 ## Gaps found

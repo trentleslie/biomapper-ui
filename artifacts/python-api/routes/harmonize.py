@@ -142,7 +142,7 @@ class ManySpec(_CamelModel):
 
 
 class ExampleRequest(_CamelModel):
-    kind: Literal["two_cohort"]
+    kind: Literal["two_cohort", "many_cohort"]
 
 
 class FromJobsRequest(_CamelModel):
@@ -552,23 +552,45 @@ async def submit_many(
                             remap_all=parsed.remap_all)
 
 
+def example_files(example: Path, kind: str, labels: list[str]) -> list[Path]:
+    """The cohort files of a built-in example, in spec order: ``a.tsv`` and ``b.tsv`` for
+    ``two_cohort``, ``<label>.tsv`` per cohort for ``many_cohort``."""
+    if kind == "two_cohort":
+        return [example / "a.tsv", example / "b.tsv"]
+    return [example / f"{label}.tsv" for label in labels]
+
+
 @router.post("/example")
 async def submit_example(
     body: ExampleRequest,
     x_clerk_user_id: str | None = Header(None),
 ) -> dict[str, Any]:
-    """Start a run on the built-in example: ``<EXAMPLES_DIR>/<kind>/`` holds ``spec.json``
-    (the ``/cohorts`` spec) and the cohort files ``a.tsv`` and ``b.tsv``."""
+    """Start a run on a built-in example. ``<EXAMPLES_DIR>/<kind>/spec.json`` is the
+    ``/cohorts`` spec (``two_cohort``, files ``a.tsv`` and ``b.tsv``) or the ``/many`` spec
+    (``many_cohort``, one ``<label>.tsv`` per cohort)."""
     user_id = _require_user(x_clerk_user_id)
     example = EXAMPLES_DIR / body.kind
-    spec_path, files = example / "spec.json", [example / "a.tsv", example / "b.tsv"]
-    if not all(p.is_file() for p in [spec_path, *files]):
+    spec_path = example / "spec.json"
+    if not spec_path.is_file():
         raise HTTPException(status_code=400, detail="The example dataset is not installed.")
-    parsed: CohortsSpec = _parse_spec(spec_path.read_text(encoding="utf-8"), CohortsSpec)
-    _check_labels([parsed.a.label, parsed.b.label])
+    raw = spec_path.read_text(encoding="utf-8")
+    if body.kind == "two_cohort":
+        parsed_two: CohortsSpec = _parse_spec(raw, CohortsSpec)
+        cohorts, many = [parsed_two.a, parsed_two.b], False
+        entity, category, remap_all, kind = parsed_two.entity, parsed_two.category, False, KIND_TWO
+    else:
+        parsed_many: ManySpec = _parse_spec(raw, ManySpec)
+        cohorts, many = parsed_many.cohorts, True
+        entity, category, kind = parsed_many.entity, parsed_many.category, KIND_MANY
+        remap_all = parsed_many.remap_all
+    files = example_files(example, body.kind, [c.label for c in cohorts])
+    if not all(p.is_file() for p in files):
+        raise HTTPException(status_code=400, detail="The example dataset is not installed.")
+    _check_labels([c.label for c in cohorts], many=many)
     return await _start_run(
-        user_id, KIND_TWO, parsed.entity, parsed.category,
-        [(cohort, path.name, path.read_bytes()) for cohort, path in zip((parsed.a, parsed.b), files)],
+        user_id, kind, entity, category,
+        [(cohort, path.name, path.read_bytes()) for cohort, path in zip(cohorts, files)],
+        remap_all=remap_all,
     )
 
 

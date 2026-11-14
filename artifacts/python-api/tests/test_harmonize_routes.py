@@ -343,13 +343,37 @@ def test_other_job_error_is_400_with_message_passed_through(client, two_files, s
     assert list(runs_root().iterdir()) == []
 
 
-def test_example_is_400_until_installed(client, tmp_path, monkeypatch):
+@pytest.mark.parametrize("kind", ["two_cohort", "many_cohort"])
+def test_example_is_400_until_installed(client, tmp_path, monkeypatch, kind):
     import routes.harmonize as harmonize_routes
 
-    monkeypatch.setattr(harmonize_routes, "EXAMPLES_DIR", tmp_path / "no_examples")
-    r = client.post("/harmonize/example", json={"kind": "two_cohort"}, headers=U1)
+    empty = tmp_path / "no_examples"
+    empty.mkdir()
+    monkeypatch.setattr(harmonize_routes, "EXAMPLES_DIR", empty)
+    r = client.post("/harmonize/example", json={"kind": kind}, headers=U1)
     assert r.status_code == 400
     assert r.json()["detail"] == "The example dataset is not installed."
+    assert not runs_root().exists() or list(runs_root().iterdir()) == []
+
+
+def test_example_is_400_when_a_cohort_file_is_missing(client, tmp_path, monkeypatch):
+    import shutil
+
+    import routes.harmonize as harmonize_routes
+
+    partial = tmp_path / "partial"
+    shutil.copytree(harmonize_routes.EXAMPLES_DIR / "many_cohort", partial / "many_cohort",
+                    ignore=shutil.ignore_patterns("recording"))
+    (partial / "many_cohort" / "example_cohort_e.tsv").unlink()
+    monkeypatch.setattr(harmonize_routes, "EXAMPLES_DIR", partial)
+    r = client.post("/harmonize/example", json={"kind": "many_cohort"}, headers=U1)
+    assert r.status_code == 400
+    assert r.json()["detail"] == "The example dataset is not installed."
+
+
+def test_example_rejects_an_unknown_kind(client):
+    r = client.post("/harmonize/example", json={"kind": "three_cohort"}, headers=U1)
+    assert r.status_code == 400
 
 
 # -- ownership and auth ------------------------------------------------------

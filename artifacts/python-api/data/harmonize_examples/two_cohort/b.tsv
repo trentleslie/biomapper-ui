@@ -1,0 +1,31 @@
+id	name	hmdb
+b01	D-Glucose	HMDB0000122
+b02	Lactate	HMDB0000190
+b03	Pyruvate	HMDB0000243
+b04	Citrate	HMDB0000094
+b05	L-Alanine	HMDB0000161
+b06	Glycine	HMDB0000123
+b07	L-Valine	HMDB0000883
+b08	L-Leucine	HMDB0000687
+b09	L-Isoleucine	HMDB0000172
+b10	L-Phenylalanine	HMDB0000159
+b11	L-Tyrosine	HMDB0000158
+b12	L-Glutamine	HMDB0000641
+b13	Creatinine	HMDB0000562
+b14	Urea	HMDB0000294
+b15	Urate	HMDB0000289
+b16	Cholesterol	HMDB0000067
+b17	beta-Hydroxybutyrate	HMDB0000011
+b18	Acetoacetate	HMDB0000060
+b19	Glycerol	HMDB0000131
+b20	Taurine	HMDB0000251
+b21	Glycine betaine	HMDB0000043
+b22	Vitamin C	HMDB0000044
+b23	L-Tryptophan	HMDB0000929
+b24	L-Kynurenine	HMDB0000684
+b25	Hydrocortisone	HMDB0000063
+b26	CO
+b27	Hexadecanoic acid	HMDB0000220
+b28	Hippurate	HMDB0000714
+b29	Caffeine	HMDB0001847
+b30	???

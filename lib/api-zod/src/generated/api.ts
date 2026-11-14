@@ -770,10 +770,10 @@ export const SubmitHarmonizeManyResponse = zod
   );
 
 /**
- * @summary Start a run on the built-in example dataset
+ * @summary Start a run on a built-in example dataset (two-cohort or many-cohort)
  */
 export const SubmitHarmonizeExampleBody = zod.object({
-  kind: zod.enum(["two_cohort"]),
+  kind: zod.enum(["two_cohort", "many_cohort"]),
 });
 
 export const SubmitHarmonizeExampleResponse = zod

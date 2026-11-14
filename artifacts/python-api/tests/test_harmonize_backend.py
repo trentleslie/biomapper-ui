@@ -174,7 +174,7 @@ async def test_real_backend_requeues_unfinished_job_on_reentry(tmp_path, stub_ap
 
 
 async def test_replay_rejects_malformed_recording(recording_dir):
-    (recording_dir / "two_cohort" / "review_items.json").write_text("[]")
+    (recording_dir / "two_cohort" / "recording" / "review_items.json").write_text("[]")
     async with replay(recording_dir) as b:
         with pytest.raises(JobError, match="not usable"):
             await b.submit_cohorts(spec("a"), spec("b"), entity="metabolites")

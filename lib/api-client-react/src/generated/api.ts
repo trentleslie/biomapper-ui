@@ -1550,7 +1550,7 @@ export const useSubmitHarmonizeMany = <
 };
 
 /**
- * @summary Start a run on the built-in example dataset
+ * @summary Start a run on a built-in example dataset (two-cohort or many-cohort)
  */
 export const getSubmitHarmonizeExampleUrl = () => {
   return `/api/harmonize/example`;
@@ -1614,7 +1614,7 @@ export type SubmitHarmonizeExampleMutationBody =
 export type SubmitHarmonizeExampleMutationError = ErrorType<ErrorResponse>;
 
 /**
- * @summary Start a run on the built-in example dataset
+ * @summary Start a run on a built-in example dataset (two-cohort or many-cohort)
  */
 export const useSubmitHarmonizeExample = <
   TError = ErrorType<ErrorResponse>,

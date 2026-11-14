@@ -1,0 +1,31 @@
+id	name	hmdb	kegg
+a01	Glucose	HMDB0000122	C00031
+a02	L-Lactic acid	HMDB0000190
+a03	Pyruvic acid	HMDB0000243
+a04	Citric acid	HMDB0000094
+a05	Alanine	HMDB0000161
+a06	Glycine	HMDB0000123
+a07	Valine	HMDB0000883
+a08	Leucine	HMDB0000687
+a09	Isoleucine	HMDB0000172
+a10	Phenylalanine	HMDB0000159
+a11	Tyrosine	HMDB0000158
+a12	Glutamine	HMDB0000641
+a13	Creatinine	HMDB0000562
+a14	Creatinine	HMDB0000562
+a15	Urea	HMDB0000294
+a16	Uric acid	HMDB0000289
+a17	Cholesterol	HMDB0000067
+a18	3-Hydroxybutyric acid	HMDB0000011
+a19	Acetoacetic acid	HMDB0000060
+a20	Glycerol	HMDB0000131
+a21	Taurine	HMDB0000251	C00031
+a22	Betaine	HMDB0000043
+a23	Ascorbic acid	HMDB0000044
+a24	Tryptophan	HMDB0000929	C00078
+a25	Kynurenine	HMDB0000684
+a26	Cortisol	HMDB0000063
+a27	Co
+a28	Palmitic acid	HMDB0000220
+a29	Hippuric acid	HMDB0000714
+a30	###
