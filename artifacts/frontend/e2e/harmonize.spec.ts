@@ -626,4 +626,42 @@ test.describe("harmonize @app", () => {
     await expect(page.getByTestId("eitl-preview-error")).toContainText("The preview could not be refreshed", { timeout: 20_000 });
     await expect(page.getByTestId("eitl-pairs-preview")).toHaveCount(0);
   });
+
+  test("replacing a file with a name-only one keeps stale identifier choices visible and clearable", async ({ page }) => {
+    const specs: string[] = [];
+    await isolate(page, {
+      "/api/harmonize/runs": [],
+      "/api/discovery/entity-types": [{ type: "biolink:SmallMolecule", aliases: ["metabolite"], defaultPrefixes: ["HMDB", "KEGG"] }],
+      "/api/harmonize/inspect": async (route: Route) => {
+        const body = route.request().postDataBuffer()?.toString() ?? "";
+        return route.fulfill({ json: body.includes("names.tsv") ? { columns: ["name"], rowCount: 2 } : { columns: ["id", "name", "hmdb"], rowCount: 2 } });
+      },
+      "/api/harmonize/cohorts": async (route: Route) => {
+        const body = route.request().postDataBuffer()?.toString() ?? "";
+        specs.push(body);
+        if (body.includes('"vocabularies":{"HMDB":["hmdb"]}},"b"')) {
+          return route.fulfill({ status: 400, json: { detail: "Column 'hmdb' is not in file 'names.tsv'. Columns found: name." } });
+        }
+        return route.fulfill({ status: 400, json: { detail: "stop here" } });
+      },
+    });
+    await goto(page, "/harmonize");
+    const tsv = (name: string, text: string) => ({ name, mimeType: "text/tab-separated-values", buffer: Buffer.from(text) });
+    await page.getByLabel("Choose file for Cohort A", { exact: true }).setInputFiles(tsv("full.tsv", "id\tname\thmdb\n1\tGlucose\tHMDB0000122\n"));
+    await expect(page.getByRole("combobox", { name: "Vocabulary in column hmdb of Cohort A" })).toHaveValue("HMDB");
+    await page.getByLabel("Replace file for Cohort A", { exact: true }).setInputFiles(tsv("names.tsv", "name\nGlucose\n"));
+    await expect(page.getByTestId("inspect-summary").first()).toContainText("2 rows, 1 column: name");
+    // The stale choice is shown as not in this file, and can be cleared.
+    await expect(page.getByTestId("vocab-columns").first()).toContainText("(not in this file)");
+    await page.getByLabel("Choose file for Cohort B", { exact: true }).setInputFiles(tsv("b.tsv", "id\tname\thmdb\n1\tGlucose\tHMDB0000122\n"));
+    await expect(page.getByTestId("inspect-summary").nth(1)).toBeVisible();
+    // Started without clearing: the server's refusal shows as written (H-09).
+    await page.getByRole("button", { name: "Start harmonization" }).click();
+    await expect(page.getByTestId("submit-error")).toContainText("Column 'hmdb' is not in file 'names.tsv'. Columns found: name.");
+    // Cleared: it is no longer sent.
+    await page.getByRole("combobox", { name: "Vocabulary in column hmdb of Cohort A" }).fill("");
+    await page.getByRole("button", { name: "Start harmonization" }).click();
+    await expect(page.getByTestId("submit-error")).toContainText("stop here");
+    expect(specs[1]).not.toContain('"vocabularies":{"HMDB":["hmdb"]}},"b"');
+  });
 });

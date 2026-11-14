@@ -277,7 +277,7 @@ export function CohortEditor({
             Type the vocabulary each identifier column holds (for example HMDB). Leave it blank when the column holds
             no identifier. Two columns can hold the same vocabulary.
           </p>
-          {identifierColumns.length === 0 ? (
+          {identifierColumns.length === 0 && missingVocabColumns.length === 0 ? (
             <p className="text-sm text-neutral-500">
               {columns.length ? "No other columns in this file." : "The file's columns appear here once you choose it."}
             </p>
