@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { keepPreviousData, useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, Loader2, RotateCcw } from "lucide-react";
 import {
@@ -38,10 +38,12 @@ const PAGE = 100;
 const ANY = "any";
 
 /** Every query that depends on this run's flags: the item pages (all filters) and the EITL preview. */
-export function invalidateFlagQueries(queryClient: ReturnType<typeof useQueryClient>, jobId: string) {
+export async function invalidateFlagQueries(queryClient: ReturnType<typeof useQueryClient>, jobId: string) {
   const itemsKey = getListHarmonizeItemsQueryKey(jobId)[0];
-  void queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === itemsKey });
-  void queryClient.invalidateQueries({ queryKey: ["harmonize-eitl-preview", jobId] });
+  await Promise.all([
+    queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === itemsKey }),
+    queryClient.invalidateQueries({ queryKey: ["harmonize-eitl-preview", jobId] }),
+  ]);
 }
 
 function FilterSelect({
@@ -216,7 +218,7 @@ export function FlagItemsView({ jobId, kind }: { jobId: string; kind: string }) 
     try {
       const res = await setHarmonizeFlags(jobId, { refs: [item.ref], flagged });
       setLastChange(`${flagged ? "Flagged" : "De-flagged"} one ${ITEM_KIND_LABEL[item.kind]?.toLowerCase() ?? "item"}. ${plural(res.flaggedTotal, "item")} flagged in this run.`);
-      invalidateFlagQueries(queryClient, jobId);
+      await invalidateFlagQueries(queryClient, jobId);
     } catch (err) {
       setActionError(errorMessage(err));
     } finally {
@@ -234,7 +236,7 @@ export function FlagItemsView({ jobId, kind }: { jobId: string; kind: string }) 
     try {
       const res = await resetHarmonizeFlags(jobId, { refs: [item.ref] });
       setLastChange(`Reset one item to biomapper's suggestion. ${plural(res.flaggedTotal, "item")} flagged in this run.`);
-      invalidateFlagQueries(queryClient, jobId);
+      await invalidateFlagQueries(queryClient, jobId);
     } catch (err) {
       setActionError(errorMessage(err));
     } finally {
@@ -251,13 +253,21 @@ export function FlagItemsView({ jobId, kind }: { jobId: string; kind: string }) 
     try {
       const res = await resetHarmonizeFlags(jobId, {});
       setLastChange(`Every flag is back to biomapper's suggestion. ${plural(res.flaggedTotal, "item")} flagged in this run.`);
-      invalidateFlagQueries(queryClient, jobId);
+      setOffset(0);
+      await invalidateFlagQueries(queryClient, jobId);
     } catch (err) {
       setActionError(errorMessage(err));
     }
   };
 
   const data = q.data;
+  // A change can leave the current page past the end (for example de-flagging the last row of the last page
+  // while showing flagged items only). Step back to the last page that has rows.
+  const total = data?.total;
+  useEffect(() => {
+    if (total != null && offset > 0 && offset >= total) setOffset(Math.max(0, Math.floor((total - 1) / PAGE) * PAGE));
+  }, [total, offset]);
+
   return (
     <div className="space-y-6">
       <Panel
@@ -390,7 +400,14 @@ export function FlagItemsView({ jobId, kind }: { jobId: string; kind: string }) 
         </div>
       </Panel>
 
-      <BulkFlagPanel jobId={jobId} kind={kind} onChanged={setLastChange} />
+      <BulkFlagPanel
+        jobId={jobId}
+        kind={kind}
+        onChanged={(msg) => {
+          setLastChange(msg);
+          setOffset(0);
+        }}
+      />
 
       <ItemDetailSheet item={openItem} onClose={() => setOpenItem(null)} />
 
@@ -436,6 +453,7 @@ function BulkFlagPanel({ jobId, kind, onChanged }: { jobId: string; kind: string
   const [busy, setBusy] = useState<boolean | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmAll, setConfirmAll] = useState<boolean | null>(null);
 
   const filter: HarmonizeFlagFilter = {
     ...(bKind !== ANY && { kind: bKind as HarmonizeItemKind }),
@@ -443,6 +461,9 @@ function BulkFlagPanel({ jobId, kind, onChanged }: { jobId: string; kind: string
     ...(bBasis !== ANY && { basis: bBasis }),
     ...(bAmbiguous !== ANY && { ambiguous: bAmbiguous === "yes" }),
   };
+
+  const everything = Object.keys(filter).length === 0;
+  const ask = (flagged: boolean) => (everything ? setConfirmAll(flagged) : void run(flagged));
 
   const run = async (flagged: boolean) => {
     setBusy(flagged);
@@ -453,7 +474,7 @@ function BulkFlagPanel({ jobId, kind, onChanged }: { jobId: string; kind: string
       const msg = `${plural(res.updated, "item")} matched and ${res.updated === 1 ? "is" : "are"} now ${flagged ? "flagged" : "not flagged"}. ${plural(res.flaggedTotal, "item")} flagged in this run.`;
       setResult(msg);
       onChanged(msg);
-      invalidateFlagQueries(queryClient, jobId);
+      await invalidateFlagQueries(queryClient, jobId);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -485,11 +506,11 @@ function BulkFlagPanel({ jobId, kind, onChanged }: { jobId: string; kind: string
           />
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => run(true)} disabled={busy !== null}>
+          <Button variant="secondary" onClick={() => ask(true)} disabled={busy !== null}>
             {busy === true && <Loader2 aria-hidden className="animate-spin motion-reduce:animate-none" />}
             Flag matching items
           </Button>
-          <Button variant="secondary" onClick={() => run(false)} disabled={busy !== null}>
+          <Button variant="secondary" onClick={() => ask(false)} disabled={busy !== null}>
             {busy === false && <Loader2 aria-hidden className="animate-spin motion-reduce:animate-none" />}
             Clear flags on matching items
           </Button>
@@ -505,6 +526,29 @@ function BulkFlagPanel({ jobId, kind, onChanged }: { jobId: string; kind: string
           </Note>
         )}
       </div>
+      <AlertDialog open={confirmAll !== null} onOpenChange={(open) => !open && setConfirmAll(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmAll ? "Flag every item in this run?" : "Clear every flag in this run?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Every choice above is on its widest setting, so this changes every item of the run. Your own flags and
+              clears cannot be brought back. Reset all flags returns only to biomapper's suggestion.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep flags as they are</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const flagged = confirmAll === true;
+                setConfirmAll(null);
+                void run(flagged);
+              }}
+            >
+              {confirmAll ? "Flag every item" : "Clear every flag"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Panel>
   );
 }

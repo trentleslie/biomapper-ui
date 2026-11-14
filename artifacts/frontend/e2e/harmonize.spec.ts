@@ -442,4 +442,59 @@ test.describe("harmonize @app", () => {
     await goto(page, `/harmonize/runs/${JOB}/review`);
     await expect(page.getByText("Review and flag is not available for this run")).toBeVisible();
   });
+
+  test("de-flagging the only row on the last page steps back to a page with rows", async ({ page }) => {
+    const { stubs, items } = runStubs([{ state: "complete", progress: null, stage: "done" }]);
+    items.splice(0, items.length);
+    for (let n = 1; n <= 101; n += 1) {
+      const k = String(n).padStart(3, "0");
+      items.push({
+        ref: `link:names_only:${n}`,
+        kind: "link",
+        arm: "names_only",
+        members: [
+          { cohort: "example_cohort_a", key: `a${k}`, name: `name a${k}`, chosenKgId: "RM:1" },
+          { cohort: "example_cohort_b", key: `b${k}`, name: `name b${k}`, chosenKgId: "RM:1" },
+        ],
+        detail: { basis: "node", ambiguous: true, oneToOne: false, origin: "links" },
+        suggested: true,
+        flagged: true,
+        source: "biomapper",
+      });
+    }
+    await isolate(page, stubs);
+    await goto(page, `/harmonize/runs/${JOB}/review?view=flags`);
+    await page.getByRole("combobox", { name: "Flag state" }).click();
+    await page.getByRole("option", { name: "Flagged", exact: true }).click();
+    await expect(page.getByTestId("item-totals")).toContainText("101 items match these filters");
+    await page.getByRole("button", { name: "Next page" }).click();
+    await expect(page.getByText("Showing 101 to 101 of 101 items")).toBeVisible();
+    await page.getByRole("checkbox", { name: /^Flagged: Link, example_cohort_a a101/ }).click();
+    await expect(page.getByTestId("item-totals")).toContainText("100 items match these filters");
+    await expect(page.getByText("Showing 1 to 100 of 100 items")).toBeVisible();
+    await expect(page.getByText("No items match these filters")).toHaveCount(0);
+  });
+
+  test("bulk flag or clear with every choice on its widest setting asks first", async ({ page }) => {
+    const { stubs } = runStubs([{ state: "complete", progress: null, stage: "done" }]);
+    let bulkCalls = 0;
+    await isolate(page, {
+      ...stubs,
+      [`/api/harmonize/runs/${JOB}/flags/bulk`]: async (route: Route, url: URL) => {
+        bulkCalls += 1;
+        return (stubs[`/api/harmonize/runs/${JOB}/flags/bulk`] as (r: Route, u: URL) => Promise<void>)(route, url);
+      },
+    });
+    await goto(page, `/harmonize/runs/${JOB}/review?view=flags`);
+    await expect(page.getByTestId("item-totals")).toContainText("2 flagged in this run");
+    await page.getByRole("button", { name: "Clear flags on matching items" }).click();
+    const dialog = page.getByRole("alertdialog");
+    await expect(dialog).toContainText("Clear every flag in this run?");
+    await dialog.getByRole("button", { name: "Keep flags as they are" }).click();
+    expect(bulkCalls).toBe(0);
+    await page.getByRole("button", { name: "Clear flags on matching items" }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Clear every flag" }).click();
+    await expect(page.getByTestId("item-totals")).toContainText("0 flagged in this run");
+    expect(bulkCalls).toBe(1);
+  });
 });
