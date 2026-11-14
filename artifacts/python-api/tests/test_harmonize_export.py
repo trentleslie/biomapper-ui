@@ -2,6 +2,7 @@
 
 Every report here is a real package-generated report (tests/harmonize_fixtures.py).
 """
+import copy
 import csv
 import io
 import json
@@ -113,6 +114,27 @@ def test_eitl_text_falls_back_to_key_without_a_name(results_report):
     _, rows = export_rows(results_report, flagged, "eitl_pairs")
     assert rows and all(r["source_text"] == r["source_id"] and r["target_text"] == r["target_id"]
                         for r in rows)
+
+
+def test_eitl_text_falls_back_to_key_for_a_whitespace_only_name(two_cohort_report):
+    report = copy.deepcopy(two_cohort_report)
+
+    def blank_a1(node):
+        if isinstance(node, dict):
+            if node.get("key") == "a1" and "name" in node:
+                node["name"] = "   "
+            for v in node.values():
+                blank_a1(v)
+        elif isinstance(node, list):
+            for v in node:
+                blank_a1(v)
+
+    blank_a1(report)
+    link = ref_of(report, "link", "names_only", ["a1", "b1"])
+    _, rows = export_rows(report, flags_for(report, {link}), "eitl_pairs")
+    assert len(rows) == 1
+    assert rows[0]["source_id"] == "a1" and rows[0]["source_text"] == "a1"
+    assert rows[0]["target_text"] == "D-Glucose"
 
 
 # The acceptance rule of expert-in-the-loop's pairs upload, read from

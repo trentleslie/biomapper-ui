@@ -164,7 +164,7 @@ def _item_rows(report: Mapping[str, Any], flagged: list[FlaggedItem], table: str
 def _pair(source: Mapping[str, Any], target: Mapping[str, Any], entity: str) -> dict[str, Any]:
     def side(m: Mapping[str, Any]) -> tuple[str, str, str]:
         key = str(m["key"])
-        return (m.get("name") or key), key, str(m["cohort"])
+        return (m.get("name") or "").strip() or key, key, str(m["cohort"])
 
     s_text, s_id, s_dataset = side(source)
     t_text, t_id, t_dataset = side(target)
