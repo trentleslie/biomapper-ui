@@ -135,7 +135,24 @@ export const GetMappingResultResponse = zod.object({
       primaryCurie: zod.string().nullish(),
       confidenceScore: zod.number().nullish(),
       confidenceTier: zod.enum(["high", "medium", "low", "unknown"]).nullish(),
+      maxAnnotatorScore: zod
+        .number()
+        .nullish()
+        .describe(
+          "The best score any annotator gave any node, whether or not the resolver chose\nthat node. Before biomapper 1.9.0 this was confidenceScore.\n",
+        ),
       needsReview: zod.boolean().optional(),
+      reviewReason: zod
+        .enum([
+          "not_scored",
+          "low_confidence",
+          "divergent_refmet",
+          "conflict_no_structure",
+        ])
+        .nullish()
+        .describe(
+          'Why a resolved row needs review. \"not_scored\" means the annotators did not score\nthe chosen entry (not a low score). A ChEBI conflict flag takes precedence over\nthe other reasons. null when no reason applies.\n',
+        ),
       chosenKgIdReview: zod
         .enum(["divergent_refmet", "conflict_no_structure"])
         .nullish()
@@ -276,7 +293,24 @@ export const GetJobResponse = zod
             confidenceTier: zod
               .enum(["high", "medium", "low", "unknown"])
               .nullish(),
+            maxAnnotatorScore: zod
+              .number()
+              .nullish()
+              .describe(
+                "The best score any annotator gave any node, whether or not the resolver chose\nthat node. Before biomapper 1.9.0 this was confidenceScore.\n",
+              ),
             needsReview: zod.boolean().optional(),
+            reviewReason: zod
+              .enum([
+                "not_scored",
+                "low_confidence",
+                "divergent_refmet",
+                "conflict_no_structure",
+              ])
+              .nullish()
+              .describe(
+                'Why a resolved row needs review. \"not_scored\" means the annotators did not score\nthe chosen entry (not a low score). A ChEBI conflict flag takes precedence over\nthe other reasons. null when no reason applies.\n',
+              ),
             chosenKgIdReview: zod
               .enum(["divergent_refmet", "conflict_no_structure"])
               .nullish()
@@ -387,7 +421,24 @@ export const UpdateJobResponse = zod
             confidenceTier: zod
               .enum(["high", "medium", "low", "unknown"])
               .nullish(),
+            maxAnnotatorScore: zod
+              .number()
+              .nullish()
+              .describe(
+                "The best score any annotator gave any node, whether or not the resolver chose\nthat node. Before biomapper 1.9.0 this was confidenceScore.\n",
+              ),
             needsReview: zod.boolean().optional(),
+            reviewReason: zod
+              .enum([
+                "not_scored",
+                "low_confidence",
+                "divergent_refmet",
+                "conflict_no_structure",
+              ])
+              .nullish()
+              .describe(
+                'Why a resolved row needs review. \"not_scored\" means the annotators did not score\nthe chosen entry (not a low score). A ChEBI conflict flag takes precedence over\nthe other reasons. null when no reason applies.\n',
+              ),
             chosenKgIdReview: zod
               .enum(["divergent_refmet", "conflict_no_structure"])
               .nullish()

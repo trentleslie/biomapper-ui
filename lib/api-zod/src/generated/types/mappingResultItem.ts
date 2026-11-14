@@ -10,6 +10,7 @@ import type { MappingResultItemConfidenceTier } from "./mappingResultItemConfide
 import type { MappingResultItemIdentifiers } from "./mappingResultItemIdentifiers";
 import type { MappingResultItemKgEquivalentIds } from "./mappingResultItemKgEquivalentIds";
 import type { MappingResultItemProvidedIds } from "./mappingResultItemProvidedIds";
+import type { MappingResultItemReviewReason } from "./mappingResultItemReviewReason";
 
 export interface MappingResultItem {
   name: string;
@@ -17,7 +18,16 @@ export interface MappingResultItem {
   primaryCurie?: string | null;
   confidenceScore?: number | null;
   confidenceTier?: MappingResultItemConfidenceTier;
+  /** The best score any annotator gave any node, whether or not the resolver chose
+that node. Before biomapper 1.9.0 this was confidenceScore.
+ */
+  maxAnnotatorScore?: number | null;
   needsReview?: boolean;
+  /** Why a resolved row needs review. "not_scored" means the annotators did not score
+the chosen entry (not a low score). A ChEBI conflict flag takes precedence over
+the other reasons. null when no reason applies.
+ */
+  reviewReason?: MappingResultItemReviewReason;
   /** Review flag set when the resolver source-weighted a small-molecule ChEBI
 conflict toward the RefMet annotator: "divergent_refmet" (RefMet node chosen
 across an InChIKey-connectivity difference) or "conflict_no_structure"

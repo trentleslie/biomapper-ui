@@ -189,15 +189,29 @@ class MapperService:
         # "divergent_refmet" / "conflict_no_structure" / None. getattr keeps this
         # safe if an older client without the field is installed.
         chosen_kg_id_review = getattr(result, "chosen_kg_id_review", None)
+        # confidence_score is the chosen node's score and may be None for a resolved row
+        # (biomapper >= 1.9.0); that is "not scored", which is not a low score.
+        score = result.confidence_score
+        tier = result.confidence_tier
+        if chosen_kg_id_review is not None:
+            review_reason = chosen_kg_id_review
+        elif result.resolved and score is None:
+            review_reason = "not_scored"
+        elif tier == "low":
+            review_reason = "low_confidence"
+        else:
+            review_reason = None
         processed: dict[str, Any] = {
             "name": name,
             "resolved": result.resolved,
             "primaryCurie": result.primary_curie,
-            "confidenceScore": result.confidence_score,
-            "confidenceTier": result.confidence_tier,
+            "confidenceScore": score,
+            "confidenceTier": tier,
+            "maxAnnotatorScore": getattr(result, "max_annotator_score", None),
+            "reviewReason": review_reason,
             "chosenKgIdReview": chosen_kg_id_review,
             # A resolver review flag is a review signal in its own right, alongside low confidence.
-            "needsReview": result.confidence_tier in ("low", "unknown") or chosen_kg_id_review is not None,
+            "needsReview": tier in ("low", "unknown") or chosen_kg_id_review is not None,
             "identifiers": {
                 "hmdb": result.ids_for("HMDB"),
                 "chebi": result.ids_for("CHEBI"),

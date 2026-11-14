@@ -9,7 +9,7 @@ import { SankeyChart } from "@/components/SankeyChart";
 import { EquivalentIds } from "@/components/EquivalentIds";
 import { DemoGuide } from "@/components/DemoGuide";
 import { FieldTooltip } from "@/components/field-tooltip";
-import { EXPLAINERS, reviewReason, rowNeedsReview } from "@/lib/result-explainers";
+import { EXPLAINERS, NOT_SCORED_LABEL, NOT_SCORED_TOOLTIP, reviewReason, rowNeedsReview } from "@/lib/result-explainers";
 import { useEnv } from "@/contexts/env-context";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
@@ -941,7 +941,7 @@ export default function DashboardPage() {
                             <TableCell className="font-mono text-xs text-neutral-500">{row.primaryCurie || "-"}</TableCell>
                             <TableCell>
                               <Badge variant={row.confidenceTier === "high" ? "success" : row.confidenceTier === "medium" ? "warning" : row.confidenceTier === "low" ? "danger" : "neutral"}>
-                                {row.confidenceTier || "unresolved"}
+                                {!row.resolved ? "unresolved" : row.confidenceTier && row.confidenceTier !== "unknown" ? row.confidenceTier : <span title={NOT_SCORED_TOOLTIP}>{NOT_SCORED_LABEL}</span>}
                               </Badge>
                             </TableCell>
                             <TableCell className="text-xs text-neutral-500">
@@ -1098,14 +1098,14 @@ export default function DashboardPage() {
                             <TableCell>
                               {row.resolved ? (
                                 <Badge variant={row.confidenceTier === "high" ? "success" : row.confidenceTier === "medium" ? "warning" : row.confidenceTier === "low" ? "danger" : "neutral"}>
-                                  {row.confidenceTier || "unknown"}
+                                  {row.confidenceTier && row.confidenceTier !== "unknown" ? row.confidenceTier : <span title={NOT_SCORED_TOOLTIP}>{NOT_SCORED_LABEL}</span>}
                                 </Badge>
                               ) : (
                                 <Badge variant="neutral">unresolved</Badge>
                               )}
                             </TableCell>
                             <TableCell className="font-mono text-sm">
-                              {row.confidenceScore != null ? row.confidenceScore.toFixed(3) : "-"}
+                              {row.confidenceScore != null ? row.confidenceScore.toFixed(3) : row.resolved ? <span title={NOT_SCORED_TOOLTIP}>{NOT_SCORED_LABEL}</span> : "-"}
                             </TableCell>
                             {providedIdColsForTable.map(col => {
                               const val = row.providedIds?.[col];

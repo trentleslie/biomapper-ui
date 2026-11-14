@@ -12,6 +12,7 @@ def _make_mock_result(**overrides):
     result.primary_curie = overrides.get("primary_curie", "CHEBI:16113")
     result.confidence_score = overrides.get("confidence_score", 0.95)
     result.confidence_tier = overrides.get("confidence_tier", "high")
+    result.max_annotator_score = overrides.get("max_annotator_score", None)
     result.ids_for = MagicMock(return_value=[])
     result.kg_equivalent_ids = overrides.get("kg_equivalent_ids", {})
     result.chosen_kg_id_review = overrides.get("chosen_kg_id_review", None)
@@ -121,6 +122,50 @@ class TestProcessResult:
 
         assert processed["chosenKgIdReview"] is None
         assert processed["needsReview"] is False
+
+    def test_resolved_row_without_score_is_not_scored_not_low(self):
+        result = _make_mock_result(
+            resolved=True, confidence_score=None, confidence_tier="unknown", max_annotator_score=2.4
+        )
+
+        row = MapperService._process_result("x", result)
+
+        assert row["confidenceTier"] == "unknown"
+        assert row["confidenceScore"] is None
+        assert row["maxAnnotatorScore"] == 2.4
+        assert row["reviewReason"] == "not_scored"
+        assert row["needsReview"] is True
+
+    def test_low_score_still_needs_review(self):
+        result = _make_mock_result(resolved=True, confidence_score=0.4, confidence_tier="low")
+
+        row = MapperService._process_result("x", result)
+
+        assert row["confidenceTier"] == "low" and row["needsReview"] is True
+        assert row["reviewReason"] == "low_confidence"
+
+    def test_chebi_conflict_review_takes_precedence_over_not_scored(self):
+        result = _make_mock_result(
+            confidence_score=None, confidence_tier="unknown", chosen_kg_id_review="divergent_refmet"
+        )
+
+        row = MapperService._process_result("x", result)
+
+        assert row["reviewReason"] == "divergent_refmet"
+        assert row["needsReview"] is True
+
+    def test_high_score_has_no_review_reason(self):
+        row = MapperService._process_result("x", _make_mock_result())
+
+        assert row["reviewReason"] is None
+        assert row["maxAnnotatorScore"] is None
+
+    def test_unresolved_row_is_not_not_scored(self):
+        result = _make_mock_result(resolved=False, confidence_score=None, confidence_tier="unknown")
+
+        row = MapperService._process_result("x", result)
+
+        assert row["reviewReason"] is None
 
 
 class TestProvidedIds:

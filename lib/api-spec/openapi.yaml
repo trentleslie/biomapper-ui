@@ -517,8 +517,22 @@ components:
           type: string
           enum: [high, medium, low, unknown]
           nullable: true
+        maxAnnotatorScore:
+          type: number
+          nullable: true
+          description: |
+            The best score any annotator gave any node, whether or not the resolver chose
+            that node. Before biomapper 1.9.0 this was confidenceScore.
         needsReview:
           type: boolean
+        reviewReason:
+          type: string
+          enum: [not_scored, low_confidence, divergent_refmet, conflict_no_structure]
+          nullable: true
+          description: |
+            Why a resolved row needs review. "not_scored" means the annotators did not score
+            the chosen entry (not a low score). A ChEBI conflict flag takes precedence over
+            the other reasons. null when no reason applies.
         chosenKgIdReview:
           type: string
           enum: [divergent_refmet, conflict_no_structure]

@@ -32,4 +32,5 @@ export * from "./mappingResultItemConfidenceTier";
 export * from "./mappingResultItemIdentifiers";
 export * from "./mappingResultItemKgEquivalentIds";
 export * from "./mappingResultItemProvidedIds";
+export * from "./mappingResultItemReviewReason";
 export * from "./vocabulary";
