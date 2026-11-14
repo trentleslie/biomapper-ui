@@ -11,7 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from routes import health, map as map_router, demo as demo_router, discovery as discovery_router, feedback as feedback_router, flags as flags_router, jobs as jobs_router, benchmark as benchmark_router
+from routes import health, map as map_router, demo as demo_router, discovery as discovery_router, feedback as feedback_router, flags as flags_router, jobs as jobs_router, benchmark as benchmark_router, harmonize as harmonize_router
 from services.database import database
 from services.feedback_store import feedback_store
 from services.harmonize_backend import make_backend
@@ -62,6 +62,7 @@ app.include_router(feedback_router.router, prefix="/feedback")
 app.include_router(flags_router.router, prefix="/flags")
 app.include_router(jobs_router.router, prefix="/jobs")
 app.include_router(benchmark_router.router, prefix="/benchmark")
+app.include_router(harmonize_router.router, prefix="/harmonize")
 
 
 @app.exception_handler(RequestValidationError)

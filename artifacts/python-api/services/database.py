@@ -89,6 +89,24 @@ ON benchmark_row_logs (run_id)
 """
 
 
+_CREATE_HARMONIZE_RUNS_TABLE = """
+CREATE TABLE IF NOT EXISTS harmonize_runs (
+    job_id     TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL,
+    kind       TEXT NOT NULL,
+    labels     TEXT NOT NULL,
+    entity     TEXT NOT NULL,
+    upload_id  TEXT NOT NULL,
+    created_at TEXT NOT NULL
+)
+"""
+
+_CREATE_HARMONIZE_RUNS_INDEX = """
+CREATE INDEX IF NOT EXISTS idx_harmonize_user_created
+ON harmonize_runs (user_id, created_at DESC)
+"""
+
+
 class Database:
     """Async SQLite persistence layer for job history."""
 
@@ -112,6 +130,8 @@ class Database:
         await self._conn.execute(_CREATE_BENCHMARK_RUNS_INDEX)
         await self._conn.execute(_CREATE_BENCHMARK_ROW_LOGS_TABLE)
         await self._conn.execute(_CREATE_BENCHMARK_ROW_LOGS_INDEX)
+        await self._conn.execute(_CREATE_HARMONIZE_RUNS_TABLE)
+        await self._conn.execute(_CREATE_HARMONIZE_RUNS_INDEX)
         await self._conn.commit()
 
         if existed:
@@ -479,6 +499,53 @@ class Database:
         for field in ("config", "vocabularies", "input_names", "corpus_metrics"):
             if field in d:
                 d[field] = json.loads(d[field]) if d.get(field) else None
+        return d
+
+    # ------------------------------------------------------------------
+    # Harmonize runs (ownership of harmonization jobs)
+    # ------------------------------------------------------------------
+
+    async def insert_harmonize_run(
+        self,
+        *,
+        job_id: str,
+        user_id: str,
+        kind: str,
+        labels: list[str],
+        entity: str,
+        upload_id: str,
+        created_at: str,
+    ) -> None:
+        await self._conn.execute(
+            """INSERT INTO harmonize_runs
+               (job_id, user_id, kind, labels, entity, upload_id, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (job_id, user_id, kind, json.dumps(labels), entity, upload_id, created_at),
+        )
+        await self._conn.commit()
+
+    async def get_harmonize_run(self, job_id: str) -> dict[str, Any] | None:
+        cursor = await self._conn.execute(
+            "SELECT * FROM harmonize_runs WHERE job_id = ?", (job_id,)
+        )
+        row = await cursor.fetchone()
+        return self._harmonize_row_to_dict(row) if row is not None else None
+
+    async def list_harmonize_runs(self, user_id: str) -> list[dict[str, Any]]:
+        """The user's runs, newest first."""
+        cursor = await self._conn.execute(
+            """SELECT * FROM harmonize_runs
+               WHERE user_id = ?
+               ORDER BY created_at DESC, rowid DESC""",
+            (user_id,),
+        )
+        rows = await cursor.fetchall()
+        return [self._harmonize_row_to_dict(row) for row in rows]
+
+    @staticmethod
+    def _harmonize_row_to_dict(row: aiosqlite.Row) -> dict[str, Any]:
+        d: dict[str, Any] = dict(row)
+        d["labels"] = json.loads(d["labels"])
         return d
 
     # ------------------------------------------------------------------

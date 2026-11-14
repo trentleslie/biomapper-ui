@@ -18,6 +18,8 @@ tags:
     description: User-scoped metabolite flag operations
   - name: jobs
     description: Job history and management operations
+  - name: harmonize
+    description: User-scoped cohort harmonization runs
 paths:
   /healthz:
     get:
@@ -392,6 +394,388 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /harmonize/inspect:
+    post:
+      operationId: inspectHarmonizeFile
+      tags: [harmonize]
+      summary: Read a cohort file's header and row count
+      description: >-
+        Checks the file like a cohort upload (.csv, .tsv or .txt, UTF-8, not empty, at most
+        50 MB) and returns its column names, so a screen can offer column pickers. Nothing is
+        kept.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/HarmonizeInspectBody"
+      responses:
+        "200":
+          description: Columns and data row count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HarmonizeInspectResult"
+        "400":
+          description: Missing user ID header, or a file that cannot be used
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /harmonize/cohorts:
+    post:
+      operationId: submitHarmonizeCohorts
+      tags: [harmonize]
+      summary: Start a two-cohort harmonization run
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/HarmonizeCohortsBody"
+      responses:
+        "200":
+          description: The new run's status (usually queued)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HarmonizeRunStatus"
+        "400":
+          description: >-
+            Missing user ID header, a bad spec or file, a column the file does not have,
+            duplicate labels, or a refusal from the job runner (its message, as written)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: The job runner already holds its limit of unfinished runs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /harmonize/many:
+    post:
+      operationId: submitHarmonizeMany
+      tags: [harmonize]
+      summary: Start a many-cohort harmonization run (2 to 12 files)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/HarmonizeManyBody"
+      responses:
+        "200":
+          description: The new run's status (usually queued)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HarmonizeRunStatus"
+        "400":
+          description: >-
+            Missing user ID header, fewer than 2 or more than 12 files, a spec that does not
+            match the files, a bad file or column, duplicate labels, or a refusal from the job
+            runner (its message, as written)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: The job runner already holds its limit of unfinished runs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /harmonize/example:
+    post:
+      operationId: submitHarmonizeExample
+      tags: [harmonize]
+      summary: Start a run on the built-in example dataset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HarmonizeExampleRequest"
+      responses:
+        "200":
+          description: The new run's status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HarmonizeRunStatus"
+        "400":
+          description: Missing user ID header, or the example dataset is not installed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: The job runner already holds its limit of unfinished runs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /harmonize/runs:
+    get:
+      operationId: listHarmonizeRuns
+      tags: [harmonize]
+      summary: List the caller's harmonization runs, newest first, each with its status
+      responses:
+        "200":
+          description: >-
+            The caller's runs. A run the job runner no longer knows has state "unknown" and the
+            runner's message as reason.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HarmonizeRunStatus"
+        "400":
+          description: Missing user ID header
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /harmonize/runs/{jobId}:
+    get:
+      operationId: getHarmonizeRun
+      tags: [harmonize]
+      summary: Get a run's status
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Run status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HarmonizeRunStatus"
+        "400":
+          description: Missing user ID header, or a refusal from the job runner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No such run for this user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /harmonize/runs/{jobId}/resume:
+    post:
+      operationId: resumeHarmonizeRun
+      tags: [harmonize]
+      summary: Resume a stalled, paused, expired or cancelled run
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Run status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HarmonizeRunStatus"
+        "400":
+          description: Missing user ID header, or the run cannot be resumed (runner's message)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No such run for this user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /harmonize/runs/{jobId}/cancel:
+    post:
+      operationId: cancelHarmonizeRun
+      tags: [harmonize]
+      summary: Cancel a run after its current batch (what was mapped is kept)
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Run status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HarmonizeRunStatus"
+        "400":
+          description: Missing user ID header, or a refusal from the job runner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No such run for this user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /harmonize/runs/{jobId}/report:
+    get:
+      operationId: getHarmonizeReport
+      tags: [harmonize]
+      summary: Get a finished run's report.json as written by the package
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >-
+            The report exactly as the package wrote it (snake_case keys, schema_version 1,
+            kind harmonize_cohorts or harmonize_many)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HarmonizeReport"
+        "400":
+          description: Missing user ID header, or the report cannot be read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No such run for this user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: The run has not finished yet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /harmonize/runs/{jobId}/review-items:
+    get:
+      operationId: listHarmonizeReviewItems
+      tags: [harmonize]
+      summary: One page of a finished run's review items, highest impact first
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: kind
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [row, link]
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: limit
+          in: query
+          required: false
+          description: Page size, 1 to 50 (default 25)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+      responses:
+        "200":
+          description: A page of review items
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HarmonizeReviewItemsPage"
+        "400":
+          description: Missing user ID header, or bad paging (runner's message)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No such run for this user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: The run has not finished yet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /harmonize/runs/{jobId}/review-items/{ref}:
+    get:
+      operationId: getHarmonizeReviewItem
+      tags: [harmonize]
+      summary: One review item in full
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: ref
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The review item's detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HarmonizeReviewItemDetail"
+        "400":
+          description: Missing user ID header, or no such item in the run (runner's message)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No such run for this user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: The run has not finished yet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -701,3 +1085,518 @@ components:
           type: string
       required:
         - detail
+
+    HarmonizeInspectBody:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+      required:
+        - file
+
+    HarmonizeInspectResult:
+      type: object
+      properties:
+        columns:
+          type: array
+          items:
+            type: string
+        rowCount:
+          type: integer
+      required:
+        - columns
+        - rowCount
+
+    HarmonizeCohortInput:
+      type: object
+      description: One cohort's columns. Every named column must be in the file's header.
+      properties:
+        label:
+          type: string
+          description: Letters, digits, '.', '-' and '_'; distinct within a run
+        nameColumn:
+          type: string
+        keyColumn:
+          type: string
+          nullable: true
+        vocabularies:
+          type: object
+          description: "Identifier columns per vocabulary, for example {\"HMDB\": [\"hmdb_id\"]}"
+          additionalProperties:
+            type: array
+            items:
+              type: string
+      required:
+        - label
+        - nameColumn
+
+    HarmonizeCohortsSpec:
+      type: object
+      properties:
+        entity:
+          type: string
+        category:
+          type: string
+          nullable: true
+        a:
+          $ref: "#/components/schemas/HarmonizeCohortInput"
+        b:
+          $ref: "#/components/schemas/HarmonizeCohortInput"
+      required:
+        - entity
+        - a
+        - b
+
+    HarmonizeManySpec:
+      type: object
+      properties:
+        entity:
+          type: string
+        category:
+          type: string
+          nullable: true
+        remapAll:
+          type: boolean
+          default: false
+        cohorts:
+          type: array
+          description: One per uploaded file, in file order
+          minItems: 2
+          maxItems: 12
+          items:
+            $ref: "#/components/schemas/HarmonizeCohortInput"
+      required:
+        - entity
+        - cohorts
+
+    HarmonizeCohortsBody:
+      type: object
+      properties:
+        fileA:
+          type: string
+          format: binary
+        fileB:
+          type: string
+          format: binary
+        spec:
+          type: string
+          description: A HarmonizeCohortsSpec as a JSON string
+      required:
+        - fileA
+        - fileB
+        - spec
+
+    HarmonizeManyBody:
+      type: object
+      properties:
+        files:
+          type: array
+          minItems: 2
+          maxItems: 12
+          items:
+            type: string
+            format: binary
+        spec:
+          type: string
+          description: A HarmonizeManySpec as a JSON string
+      required:
+        - files
+        - spec
+
+    HarmonizeExampleRequest:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [two_cohort]
+      required:
+        - kind
+
+    HarmonizeCohortStatus:
+      type: object
+      properties:
+        label:
+          type: string
+        path:
+          type: string
+        rows:
+          type: integer
+      required:
+        - label
+        - path
+        - rows
+
+    HarmonizeJobOwner:
+      type: object
+      properties:
+        host:
+          type: string
+          nullable: true
+        pid:
+          type: integer
+          nullable: true
+
+    HarmonizeReviewCounts:
+      type: object
+      properties:
+        row:
+          type: integer
+        link:
+          type: integer
+        skippedNoNode:
+          type: integer
+        candidatesCaptured:
+          type: integer
+        candidatesNotCaptured:
+          type: integer
+      required:
+        - row
+        - link
+        - skippedNoNode
+        - candidatesCaptured
+        - candidatesNotCaptured
+
+    HarmonizeProgress:
+      type: object
+      description: The latest progress update of the running arm (and cohort, on two-cohort runs)
+      properties:
+        function:
+          type: string
+        arm:
+          type: string
+          description: names_only, identifier or (two cohorts only) review
+        cohort:
+          type: string
+          nullable: true
+        cohorts:
+          type: array
+          items:
+            type: string
+        entitiesDone:
+          type: integer
+        entitiesTotal:
+          type: integer
+      required:
+        - function
+        - arm
+        - entitiesDone
+        - entitiesTotal
+
+    HarmonizeRunStatus:
+      type: object
+      description: >-
+        The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity
+        and createdAt. summary is the package's compact summary, passed through with its own
+        (snake_case and data) keys. A listed run the job runner no longer knows carries only
+        jobId, state "unknown", reason, kind, labels, entity and createdAt.
+      properties:
+        jobId:
+          type: string
+        state:
+          type: string
+          enum: [queued, running, paused, stalled, expired, cancelled, complete, failed,
+                 owned_elsewhere, partial, unknown]
+        reason:
+          type: string
+          nullable: true
+        kind:
+          type: string
+          enum: [harmonize_cohorts, harmonize_many]
+        labels:
+          type: array
+          items:
+            type: string
+        entity:
+          type: string
+        createdAt:
+          type: string
+          description: When this app recorded the run (UTC, ISO 8601)
+        stage:
+          type: string
+          enum: [queued, mapping, building, capture, placing, done]
+        cohorts:
+          type: array
+          items:
+            $ref: "#/components/schemas/HarmonizeCohortStatus"
+        outputDir:
+          type: string
+        storeDir:
+          type: string
+          nullable: true
+        entitiesTotal:
+          type: integer
+        entitiesMapped:
+          type: integer
+        rowsErrored:
+          type: integer
+        etaS:
+          type: number
+          nullable: true
+        kgBuild:
+          type: string
+        kgVerified:
+          type: boolean
+        owner:
+          allOf:
+            - $ref: "#/components/schemas/HarmonizeJobOwner"
+          nullable: true
+        createdUtc:
+          type: string
+        updatedUtc:
+          type: string
+        summary:
+          type: object
+          nullable: true
+          additionalProperties: true
+        reviewItems:
+          allOf:
+            - $ref: "#/components/schemas/HarmonizeReviewCounts"
+          nullable: true
+        progress:
+          $ref: "#/components/schemas/HarmonizeProgress"
+      required:
+        - jobId
+        - state
+        - kind
+        - labels
+        - entity
+        - createdAt
+
+    HarmonizeReport:
+      type: object
+      description: report.json as the package wrote it (snake_case keys)
+      properties:
+        schema_version:
+          type: integer
+        kind:
+          type: string
+          enum: [harmonize_cohorts, harmonize_many]
+      required:
+        - schema_version
+        - kind
+      additionalProperties: true
+
+    HarmonizeReviewItemSummary:
+      type: object
+      properties:
+        ref:
+          type: string
+        kind:
+          type: string
+          enum: [row, link]
+        impact:
+          type: integer
+        label:
+          type: string
+          description: Untrusted text, the entity name or one name per side
+        reasons:
+          type: array
+          items:
+            type: string
+        engineChoice:
+          type: string
+          nullable: true
+        nodes:
+          type: array
+          items:
+            type: string
+        nRows:
+          type: integer
+        cohorts:
+          type: array
+          items:
+            type: string
+        evidence:
+          type: string
+        suggestion:
+          type: string
+          nullable: true
+      required:
+        - ref
+        - kind
+        - impact
+        - label
+        - reasons
+        - nodes
+        - nRows
+        - cohorts
+        - evidence
+
+    HarmonizeReviewItemsPage:
+      type: object
+      properties:
+        jobId:
+          type: string
+        total:
+          type: integer
+        counts:
+          type: object
+          description: Items per kind in the whole run, keyed row and link
+          additionalProperties:
+            type: integer
+        skippedNoNode:
+          type: integer
+        offset:
+          type: integer
+        limit:
+          type: integer
+        nextOffset:
+          type: integer
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/HarmonizeReviewItemSummary"
+        note:
+          type: string
+      required:
+        - jobId
+        - total
+        - counts
+        - skippedNoNode
+        - offset
+        - limit
+        - items
+
+    HarmonizeEntryRow:
+      type: object
+      properties:
+        cohort:
+          type: string
+        key:
+          type: string
+        name:
+          type: string
+      required:
+        - cohort
+        - key
+        - name
+
+    HarmonizeRowDetail:
+      type: object
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        weakTrigger:
+          type: string
+          nullable: true
+        engineChoice:
+          type: string
+          nullable: true
+        certificateState:
+          type: string
+          nullable: true
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/HarmonizeEntryRow"
+        nRows:
+          type: integer
+        cohorts:
+          type: array
+          items:
+            type: string
+        candidatesStatus:
+          type: string
+        candidatesReason:
+          type: string
+          nullable: true
+        supersedingRef:
+          type: string
+          nullable: true
+
+    HarmonizeSideDetail:
+      type: object
+      properties:
+        node:
+          type: string
+          nullable: true
+        nodeName:
+          type: string
+          nullable: true
+        nodeNameStatus:
+          type: string
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/HarmonizeEntryRow"
+        nRows:
+          type: integer
+        certificateStates:
+          type: object
+          description: Rows per certificate state, keyed by state
+          additionalProperties:
+            type: integer
+        identifiers:
+          type: object
+          description: Identifiers per vocabulary, keyed by vocabulary
+          additionalProperties:
+            type: array
+            items:
+              type: string
+
+    HarmonizeLinkDetail:
+      type: object
+      properties:
+        linkKind:
+          type: string
+        basis:
+          type: string
+          nullable: true
+        bases:
+          type: array
+          items:
+            type: string
+        reviewReasons:
+          type: array
+          items:
+            type: string
+        nRowPairs:
+          type: integer
+        cohorts:
+          type: array
+          items:
+            type: string
+        question:
+          type: string
+        a:
+          $ref: "#/components/schemas/HarmonizeSideDetail"
+        b:
+          $ref: "#/components/schemas/HarmonizeSideDetail"
+
+    HarmonizeReviewItemDetail:
+      type: object
+      properties:
+        ref:
+          type: string
+        kind:
+          type: string
+          enum: [row, link]
+        jobId:
+          type: string
+        impact:
+          type: integer
+        suggestion:
+          type: string
+          nullable: true
+        row:
+          allOf:
+            - $ref: "#/components/schemas/HarmonizeRowDetail"
+          nullable: true
+        link:
+          allOf:
+            - $ref: "#/components/schemas/HarmonizeLinkDetail"
+          nullable: true
+        nextStep:
+          type: string
+        note:
+          type: string
+      required:
+        - ref
+        - kind
+        - jobId
+        - impact
+        - nextStep

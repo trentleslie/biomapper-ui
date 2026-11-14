@@ -514,3 +514,812 @@ export const UpdateJobResponse = zod
 export const DeleteJobParams = zod.object({
   jobId: zod.coerce.string(),
 });
+
+/**
+ * Checks the file like a cohort upload (.csv, .tsv or .txt, UTF-8, not empty, at most 50 MB) and returns its column names, so a screen can offer column pickers. Nothing is kept.
+ * @summary Read a cohort file's header and row count
+ */
+export const InspectHarmonizeFileBody = zod.object({
+  file: zod.instanceof(File),
+});
+
+export const InspectHarmonizeFileResponse = zod.object({
+  columns: zod.array(zod.string()),
+  rowCount: zod.number(),
+});
+
+/**
+ * @summary Start a two-cohort harmonization run
+ */
+export const SubmitHarmonizeCohortsBody = zod.object({
+  fileA: zod.instanceof(File),
+  fileB: zod.instanceof(File),
+  spec: zod.string().describe("A HarmonizeCohortsSpec as a JSON string"),
+});
+
+export const SubmitHarmonizeCohortsResponse = zod
+  .object({
+    jobId: zod.string(),
+    state: zod.enum([
+      "queued",
+      "running",
+      "paused",
+      "stalled",
+      "expired",
+      "cancelled",
+      "complete",
+      "failed",
+      "owned_elsewhere",
+      "partial",
+      "unknown",
+    ]),
+    reason: zod.string().nullish(),
+    kind: zod.enum(["harmonize_cohorts", "harmonize_many"]),
+    labels: zod.array(zod.string()),
+    entity: zod.string(),
+    createdAt: zod
+      .string()
+      .describe("When this app recorded the run (UTC, ISO 8601)"),
+    stage: zod
+      .enum(["queued", "mapping", "building", "capture", "placing", "done"])
+      .optional(),
+    cohorts: zod
+      .array(
+        zod.object({
+          label: zod.string(),
+          path: zod.string(),
+          rows: zod.number(),
+        }),
+      )
+      .optional(),
+    outputDir: zod.string().optional(),
+    storeDir: zod.string().nullish(),
+    entitiesTotal: zod.number().optional(),
+    entitiesMapped: zod.number().optional(),
+    rowsErrored: zod.number().optional(),
+    etaS: zod.number().nullish(),
+    kgBuild: zod.string().optional(),
+    kgVerified: zod.boolean().optional(),
+    owner: zod
+      .object({
+        host: zod.string().nullish(),
+        pid: zod.number().nullish(),
+      })
+      .nullish(),
+    createdUtc: zod.string().optional(),
+    updatedUtc: zod.string().optional(),
+    summary: zod.record(zod.string(), zod.unknown()).nullish(),
+    reviewItems: zod
+      .object({
+        row: zod.number(),
+        link: zod.number(),
+        skippedNoNode: zod.number(),
+        candidatesCaptured: zod.number(),
+        candidatesNotCaptured: zod.number(),
+      })
+      .nullish(),
+    progress: zod
+      .object({
+        function: zod.string(),
+        arm: zod
+          .string()
+          .describe("names_only, identifier or (two cohorts only) review"),
+        cohort: zod.string().nullish(),
+        cohorts: zod.array(zod.string()).optional(),
+        entitiesDone: zod.number(),
+        entitiesTotal: zod.number(),
+      })
+      .optional()
+      .describe(
+        "The latest progress update of the running arm (and cohort, on two-cohort runs)",
+      ),
+  })
+  .describe(
+    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
+  );
+
+/**
+ * @summary Start a many-cohort harmonization run (2 to 12 files)
+ */
+export const submitHarmonizeManyBodyFilesMin = 2;
+export const submitHarmonizeManyBodyFilesMax = 12;
+
+export const SubmitHarmonizeManyBody = zod.object({
+  files: zod
+    .array(zod.instanceof(File))
+    .min(submitHarmonizeManyBodyFilesMin)
+    .max(submitHarmonizeManyBodyFilesMax),
+  spec: zod.string().describe("A HarmonizeManySpec as a JSON string"),
+});
+
+export const SubmitHarmonizeManyResponse = zod
+  .object({
+    jobId: zod.string(),
+    state: zod.enum([
+      "queued",
+      "running",
+      "paused",
+      "stalled",
+      "expired",
+      "cancelled",
+      "complete",
+      "failed",
+      "owned_elsewhere",
+      "partial",
+      "unknown",
+    ]),
+    reason: zod.string().nullish(),
+    kind: zod.enum(["harmonize_cohorts", "harmonize_many"]),
+    labels: zod.array(zod.string()),
+    entity: zod.string(),
+    createdAt: zod
+      .string()
+      .describe("When this app recorded the run (UTC, ISO 8601)"),
+    stage: zod
+      .enum(["queued", "mapping", "building", "capture", "placing", "done"])
+      .optional(),
+    cohorts: zod
+      .array(
+        zod.object({
+          label: zod.string(),
+          path: zod.string(),
+          rows: zod.number(),
+        }),
+      )
+      .optional(),
+    outputDir: zod.string().optional(),
+    storeDir: zod.string().nullish(),
+    entitiesTotal: zod.number().optional(),
+    entitiesMapped: zod.number().optional(),
+    rowsErrored: zod.number().optional(),
+    etaS: zod.number().nullish(),
+    kgBuild: zod.string().optional(),
+    kgVerified: zod.boolean().optional(),
+    owner: zod
+      .object({
+        host: zod.string().nullish(),
+        pid: zod.number().nullish(),
+      })
+      .nullish(),
+    createdUtc: zod.string().optional(),
+    updatedUtc: zod.string().optional(),
+    summary: zod.record(zod.string(), zod.unknown()).nullish(),
+    reviewItems: zod
+      .object({
+        row: zod.number(),
+        link: zod.number(),
+        skippedNoNode: zod.number(),
+        candidatesCaptured: zod.number(),
+        candidatesNotCaptured: zod.number(),
+      })
+      .nullish(),
+    progress: zod
+      .object({
+        function: zod.string(),
+        arm: zod
+          .string()
+          .describe("names_only, identifier or (two cohorts only) review"),
+        cohort: zod.string().nullish(),
+        cohorts: zod.array(zod.string()).optional(),
+        entitiesDone: zod.number(),
+        entitiesTotal: zod.number(),
+      })
+      .optional()
+      .describe(
+        "The latest progress update of the running arm (and cohort, on two-cohort runs)",
+      ),
+  })
+  .describe(
+    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
+  );
+
+/**
+ * @summary Start a run on the built-in example dataset
+ */
+export const SubmitHarmonizeExampleBody = zod.object({
+  kind: zod.enum(["two_cohort"]),
+});
+
+export const SubmitHarmonizeExampleResponse = zod
+  .object({
+    jobId: zod.string(),
+    state: zod.enum([
+      "queued",
+      "running",
+      "paused",
+      "stalled",
+      "expired",
+      "cancelled",
+      "complete",
+      "failed",
+      "owned_elsewhere",
+      "partial",
+      "unknown",
+    ]),
+    reason: zod.string().nullish(),
+    kind: zod.enum(["harmonize_cohorts", "harmonize_many"]),
+    labels: zod.array(zod.string()),
+    entity: zod.string(),
+    createdAt: zod
+      .string()
+      .describe("When this app recorded the run (UTC, ISO 8601)"),
+    stage: zod
+      .enum(["queued", "mapping", "building", "capture", "placing", "done"])
+      .optional(),
+    cohorts: zod
+      .array(
+        zod.object({
+          label: zod.string(),
+          path: zod.string(),
+          rows: zod.number(),
+        }),
+      )
+      .optional(),
+    outputDir: zod.string().optional(),
+    storeDir: zod.string().nullish(),
+    entitiesTotal: zod.number().optional(),
+    entitiesMapped: zod.number().optional(),
+    rowsErrored: zod.number().optional(),
+    etaS: zod.number().nullish(),
+    kgBuild: zod.string().optional(),
+    kgVerified: zod.boolean().optional(),
+    owner: zod
+      .object({
+        host: zod.string().nullish(),
+        pid: zod.number().nullish(),
+      })
+      .nullish(),
+    createdUtc: zod.string().optional(),
+    updatedUtc: zod.string().optional(),
+    summary: zod.record(zod.string(), zod.unknown()).nullish(),
+    reviewItems: zod
+      .object({
+        row: zod.number(),
+        link: zod.number(),
+        skippedNoNode: zod.number(),
+        candidatesCaptured: zod.number(),
+        candidatesNotCaptured: zod.number(),
+      })
+      .nullish(),
+    progress: zod
+      .object({
+        function: zod.string(),
+        arm: zod
+          .string()
+          .describe("names_only, identifier or (two cohorts only) review"),
+        cohort: zod.string().nullish(),
+        cohorts: zod.array(zod.string()).optional(),
+        entitiesDone: zod.number(),
+        entitiesTotal: zod.number(),
+      })
+      .optional()
+      .describe(
+        "The latest progress update of the running arm (and cohort, on two-cohort runs)",
+      ),
+  })
+  .describe(
+    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
+  );
+
+/**
+ * @summary List the caller's harmonization runs, newest first, each with its status
+ */
+export const ListHarmonizeRunsResponseItem = zod
+  .object({
+    jobId: zod.string(),
+    state: zod.enum([
+      "queued",
+      "running",
+      "paused",
+      "stalled",
+      "expired",
+      "cancelled",
+      "complete",
+      "failed",
+      "owned_elsewhere",
+      "partial",
+      "unknown",
+    ]),
+    reason: zod.string().nullish(),
+    kind: zod.enum(["harmonize_cohorts", "harmonize_many"]),
+    labels: zod.array(zod.string()),
+    entity: zod.string(),
+    createdAt: zod
+      .string()
+      .describe("When this app recorded the run (UTC, ISO 8601)"),
+    stage: zod
+      .enum(["queued", "mapping", "building", "capture", "placing", "done"])
+      .optional(),
+    cohorts: zod
+      .array(
+        zod.object({
+          label: zod.string(),
+          path: zod.string(),
+          rows: zod.number(),
+        }),
+      )
+      .optional(),
+    outputDir: zod.string().optional(),
+    storeDir: zod.string().nullish(),
+    entitiesTotal: zod.number().optional(),
+    entitiesMapped: zod.number().optional(),
+    rowsErrored: zod.number().optional(),
+    etaS: zod.number().nullish(),
+    kgBuild: zod.string().optional(),
+    kgVerified: zod.boolean().optional(),
+    owner: zod
+      .object({
+        host: zod.string().nullish(),
+        pid: zod.number().nullish(),
+      })
+      .nullish(),
+    createdUtc: zod.string().optional(),
+    updatedUtc: zod.string().optional(),
+    summary: zod.record(zod.string(), zod.unknown()).nullish(),
+    reviewItems: zod
+      .object({
+        row: zod.number(),
+        link: zod.number(),
+        skippedNoNode: zod.number(),
+        candidatesCaptured: zod.number(),
+        candidatesNotCaptured: zod.number(),
+      })
+      .nullish(),
+    progress: zod
+      .object({
+        function: zod.string(),
+        arm: zod
+          .string()
+          .describe("names_only, identifier or (two cohorts only) review"),
+        cohort: zod.string().nullish(),
+        cohorts: zod.array(zod.string()).optional(),
+        entitiesDone: zod.number(),
+        entitiesTotal: zod.number(),
+      })
+      .optional()
+      .describe(
+        "The latest progress update of the running arm (and cohort, on two-cohort runs)",
+      ),
+  })
+  .describe(
+    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
+  );
+export const ListHarmonizeRunsResponse = zod.array(
+  ListHarmonizeRunsResponseItem,
+);
+
+/**
+ * @summary Get a run's status
+ */
+export const GetHarmonizeRunParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const GetHarmonizeRunResponse = zod
+  .object({
+    jobId: zod.string(),
+    state: zod.enum([
+      "queued",
+      "running",
+      "paused",
+      "stalled",
+      "expired",
+      "cancelled",
+      "complete",
+      "failed",
+      "owned_elsewhere",
+      "partial",
+      "unknown",
+    ]),
+    reason: zod.string().nullish(),
+    kind: zod.enum(["harmonize_cohorts", "harmonize_many"]),
+    labels: zod.array(zod.string()),
+    entity: zod.string(),
+    createdAt: zod
+      .string()
+      .describe("When this app recorded the run (UTC, ISO 8601)"),
+    stage: zod
+      .enum(["queued", "mapping", "building", "capture", "placing", "done"])
+      .optional(),
+    cohorts: zod
+      .array(
+        zod.object({
+          label: zod.string(),
+          path: zod.string(),
+          rows: zod.number(),
+        }),
+      )
+      .optional(),
+    outputDir: zod.string().optional(),
+    storeDir: zod.string().nullish(),
+    entitiesTotal: zod.number().optional(),
+    entitiesMapped: zod.number().optional(),
+    rowsErrored: zod.number().optional(),
+    etaS: zod.number().nullish(),
+    kgBuild: zod.string().optional(),
+    kgVerified: zod.boolean().optional(),
+    owner: zod
+      .object({
+        host: zod.string().nullish(),
+        pid: zod.number().nullish(),
+      })
+      .nullish(),
+    createdUtc: zod.string().optional(),
+    updatedUtc: zod.string().optional(),
+    summary: zod.record(zod.string(), zod.unknown()).nullish(),
+    reviewItems: zod
+      .object({
+        row: zod.number(),
+        link: zod.number(),
+        skippedNoNode: zod.number(),
+        candidatesCaptured: zod.number(),
+        candidatesNotCaptured: zod.number(),
+      })
+      .nullish(),
+    progress: zod
+      .object({
+        function: zod.string(),
+        arm: zod
+          .string()
+          .describe("names_only, identifier or (two cohorts only) review"),
+        cohort: zod.string().nullish(),
+        cohorts: zod.array(zod.string()).optional(),
+        entitiesDone: zod.number(),
+        entitiesTotal: zod.number(),
+      })
+      .optional()
+      .describe(
+        "The latest progress update of the running arm (and cohort, on two-cohort runs)",
+      ),
+  })
+  .describe(
+    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
+  );
+
+/**
+ * @summary Resume a stalled, paused, expired or cancelled run
+ */
+export const ResumeHarmonizeRunParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const ResumeHarmonizeRunResponse = zod
+  .object({
+    jobId: zod.string(),
+    state: zod.enum([
+      "queued",
+      "running",
+      "paused",
+      "stalled",
+      "expired",
+      "cancelled",
+      "complete",
+      "failed",
+      "owned_elsewhere",
+      "partial",
+      "unknown",
+    ]),
+    reason: zod.string().nullish(),
+    kind: zod.enum(["harmonize_cohorts", "harmonize_many"]),
+    labels: zod.array(zod.string()),
+    entity: zod.string(),
+    createdAt: zod
+      .string()
+      .describe("When this app recorded the run (UTC, ISO 8601)"),
+    stage: zod
+      .enum(["queued", "mapping", "building", "capture", "placing", "done"])
+      .optional(),
+    cohorts: zod
+      .array(
+        zod.object({
+          label: zod.string(),
+          path: zod.string(),
+          rows: zod.number(),
+        }),
+      )
+      .optional(),
+    outputDir: zod.string().optional(),
+    storeDir: zod.string().nullish(),
+    entitiesTotal: zod.number().optional(),
+    entitiesMapped: zod.number().optional(),
+    rowsErrored: zod.number().optional(),
+    etaS: zod.number().nullish(),
+    kgBuild: zod.string().optional(),
+    kgVerified: zod.boolean().optional(),
+    owner: zod
+      .object({
+        host: zod.string().nullish(),
+        pid: zod.number().nullish(),
+      })
+      .nullish(),
+    createdUtc: zod.string().optional(),
+    updatedUtc: zod.string().optional(),
+    summary: zod.record(zod.string(), zod.unknown()).nullish(),
+    reviewItems: zod
+      .object({
+        row: zod.number(),
+        link: zod.number(),
+        skippedNoNode: zod.number(),
+        candidatesCaptured: zod.number(),
+        candidatesNotCaptured: zod.number(),
+      })
+      .nullish(),
+    progress: zod
+      .object({
+        function: zod.string(),
+        arm: zod
+          .string()
+          .describe("names_only, identifier or (two cohorts only) review"),
+        cohort: zod.string().nullish(),
+        cohorts: zod.array(zod.string()).optional(),
+        entitiesDone: zod.number(),
+        entitiesTotal: zod.number(),
+      })
+      .optional()
+      .describe(
+        "The latest progress update of the running arm (and cohort, on two-cohort runs)",
+      ),
+  })
+  .describe(
+    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
+  );
+
+/**
+ * @summary Cancel a run after its current batch (what was mapped is kept)
+ */
+export const CancelHarmonizeRunParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const CancelHarmonizeRunResponse = zod
+  .object({
+    jobId: zod.string(),
+    state: zod.enum([
+      "queued",
+      "running",
+      "paused",
+      "stalled",
+      "expired",
+      "cancelled",
+      "complete",
+      "failed",
+      "owned_elsewhere",
+      "partial",
+      "unknown",
+    ]),
+    reason: zod.string().nullish(),
+    kind: zod.enum(["harmonize_cohorts", "harmonize_many"]),
+    labels: zod.array(zod.string()),
+    entity: zod.string(),
+    createdAt: zod
+      .string()
+      .describe("When this app recorded the run (UTC, ISO 8601)"),
+    stage: zod
+      .enum(["queued", "mapping", "building", "capture", "placing", "done"])
+      .optional(),
+    cohorts: zod
+      .array(
+        zod.object({
+          label: zod.string(),
+          path: zod.string(),
+          rows: zod.number(),
+        }),
+      )
+      .optional(),
+    outputDir: zod.string().optional(),
+    storeDir: zod.string().nullish(),
+    entitiesTotal: zod.number().optional(),
+    entitiesMapped: zod.number().optional(),
+    rowsErrored: zod.number().optional(),
+    etaS: zod.number().nullish(),
+    kgBuild: zod.string().optional(),
+    kgVerified: zod.boolean().optional(),
+    owner: zod
+      .object({
+        host: zod.string().nullish(),
+        pid: zod.number().nullish(),
+      })
+      .nullish(),
+    createdUtc: zod.string().optional(),
+    updatedUtc: zod.string().optional(),
+    summary: zod.record(zod.string(), zod.unknown()).nullish(),
+    reviewItems: zod
+      .object({
+        row: zod.number(),
+        link: zod.number(),
+        skippedNoNode: zod.number(),
+        candidatesCaptured: zod.number(),
+        candidatesNotCaptured: zod.number(),
+      })
+      .nullish(),
+    progress: zod
+      .object({
+        function: zod.string(),
+        arm: zod
+          .string()
+          .describe("names_only, identifier or (two cohorts only) review"),
+        cohort: zod.string().nullish(),
+        cohorts: zod.array(zod.string()).optional(),
+        entitiesDone: zod.number(),
+        entitiesTotal: zod.number(),
+      })
+      .optional()
+      .describe(
+        "The latest progress update of the running arm (and cohort, on two-cohort runs)",
+      ),
+  })
+  .describe(
+    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
+  );
+
+/**
+ * @summary Get a finished run's report.json as written by the package
+ */
+export const GetHarmonizeReportParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const GetHarmonizeReportResponse = zod
+  .object({
+    schema_version: zod.number(),
+    kind: zod.enum(["harmonize_cohorts", "harmonize_many"]),
+  })
+  .describe("report.json as the package wrote it (snake_case keys)");
+
+/**
+ * @summary One page of a finished run's review items, highest impact first
+ */
+export const ListHarmonizeReviewItemsParams = zod.object({
+  jobId: zod.coerce.string(),
+});
+
+export const listHarmonizeReviewItemsQueryOffsetDefault = 0;
+export const listHarmonizeReviewItemsQueryOffsetMin = 0;
+
+export const listHarmonizeReviewItemsQueryLimitMax = 50;
+
+export const ListHarmonizeReviewItemsQueryParams = zod.object({
+  kind: zod.enum(["row", "link"]).optional(),
+  offset: zod.coerce
+    .number()
+    .min(listHarmonizeReviewItemsQueryOffsetMin)
+    .default(listHarmonizeReviewItemsQueryOffsetDefault),
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(listHarmonizeReviewItemsQueryLimitMax)
+    .optional()
+    .describe("Page size, 1 to 50 (default 25)"),
+});
+
+export const ListHarmonizeReviewItemsResponse = zod.object({
+  jobId: zod.string(),
+  total: zod.number(),
+  counts: zod
+    .record(zod.string(), zod.number())
+    .describe("Items per kind in the whole run, keyed row and link"),
+  skippedNoNode: zod.number(),
+  offset: zod.number(),
+  limit: zod.number(),
+  nextOffset: zod.number().nullish(),
+  items: zod.array(
+    zod.object({
+      ref: zod.string(),
+      kind: zod.enum(["row", "link"]),
+      impact: zod.number(),
+      label: zod
+        .string()
+        .describe("Untrusted text, the entity name or one name per side"),
+      reasons: zod.array(zod.string()),
+      engineChoice: zod.string().nullish(),
+      nodes: zod.array(zod.string()),
+      nRows: zod.number(),
+      cohorts: zod.array(zod.string()),
+      evidence: zod.string(),
+      suggestion: zod.string().nullish(),
+    }),
+  ),
+  note: zod.string().optional(),
+});
+
+/**
+ * @summary One review item in full
+ */
+export const GetHarmonizeReviewItemParams = zod.object({
+  jobId: zod.coerce.string(),
+  ref: zod.coerce.string(),
+});
+
+export const GetHarmonizeReviewItemResponse = zod.object({
+  ref: zod.string(),
+  kind: zod.enum(["row", "link"]),
+  jobId: zod.string(),
+  impact: zod.number(),
+  suggestion: zod.string().nullish(),
+  row: zod
+    .object({
+      name: zod.string().optional(),
+      category: zod.string().optional(),
+      weakTrigger: zod.string().nullish(),
+      engineChoice: zod.string().nullish(),
+      certificateState: zod.string().nullish(),
+      rows: zod
+        .array(
+          zod.object({
+            cohort: zod.string(),
+            key: zod.string(),
+            name: zod.string(),
+          }),
+        )
+        .optional(),
+      nRows: zod.number().optional(),
+      cohorts: zod.array(zod.string()).optional(),
+      candidatesStatus: zod.string().optional(),
+      candidatesReason: zod.string().nullish(),
+      supersedingRef: zod.string().nullish(),
+    })
+    .nullish(),
+  link: zod
+    .object({
+      linkKind: zod.string().optional(),
+      basis: zod.string().nullish(),
+      bases: zod.array(zod.string()).optional(),
+      reviewReasons: zod.array(zod.string()).optional(),
+      nRowPairs: zod.number().optional(),
+      cohorts: zod.array(zod.string()).optional(),
+      question: zod.string().optional(),
+      a: zod
+        .object({
+          node: zod.string().nullish(),
+          nodeName: zod.string().nullish(),
+          nodeNameStatus: zod.string().optional(),
+          rows: zod
+            .array(
+              zod.object({
+                cohort: zod.string(),
+                key: zod.string(),
+                name: zod.string(),
+              }),
+            )
+            .optional(),
+          nRows: zod.number().optional(),
+          certificateStates: zod
+            .record(zod.string(), zod.number())
+            .optional()
+            .describe("Rows per certificate state, keyed by state"),
+          identifiers: zod
+            .record(zod.string(), zod.array(zod.string()))
+            .optional()
+            .describe("Identifiers per vocabulary, keyed by vocabulary"),
+        })
+        .optional(),
+      b: zod
+        .object({
+          node: zod.string().nullish(),
+          nodeName: zod.string().nullish(),
+          nodeNameStatus: zod.string().optional(),
+          rows: zod
+            .array(
+              zod.object({
+                cohort: zod.string(),
+                key: zod.string(),
+                name: zod.string(),
+              }),
+            )
+            .optional(),
+          nRows: zod.number().optional(),
+          certificateStates: zod
+            .record(zod.string(), zod.number())
+            .optional()
+            .describe("Rows per certificate state, keyed by state"),
+          identifiers: zod
+            .record(zod.string(), zod.array(zod.string()))
+            .optional()
+            .describe("Identifiers per vocabulary, keyed by vocabulary"),
+        })
+        .optional(),
+    })
+    .nullish(),
+  nextStep: zod.string(),
+  note: zod.string().optional(),
+});

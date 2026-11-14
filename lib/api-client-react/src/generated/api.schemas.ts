@@ -244,6 +244,312 @@ export interface ErrorResponse {
   detail: string;
 }
 
+export interface HarmonizeInspectBody {
+  file: Blob;
+}
+
+export interface HarmonizeInspectResult {
+  columns: string[];
+  rowCount: number;
+}
+
+/**
+ * Identifier columns per vocabulary, for example {"HMDB": ["hmdb_id"]}
+ */
+export type HarmonizeCohortInputVocabularies = { [key: string]: string[] };
+
+/**
+ * One cohort's columns. Every named column must be in the file's header.
+ */
+export interface HarmonizeCohortInput {
+  /** Letters, digits, '.', '-' and '_'; distinct within a run */
+  label: string;
+  nameColumn: string;
+  keyColumn?: string | null;
+  /** Identifier columns per vocabulary, for example {"HMDB": ["hmdb_id"]} */
+  vocabularies?: HarmonizeCohortInputVocabularies;
+}
+
+export interface HarmonizeCohortsSpec {
+  entity: string;
+  category?: string | null;
+  a: HarmonizeCohortInput;
+  b: HarmonizeCohortInput;
+}
+
+export interface HarmonizeManySpec {
+  entity: string;
+  category?: string | null;
+  remapAll?: boolean;
+  /**
+   * One per uploaded file, in file order
+   * @minItems 2
+   * @maxItems 12
+   */
+  cohorts: HarmonizeCohortInput[];
+}
+
+export interface HarmonizeCohortsBody {
+  fileA: Blob;
+  fileB: Blob;
+  /** A HarmonizeCohortsSpec as a JSON string */
+  spec: string;
+}
+
+export interface HarmonizeManyBody {
+  /**
+   * @minItems 2
+   * @maxItems 12
+   */
+  files: Blob[];
+  /** A HarmonizeManySpec as a JSON string */
+  spec: string;
+}
+
+export type HarmonizeExampleRequestKind =
+  (typeof HarmonizeExampleRequestKind)[keyof typeof HarmonizeExampleRequestKind];
+
+export const HarmonizeExampleRequestKind = {
+  two_cohort: "two_cohort",
+} as const;
+
+export interface HarmonizeExampleRequest {
+  kind: HarmonizeExampleRequestKind;
+}
+
+export interface HarmonizeCohortStatus {
+  label: string;
+  path: string;
+  rows: number;
+}
+
+export interface HarmonizeJobOwner {
+  host?: string | null;
+  pid?: number | null;
+}
+
+export interface HarmonizeReviewCounts {
+  row: number;
+  link: number;
+  skippedNoNode: number;
+  candidatesCaptured: number;
+  candidatesNotCaptured: number;
+}
+
+/**
+ * The latest progress update of the running arm (and cohort, on two-cohort runs)
+ */
+export interface HarmonizeProgress {
+  function: string;
+  /** names_only, identifier or (two cohorts only) review */
+  arm: string;
+  cohort?: string | null;
+  cohorts?: string[];
+  entitiesDone: number;
+  entitiesTotal: number;
+}
+
+export type HarmonizeRunStatusState =
+  (typeof HarmonizeRunStatusState)[keyof typeof HarmonizeRunStatusState];
+
+export const HarmonizeRunStatusState = {
+  queued: "queued",
+  running: "running",
+  paused: "paused",
+  stalled: "stalled",
+  expired: "expired",
+  cancelled: "cancelled",
+  complete: "complete",
+  failed: "failed",
+  owned_elsewhere: "owned_elsewhere",
+  partial: "partial",
+  unknown: "unknown",
+} as const;
+
+export type HarmonizeRunStatusKind =
+  (typeof HarmonizeRunStatusKind)[keyof typeof HarmonizeRunStatusKind];
+
+export const HarmonizeRunStatusKind = {
+  harmonize_cohorts: "harmonize_cohorts",
+  harmonize_many: "harmonize_many",
+} as const;
+
+export type HarmonizeRunStatusStage =
+  (typeof HarmonizeRunStatusStage)[keyof typeof HarmonizeRunStatusStage];
+
+export const HarmonizeRunStatusStage = {
+  queued: "queued",
+  mapping: "mapping",
+  building: "building",
+  capture: "capture",
+  placing: "placing",
+  done: "done",
+} as const;
+
+export type HarmonizeRunStatusSummary = { [key: string]: unknown } | null;
+
+/**
+ * The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. A listed run the job runner no longer knows carries only jobId, state "unknown", reason, kind, labels, entity and createdAt.
+ */
+export interface HarmonizeRunStatus {
+  jobId: string;
+  state: HarmonizeRunStatusState;
+  reason?: string | null;
+  kind: HarmonizeRunStatusKind;
+  labels: string[];
+  entity: string;
+  /** When this app recorded the run (UTC, ISO 8601) */
+  createdAt: string;
+  stage?: HarmonizeRunStatusStage;
+  cohorts?: HarmonizeCohortStatus[];
+  outputDir?: string;
+  storeDir?: string | null;
+  entitiesTotal?: number;
+  entitiesMapped?: number;
+  rowsErrored?: number;
+  etaS?: number | null;
+  kgBuild?: string;
+  kgVerified?: boolean;
+  owner?: HarmonizeJobOwner | null;
+  createdUtc?: string;
+  updatedUtc?: string;
+  summary?: HarmonizeRunStatusSummary;
+  reviewItems?: HarmonizeReviewCounts | null;
+  progress?: HarmonizeProgress;
+}
+
+export type HarmonizeReportKind =
+  (typeof HarmonizeReportKind)[keyof typeof HarmonizeReportKind];
+
+export const HarmonizeReportKind = {
+  harmonize_cohorts: "harmonize_cohorts",
+  harmonize_many: "harmonize_many",
+} as const;
+
+/**
+ * report.json as the package wrote it (snake_case keys)
+ */
+export interface HarmonizeReport {
+  schema_version: number;
+  kind: HarmonizeReportKind;
+  [key: string]: unknown;
+}
+
+export type HarmonizeReviewItemSummaryKind =
+  (typeof HarmonizeReviewItemSummaryKind)[keyof typeof HarmonizeReviewItemSummaryKind];
+
+export const HarmonizeReviewItemSummaryKind = {
+  row: "row",
+  link: "link",
+} as const;
+
+export interface HarmonizeReviewItemSummary {
+  ref: string;
+  kind: HarmonizeReviewItemSummaryKind;
+  impact: number;
+  /** Untrusted text, the entity name or one name per side */
+  label: string;
+  reasons: string[];
+  engineChoice?: string | null;
+  nodes: string[];
+  nRows: number;
+  cohorts: string[];
+  evidence: string;
+  suggestion?: string | null;
+}
+
+/**
+ * Items per kind in the whole run, keyed row and link
+ */
+export type HarmonizeReviewItemsPageCounts = { [key: string]: number };
+
+export interface HarmonizeReviewItemsPage {
+  jobId: string;
+  total: number;
+  /** Items per kind in the whole run, keyed row and link */
+  counts: HarmonizeReviewItemsPageCounts;
+  skippedNoNode: number;
+  offset: number;
+  limit: number;
+  nextOffset?: number | null;
+  items: HarmonizeReviewItemSummary[];
+  note?: string;
+}
+
+export interface HarmonizeEntryRow {
+  cohort: string;
+  key: string;
+  name: string;
+}
+
+export interface HarmonizeRowDetail {
+  name?: string;
+  category?: string;
+  weakTrigger?: string | null;
+  engineChoice?: string | null;
+  certificateState?: string | null;
+  rows?: HarmonizeEntryRow[];
+  nRows?: number;
+  cohorts?: string[];
+  candidatesStatus?: string;
+  candidatesReason?: string | null;
+  supersedingRef?: string | null;
+}
+
+/**
+ * Rows per certificate state, keyed by state
+ */
+export type HarmonizeSideDetailCertificateStates = { [key: string]: number };
+
+/**
+ * Identifiers per vocabulary, keyed by vocabulary
+ */
+export type HarmonizeSideDetailIdentifiers = { [key: string]: string[] };
+
+export interface HarmonizeSideDetail {
+  node?: string | null;
+  nodeName?: string | null;
+  nodeNameStatus?: string;
+  rows?: HarmonizeEntryRow[];
+  nRows?: number;
+  /** Rows per certificate state, keyed by state */
+  certificateStates?: HarmonizeSideDetailCertificateStates;
+  /** Identifiers per vocabulary, keyed by vocabulary */
+  identifiers?: HarmonizeSideDetailIdentifiers;
+}
+
+export interface HarmonizeLinkDetail {
+  linkKind?: string;
+  basis?: string | null;
+  bases?: string[];
+  reviewReasons?: string[];
+  nRowPairs?: number;
+  cohorts?: string[];
+  question?: string;
+  a?: HarmonizeSideDetail;
+  b?: HarmonizeSideDetail;
+}
+
+export type HarmonizeReviewItemDetailKind =
+  (typeof HarmonizeReviewItemDetailKind)[keyof typeof HarmonizeReviewItemDetailKind];
+
+export const HarmonizeReviewItemDetailKind = {
+  row: "row",
+  link: "link",
+} as const;
+
+export interface HarmonizeReviewItemDetail {
+  ref: string;
+  kind: HarmonizeReviewItemDetailKind;
+  jobId: string;
+  impact: number;
+  suggestion?: string | null;
+  row?: HarmonizeRowDetail | null;
+  link?: HarmonizeLinkDetail | null;
+  nextStep: string;
+  note?: string;
+}
+
 export type CreateFlagParams = {
   /**
    * Metabolite name to flag
@@ -261,3 +567,25 @@ export type DeleteFlagParams = {
    */
   name: string;
 };
+
+export type ListHarmonizeReviewItemsParams = {
+  kind?: ListHarmonizeReviewItemsKind;
+  /**
+   * @minimum 0
+   */
+  offset?: number;
+  /**
+   * Page size, 1 to 50 (default 25)
+   * @minimum 1
+   * @maximum 50
+   */
+  limit?: number;
+};
+
+export type ListHarmonizeReviewItemsKind =
+  (typeof ListHarmonizeReviewItemsKind)[keyof typeof ListHarmonizeReviewItemsKind];
+
+export const ListHarmonizeReviewItemsKind = {
+  row: "row",
+  link: "link",
+} as const;

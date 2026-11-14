@@ -188,6 +188,29 @@ app.use(
   }),
 );
 
+// Harmonize endpoints: user-scoped, same auth gate as /api/jobs. Mounted before the body
+// parsers, so multipart cohort uploads stream through to the Python API with no size cap
+// here; the per-file limit (50 MB) and its message come from the Python API.
+app.use(
+  "/api/harmonize",
+  ...(clerkEnabled ? [requireMapAuth] : []),
+  createProxyMiddleware({
+    target: PYTHON_API_BASE,
+    changeOrigin: true,
+    pathRewrite: (path: string) => "/harmonize" + (path === "/" ? "" : path),
+    on: {
+      proxyReq: onProxyReqInjectUser,
+      error: (_err, _req, res) => {
+        if (!("headersSent" in res && res.headersSent)) {
+          (res as express.Response)
+            .status(502)
+            .json({ detail: "Harmonization service unavailable. Please try again later." });
+        }
+      },
+    },
+  }),
+);
+
 // Benchmark endpoints — user-scoped. STRICT auth on every path (incl. /stream and
 // /result): benchmark runs store the curator's ground-truth dataset (sensitive), so
 // unlike /api/map there is NO demo/stream/result exemption.
