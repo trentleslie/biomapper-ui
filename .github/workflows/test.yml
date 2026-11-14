@@ -55,6 +55,10 @@ jobs:
       - name: Run frontend tests
         run: pnpm --filter @workspace/frontend test
 
+      # The Express proxy's identity header, against a local stub upstream (no network, no Clerk).
+      - name: Run api-server tests
+        run: pnpm --filter @workspace/api-server test
+
   e2e:
     runs-on: ubuntu-latest
     steps:
