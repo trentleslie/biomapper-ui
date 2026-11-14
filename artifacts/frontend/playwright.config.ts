@@ -7,15 +7,18 @@ import { defineConfig } from "@playwright/test";
 // out so secret scanners do not flag a key-shaped literal.
 const DUMMY_CLERK_KEY = `pk_test_${Buffer.from("example.clerk.accounts.dev$").toString("base64")}`;
 
-const APP_PORT = 5191;
-const BYPASS_PORT = 5192;
+// E2E_PORT_BASE moves both dev servers (base and base + 1) so several checkouts can run e2e at once. When it is
+// set, a server already on those ports is never reused: it may belong to another checkout.
+const PORT_BASE = process.env.E2E_PORT_BASE ? Number(process.env.E2E_PORT_BASE) : undefined;
+const APP_PORT = PORT_BASE ?? 5191;
+const BYPASS_PORT = PORT_BASE !== undefined ? PORT_BASE + 1 : 5192;
 
 function server(port: number, extraEnv: Record<string, string> = {}) {
   return {
     // Plain `vite`: `pnpm run e2e` puts node_modules/.bin on PATH, and npx would add npm config warnings.
     command: "vite --config vite.config.ts --strictPort",
     url: `http://localhost:${port}/`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: PORT_BASE === undefined && !process.env.CI,
     timeout: 120_000,
     env: {
       PORT: String(port),
