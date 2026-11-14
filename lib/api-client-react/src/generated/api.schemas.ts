@@ -137,7 +137,7 @@ export const MappingResultItemChosenKgIdReview = {
 /**
  * Map of vocabulary key → list of CURIEs/identifiers found for this entity.
 Keys are vocabulary identifiers (e.g. "hmdb", "chebi", "uniprot").
-Open record — backend may emit any vocabulary key the underlying
+Open record: the backend may emit any vocabulary key the underlying
 BioMapper run produces, including ones not in the small-molecule
 preset.
 
@@ -182,7 +182,7 @@ review is warranted.
   chosenKgIdReview?: MappingResultItemChosenKgIdReview;
   /** Map of vocabulary key → list of CURIEs/identifiers found for this entity.
 Keys are vocabulary identifiers (e.g. "hmdb", "chebi", "uniprot").
-Open record — backend may emit any vocabulary key the underlying
+Open record: the backend may emit any vocabulary key the underlying
 BioMapper run produces, including ones not in the small-molecule
 preset.
  */
@@ -446,7 +446,9 @@ export interface HarmonizeRunStatus {
   createdAt: string;
   stage?: HarmonizeRunStatusStage;
   cohorts?: HarmonizeCohortStatus[];
+  /** Job-wide estimate of the entities to map. Do not show entitiesMapped out of entitiesTotal as a fraction or percentage; use progress.entitiesDone out of progress.entitiesTotal for the current progress.arm instead. */
   entitiesTotal?: number;
+  /** Job-wide estimate of the entities mapped so far. The package counts mappings per arm and across restarts, so this can exceed entitiesTotal (107 of 53 has been seen on a live run). It must not be shown as a fraction of entitiesTotal. The source of truth for progress is progress.arm with progress.entitiesDone out of progress.entitiesTotal. */
   entitiesMapped?: number;
   rowsErrored?: number;
   etaS?: number | null;

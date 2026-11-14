@@ -163,7 +163,7 @@ export const GetMappingResultResponse = zod.object({
         .record(zod.string(), zod.array(zod.string()))
         .optional()
         .describe(
-          'Map of vocabulary key → list of CURIEs\/identifiers found for this entity.\nKeys are vocabulary identifiers (e.g. \"hmdb\", \"chebi\", \"uniprot\").\nOpen record — backend may emit any vocabulary key the underlying\nBioMapper run produces, including ones not in the small-molecule\npreset.\n',
+          'Map of vocabulary key → list of CURIEs\/identifiers found for this entity.\nKeys are vocabulary identifiers (e.g. \"hmdb\", \"chebi\", \"uniprot\").\nOpen record: the backend may emit any vocabulary key the underlying\nBioMapper run produces, including ones not in the small-molecule\npreset.\n',
         ),
       kgEquivalentIds: zod
         .record(zod.string(), zod.array(zod.string()))
@@ -339,7 +339,7 @@ export const GetJobResponse = zod
               .record(zod.string(), zod.array(zod.string()))
               .optional()
               .describe(
-                'Map of vocabulary key → list of CURIEs\/identifiers found for this entity.\nKeys are vocabulary identifiers (e.g. \"hmdb\", \"chebi\", \"uniprot\").\nOpen record — backend may emit any vocabulary key the underlying\nBioMapper run produces, including ones not in the small-molecule\npreset.\n',
+                'Map of vocabulary key → list of CURIEs\/identifiers found for this entity.\nKeys are vocabulary identifiers (e.g. \"hmdb\", \"chebi\", \"uniprot\").\nOpen record: the backend may emit any vocabulary key the underlying\nBioMapper run produces, including ones not in the small-molecule\npreset.\n',
               ),
             kgEquivalentIds: zod
               .record(zod.string(), zod.array(zod.string()))
@@ -485,7 +485,7 @@ export const UpdateJobResponse = zod
               .record(zod.string(), zod.array(zod.string()))
               .optional()
               .describe(
-                'Map of vocabulary key → list of CURIEs\/identifiers found for this entity.\nKeys are vocabulary identifiers (e.g. \"hmdb\", \"chebi\", \"uniprot\").\nOpen record — backend may emit any vocabulary key the underlying\nBioMapper run produces, including ones not in the small-molecule\npreset.\n',
+                'Map of vocabulary key → list of CURIEs\/identifiers found for this entity.\nKeys are vocabulary identifiers (e.g. \"hmdb\", \"chebi\", \"uniprot\").\nOpen record: the backend may emit any vocabulary key the underlying\nBioMapper run produces, including ones not in the small-molecule\npreset.\n',
               ),
             kgEquivalentIds: zod
               .record(zod.string(), zod.array(zod.string()))
@@ -629,8 +629,18 @@ export const SubmitHarmonizeCohortsResponse = zod
         }),
       )
       .optional(),
-    entitiesTotal: zod.number().optional(),
-    entitiesMapped: zod.number().optional(),
+    entitiesTotal: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities to map. Do not show entitiesMapped out of entitiesTotal as a fraction or percentage; use progress.entitiesDone out of progress.entitiesTotal for the current progress.arm instead.",
+      ),
+    entitiesMapped: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities mapped so far. The package counts mappings per arm and across restarts, so this can exceed entitiesTotal (107 of 53 has been seen on a live run). It must not be shown as a fraction of entitiesTotal. The source of truth for progress is progress.arm with progress.entitiesDone out of progress.entitiesTotal.",
+      ),
     rowsErrored: zod.number().optional(),
     etaS: zod.number().nullish(),
     kgBuild: zod.string().optional(),
@@ -725,8 +735,18 @@ export const SubmitHarmonizeManyResponse = zod
         }),
       )
       .optional(),
-    entitiesTotal: zod.number().optional(),
-    entitiesMapped: zod.number().optional(),
+    entitiesTotal: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities to map. Do not show entitiesMapped out of entitiesTotal as a fraction or percentage; use progress.entitiesDone out of progress.entitiesTotal for the current progress.arm instead.",
+      ),
+    entitiesMapped: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities mapped so far. The package counts mappings per arm and across restarts, so this can exceed entitiesTotal (107 of 53 has been seen on a live run). It must not be shown as a fraction of entitiesTotal. The source of truth for progress is progress.arm with progress.entitiesDone out of progress.entitiesTotal.",
+      ),
     rowsErrored: zod.number().optional(),
     etaS: zod.number().nullish(),
     kgBuild: zod.string().optional(),
@@ -814,8 +834,18 @@ export const SubmitHarmonizeExampleResponse = zod
         }),
       )
       .optional(),
-    entitiesTotal: zod.number().optional(),
-    entitiesMapped: zod.number().optional(),
+    entitiesTotal: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities to map. Do not show entitiesMapped out of entitiesTotal as a fraction or percentage; use progress.entitiesDone out of progress.entitiesTotal for the current progress.arm instead.",
+      ),
+    entitiesMapped: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities mapped so far. The package counts mappings per arm and across restarts, so this can exceed entitiesTotal (107 of 53 has been seen on a live run). It must not be shown as a fraction of entitiesTotal. The source of truth for progress is progress.arm with progress.entitiesDone out of progress.entitiesTotal.",
+      ),
     rowsErrored: zod.number().optional(),
     etaS: zod.number().nullish(),
     kgBuild: zod.string().optional(),
@@ -919,8 +949,18 @@ export const SubmitHarmonizeFromJobsResponse = zod
         }),
       )
       .optional(),
-    entitiesTotal: zod.number().optional(),
-    entitiesMapped: zod.number().optional(),
+    entitiesTotal: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities to map. Do not show entitiesMapped out of entitiesTotal as a fraction or percentage; use progress.entitiesDone out of progress.entitiesTotal for the current progress.arm instead.",
+      ),
+    entitiesMapped: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities mapped so far. The package counts mappings per arm and across restarts, so this can exceed entitiesTotal (107 of 53 has been seen on a live run). It must not be shown as a fraction of entitiesTotal. The source of truth for progress is progress.arm with progress.entitiesDone out of progress.entitiesTotal.",
+      ),
     rowsErrored: zod.number().optional(),
     etaS: zod.number().nullish(),
     kgBuild: zod.string().optional(),
@@ -1004,8 +1044,18 @@ export const ListHarmonizeRunsResponseItem = zod
         }),
       )
       .optional(),
-    entitiesTotal: zod.number().optional(),
-    entitiesMapped: zod.number().optional(),
+    entitiesTotal: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities to map. Do not show entitiesMapped out of entitiesTotal as a fraction or percentage; use progress.entitiesDone out of progress.entitiesTotal for the current progress.arm instead.",
+      ),
+    entitiesMapped: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities mapped so far. The package counts mappings per arm and across restarts, so this can exceed entitiesTotal (107 of 53 has been seen on a live run). It must not be shown as a fraction of entitiesTotal. The source of truth for progress is progress.arm with progress.entitiesDone out of progress.entitiesTotal.",
+      ),
     rowsErrored: zod.number().optional(),
     etaS: zod.number().nullish(),
     kgBuild: zod.string().optional(),
@@ -1096,8 +1146,18 @@ export const GetHarmonizeRunResponse = zod
         }),
       )
       .optional(),
-    entitiesTotal: zod.number().optional(),
-    entitiesMapped: zod.number().optional(),
+    entitiesTotal: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities to map. Do not show entitiesMapped out of entitiesTotal as a fraction or percentage; use progress.entitiesDone out of progress.entitiesTotal for the current progress.arm instead.",
+      ),
+    entitiesMapped: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities mapped so far. The package counts mappings per arm and across restarts, so this can exceed entitiesTotal (107 of 53 has been seen on a live run). It must not be shown as a fraction of entitiesTotal. The source of truth for progress is progress.arm with progress.entitiesDone out of progress.entitiesTotal.",
+      ),
     rowsErrored: zod.number().optional(),
     etaS: zod.number().nullish(),
     kgBuild: zod.string().optional(),
@@ -1185,8 +1245,18 @@ export const ResumeHarmonizeRunResponse = zod
         }),
       )
       .optional(),
-    entitiesTotal: zod.number().optional(),
-    entitiesMapped: zod.number().optional(),
+    entitiesTotal: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities to map. Do not show entitiesMapped out of entitiesTotal as a fraction or percentage; use progress.entitiesDone out of progress.entitiesTotal for the current progress.arm instead.",
+      ),
+    entitiesMapped: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities mapped so far. The package counts mappings per arm and across restarts, so this can exceed entitiesTotal (107 of 53 has been seen on a live run). It must not be shown as a fraction of entitiesTotal. The source of truth for progress is progress.arm with progress.entitiesDone out of progress.entitiesTotal.",
+      ),
     rowsErrored: zod.number().optional(),
     etaS: zod.number().nullish(),
     kgBuild: zod.string().optional(),
@@ -1274,8 +1344,18 @@ export const CancelHarmonizeRunResponse = zod
         }),
       )
       .optional(),
-    entitiesTotal: zod.number().optional(),
-    entitiesMapped: zod.number().optional(),
+    entitiesTotal: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities to map. Do not show entitiesMapped out of entitiesTotal as a fraction or percentage; use progress.entitiesDone out of progress.entitiesTotal for the current progress.arm instead.",
+      ),
+    entitiesMapped: zod
+      .number()
+      .optional()
+      .describe(
+        "Job-wide estimate of the entities mapped so far. The package counts mappings per arm and across restarts, so this can exceed entitiesTotal (107 of 53 has been seen on a live run). It must not be shown as a fraction of entitiesTotal. The source of truth for progress is progress.arm with progress.entitiesDone out of progress.entitiesTotal.",
+      ),
     rowsErrored: zod.number().optional(),
     etaS: zod.number().nullish(),
     kgBuild: zod.string().optional(),
