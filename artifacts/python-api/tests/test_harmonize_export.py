@@ -123,6 +123,8 @@ def test_eitl_text_falls_back_to_key_for_a_whitespace_only_name(two_cohort_repor
         if isinstance(node, dict):
             if node.get("key") == "a1" and "name" in node:
                 node["name"] = "   "
+            if node.get("a_key") == "a1" and "a_name" in node:
+                node["a_name"] = "   "
             for v in node.values():
                 blank_a1(v)
         elif isinstance(node, list):
