@@ -54,7 +54,9 @@ export function RunStage({ run }: { run: HarmonizeRunStatus }) {
   const [actionError, setActionError] = useState<string | null>(null);
   const info = stateInfo(run.state);
   const progress = armProgress(run.progress);
-  const arms = armsFor(run.kind);
+  // An arm the package reports that this screen does not list is shown after the known ones, not hidden.
+  const known = armsFor(run.kind);
+  const arms = progress && !known.includes(progress.arm) ? [...known, progress.arm] : known;
   const currentArmIndex = progress ? arms.indexOf(progress.arm) : -1;
   const finished = hasResults(run.state);
   const isTwo = run.kind === "harmonize_cohorts";
@@ -76,6 +78,22 @@ export function RunStage({ run }: { run: HarmonizeRunStatus }) {
 
   return (
     <div className="space-y-6">
+      {finished && (
+        <div
+          className="flex flex-wrap items-center justify-between gap-3 rounded border border-success-border bg-success-bg px-5 py-4"
+          data-testid="run-finished"
+        >
+          <p className="text-base font-semibold text-success">
+            {run.state === "partial" ? "Finished, with some rows that could not be mapped." : "Finished."} Review the results.
+          </p>
+          <Button asChild size="lg">
+            <Link href={stageHref(run.jobId, "review")}>
+              Review results <ArrowRight aria-hidden />
+            </Link>
+          </Button>
+        </div>
+      )}
+
       <Panel
         id="run-status"
         title="Run status"
@@ -120,6 +138,8 @@ export function RunStage({ run }: { run: HarmonizeRunStatus }) {
             <ol aria-label="Arms of this run" className="grid gap-3 md:grid-cols-3">
               {arms.map((arm, i) => {
                 const isCurrent = !finished && i === currentArmIndex;
+                // A stopped run (cancelled, paused, failed...) is not working on any arm now.
+                const working = isActive(run.state);
                 const isDone = finished || (currentArmIndex >= 0 && i < currentArmIndex);
                 return (
                   <li
@@ -138,7 +158,7 @@ export function RunStage({ run }: { run: HarmonizeRunStatus }) {
                             <Check aria-hidden className="h-3.5 w-3.5" /> Done
                           </span>
                         ) : isCurrent ? (
-                          "Now"
+                          working ? "Now" : "Stopped here"
                         ) : (
                           "Next"
                         )}
@@ -240,20 +260,6 @@ export function RunStage({ run }: { run: HarmonizeRunStatus }) {
         <Note tone="danger" title="That did not work">
           {actionError}
         </Note>
-      )}
-
-      {finished && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-success-border bg-success-bg px-5 py-4">
-          <p className="text-sm font-medium text-success">
-            {run.state === "partial" ? "The run finished with some rows unmapped." : "The run is complete."} Next, review the
-            results and flag what an expert should check.
-          </p>
-          <Button asChild size="lg">
-            <Link href={stageHref(run.jobId, "review")}>
-              Review results <ArrowRight aria-hidden />
-            </Link>
-          </Button>
-        </div>
       )}
 
       <AlertDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
