@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { isolate, JOBS } from "./helpers";
+import { goto, isolate, JOBS } from "./helpers";
 
 // Every container whose content can overflow must show a scroll bar the reader can see without hovering or
 // scrolling first. docs/harmonization/scroll-audit.md lists each site; these tests fill them past their bounds
@@ -108,7 +108,7 @@ test.describe("scroll bars on the demo surface @demo", () => {
   test("results table, review list and vocabulary coverage on a long demo job", async ({ page }) => {
     const jobId = "demo-job-1";
     await isolate(page, dashboardStubs(jobId));
-    await page.goto(`/job/${jobId}?demo=true`);
+    await goto(page, `/job/${jobId}?demo=true`);
     await expect(page.getByTestId("input-results-search")).toBeVisible();
     await expectNoViolations(page, ["main"]);
     // The wide table scrolls sideways inside its own box, with a bar.
@@ -124,7 +124,7 @@ test.describe("scroll bars on the demo surface @demo", () => {
     const jobId = "demo-job-2";
     await isolate(page, dashboardStubs(jobId, 40));
     await page.setViewportSize({ width: 1440, height: 260 });
-    await page.goto(`/job/${jobId}?demo=true`);
+    await goto(page, `/job/${jobId}?demo=true`);
     await page.getByTestId("select-results-confidence").click();
     await expect(page.getByRole("option", { name: "All Results" })).toBeVisible();
     await expectNoViolations(page);
@@ -133,7 +133,7 @@ test.describe("scroll bars on the demo surface @demo", () => {
   test("rail: the expanded panel on a short window", async ({ page }) => {
     await isolate(page);
     await page.setViewportSize({ width: 1440, height: 120 });
-    await page.goto("/demo");
+    await goto(page, "/demo");
     await page.getByTestId("app-nav").hover();
     await expect(page.getByTestId("app-nav")).toHaveAttribute("data-expanded", "true");
     await expect(page.getByTestId("app-nav-panel")).toHaveCSS("width", "240px"); // past the width transition
@@ -149,7 +149,7 @@ test.describe("scroll bars on the signed-in surface @app", () => {
       "/api/discovery/entity-types": entityTypes,
       "/api/discovery/vocabularies": vocabularies,
     });
-    await page.goto("/");
+    await goto(page, "/");
     const columns = Array.from({ length: 60 }, (_, i) => `column_${i}`);
     const csv = `${columns.join(",")}\n${columns.map((_, i) => `value ${i}`).join(",")}\n`;
     await page.locator("input[type=file]").setInputFiles({ name: "wide.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
@@ -173,7 +173,7 @@ test.describe("scroll bars on the signed-in surface @app", () => {
   test("feedback dialog on a short window", async ({ page }) => {
     await isolate(page);
     await page.setViewportSize({ width: 1440, height: 300 });
-    await page.goto("/");
+    await goto(page, "/");
     await page.getByRole("button", { name: "Submit feedback" }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await expectNoViolations(page, ["z-50"]);
@@ -182,7 +182,7 @@ test.describe("scroll bars on the signed-in surface @app", () => {
   test("jobs list and its delete dialog", async ({ page }) => {
     const jobs = Array.from({ length: 150 }, (_, i) => ({ ...JOBS[0], jobId: `cccccccc-0000-0000-0000-${String(i).padStart(12, "0")}`, displayName: `Job ${i}` }));
     await isolate(page, { "/api/jobs": jobs });
-    await page.goto("/jobs");
+    await goto(page, "/jobs");
     await expect(page.getByRole("table").getByText("Job 0", { exact: true })).toBeVisible();
     await expectNoViolations(page, ["main"]);
     await page.getByTitle("Delete job").first().click();
@@ -194,7 +194,7 @@ test.describe("scroll bars on the signed-in surface @app", () => {
   test("flagged annotations list", async ({ page }) => {
     const flags = Array.from({ length: 200 }, (_, i) => ({ name: `flagged compound ${i}`, count: i + 1 }));
     await isolate(page, { "/api/flags/all": { items: flags, total: flags.length } });
-    await page.goto("/flagged");
+    await goto(page, "/flagged");
     await expect(page.getByText("flagged compound 0", { exact: true })).toBeVisible();
     await expectNoViolations(page, ["main"]);
   });
@@ -219,11 +219,11 @@ test.describe("scroll bars on the signed-in surface @app", () => {
       "/api/benchmark/runs/run-0": run("run-0"),
       "/api/benchmark/runs/run-0/rows": rows,
     });
-    await page.goto("/benchmark/runs");
+    await goto(page, "/benchmark/runs");
     await expect(page.getByRole("heading", { name: "Benchmark runs" })).toBeVisible();
     await expectNoViolations(page, ["main"]);
 
-    await page.goto("/benchmark/runs/run-0");
+    await goto(page, "/benchmark/runs/run-0");
     await expect(page.getByText("Per-row disagreement log")).toBeVisible();
     await expectNoViolations(page, ["main"]);
     await page.setViewportSize({ width: 1440, height: 400 });

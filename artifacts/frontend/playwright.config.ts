@@ -30,11 +30,13 @@ export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
+  // Locally a flake must fail loudly; CI gets one retry, and the trace below is kept for any failure.
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? "github" : "list",
   use: {
     viewport: { width: 1440, height: 900 },
-    trace: "off",
+    // A failing test leaves a trace (test-results/<test>/trace.zip) to open with `playwright show-trace`.
+    trace: "retain-on-failure",
     // Playwright's headless Chromium passes --hide-scrollbars, which would make every scroll bar invisible and the
     // scroll.spec.ts checks meaningless. Real users see bars, so the tests must too.
     launchOptions: { ignoreDefaultArgs: ["--hide-scrollbars"] },

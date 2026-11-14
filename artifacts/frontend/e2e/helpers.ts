@@ -5,6 +5,20 @@ export const JOBS = [
   { jobId: "bbbbbbbb-0000-0000-0000-000000000002", displayName: null, status: "running", total: 10, completed: 4, errorCount: 0, env: "production", createdAt: 1_700_000_200, updatedAt: 1_700_000_300 },
 ];
 
+/**
+ * page.goto, then park the pointer over the content area.
+ *
+ * Every navigation puts Playwright's pointer back at (0, 0), which is inside the left rail, and Chromium fires
+ * mouseenter on the rail as soon as it renders there. The rail then opened on its own after its hover delay, so a
+ * test asserting the resting rail raced that delay and failed whenever the page was slow (a cold Vite start, a
+ * loaded machine). Moving the pointer away fires mouseleave, which cancels a pending open and closes an open rail.
+ * Tests that want the rail open hover or focus it themselves.
+ */
+export async function goto(page: Page, url: string) {
+  await page.goto(url);
+  await page.mouse.move(1200, 10);
+}
+
 /** A canned answer for one /api path: a JSON body, or a function that fulfils the route itself. */
 export type Stub = unknown | ((route: Route, url: URL) => Promise<void> | void);
 

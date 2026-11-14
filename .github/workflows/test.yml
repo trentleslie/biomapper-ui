@@ -82,4 +82,13 @@ jobs:
 
       # No backend and no network: the spec stubs every /api call and every external request.
       - name: Run e2e tests
-        run: pnpm --filter @workspace/frontend e2e --trace off
+        run: pnpm --filter @workspace/frontend e2e
+
+      # Playwright keeps a trace for every failing test (trace: retain-on-failure); keep them with the run.
+      - name: Upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-test-results
+          path: artifacts/frontend/test-results/
+          retention-days: 7

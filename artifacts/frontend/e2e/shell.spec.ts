@@ -1,6 +1,6 @@
 import path from "node:path";
 import { test, expect, type Page } from "@playwright/test";
-import { isolate, JOBS } from "./helpers";
+import { goto, isolate, JOBS } from "./helpers";
 
 // Screenshots for the PR are written only on request (SHELL_SCREENSHOTS=1), so a normal run never edits the repo.
 const SCREENSHOT_DIR = path.resolve(import.meta.dirname, "../../../docs/harmonization/screenshots");
@@ -47,7 +47,7 @@ async function expectSelfHostedInter(page: Page, googleFontRequests: string[]) {
 test.describe("demo shell @demo", () => {
   test("rail, destinations and self-hosted Inter on /demo", async ({ page }) => {
     const googleFontRequests = await isolate(page);
-    await page.goto("/demo");
+    await goto(page, "/demo");
     await expect(page.getByRole("heading", { name: "See BioMapper in Action" })).toBeVisible();
 
     await expectRailExpandsWithoutReflow(page);
@@ -63,7 +63,7 @@ test.describe("demo shell @demo", () => {
 
   test("keyboard focus opens the rail", async ({ page }) => {
     await isolate(page);
-    await page.goto("/demo");
+    await goto(page, "/demo");
     const nav = page.getByTestId("app-nav");
     await expect(nav).toHaveAttribute("data-expanded", "false");
     await page.keyboard.press("Tab");
@@ -74,7 +74,7 @@ test.describe("demo shell @demo", () => {
     test.skip(!TAKE_SCREENSHOTS, "set SHELL_SCREENSHOTS=1 to refresh the PR screenshots");
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2, baseURL: test.info().project.use.baseURL });
     await isolate(page);
-    await page.goto("/demo");
+    await goto(page, "/demo");
     await expect(page.getByRole("heading", { name: "See BioMapper in Action" })).toBeVisible();
     await page.evaluate(() => document.fonts.ready);
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "shell-demo.png") });
@@ -85,7 +85,7 @@ test.describe("demo shell @demo", () => {
 test.describe("app shell @app", () => {
   test("rail and every existing destination on the upload page", async ({ page }) => {
     const googleFontRequests = await isolate(page);
-    await page.goto("/");
+    await goto(page, "/");
 
     await expectRailExpandsWithoutReflow(page);
 
@@ -111,7 +111,7 @@ test.describe("app shell @app", () => {
     test.skip(!TAKE_SCREENSHOTS, "set SHELL_SCREENSHOTS=1 to refresh the PR screenshots");
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2, baseURL: test.info().project.use.baseURL });
     await isolate(page);
-    await page.goto("/");
+    await goto(page, "/");
     await expect(page.getByTestId("app-shell")).toBeVisible();
     await page.evaluate(() => document.fonts.ready);
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "shell-upload.png") });
