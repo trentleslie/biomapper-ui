@@ -169,7 +169,7 @@ export function SetupStage() {
     const titles = mode === "two" ? ["Cohort A", "Cohort B"] : slots.map((_, i) => `Cohort ${i + 1}`);
     if (mode === "many") {
       const countMsg = manyCountMessage(slots.length);
-      if (countMsg && slots.length < 2) {
+      if (countMsg) {
         setSubmitError(countMsg);
         return;
       }

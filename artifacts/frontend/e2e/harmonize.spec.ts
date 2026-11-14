@@ -664,4 +664,25 @@ test.describe("harmonize @app", () => {
     await expect(page.getByTestId("submit-error")).toContainText("stop here");
     expect(specs[1]).not.toContain('"vocabularies":{"HMDB":["hmdb"]}},"b"');
   });
+
+  test("a many-cohort run with 13 files is refused on screen with the count rule, before any upload", async ({ page }) => {
+    let uploads = 0;
+    await isolate(page, {
+      "/api/harmonize/runs": [],
+      "/api/harmonize/inspect": { columns: ["id", "name"], rowCount: 1 },
+      "/api/harmonize/many": async (route: Route) => {
+        uploads += 1;
+        return route.fulfill({ status: 400, json: { detail: "A many-cohort run takes 2 to 12 cohort files (got 13)." } });
+      },
+    });
+    await goto(page, "/harmonize");
+    await page.getByRole("radio", { name: /Many cohort files/ }).click();
+    const files = Array.from({ length: 13 }, (_, i) => ({ name: `c${i + 1}.tsv`, mimeType: "text/tab-separated-values", buffer: Buffer.from("id\tname\n1\tGlucose\n") }));
+    await page.getByLabel("Add cohort files", { exact: true }).first().setInputFiles(files);
+    await expect(page.getByTestId("cohort-editor")).toHaveCount(13);
+    await page.getByRole("button", { name: "Start harmonization" }).click();
+    // Word for word the server's message (routes/harmonize.py, H-53).
+    await expect(page.getByTestId("submit-error")).toContainText("A many-cohort run takes 2 to 12 cohort files (got 13).");
+    expect(uploads).toBe(0);
+  });
 });
