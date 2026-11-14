@@ -28,6 +28,17 @@ Checked by `artifacts/frontend/e2e/scroll.spec.ts` (run with `pnpm --filter @wor
 | Feedback dialog | `components/FeedbackDialog.tsx`, `ui/dialog.tsx` | Short windows | `DialogContent` caps at `100dvh - 2rem` and is `scroll-visible`; the page's own `overflow-y-auto` removed | feedback test |
 | Delete dialogs | `pages/jobs.tsx`, `pages/benchmark-runs.tsx`, `ui/alert-dialog.tsx` | Short windows | `AlertDialogContent` caps at `100dvh - 2rem` and is `scroll-visible` | jobs test |
 | Feedback textareas | `components/FeedbackDialog.tsx` | Long text | `scroll-visible [scrollbar-gutter:auto]!` | covered by the shared class |
+| Harmonize: your runs list | `components/harmonize/RunsList.tsx` | Many runs; `max-h-[min(26rem,calc(100vh-24rem))]` | `scroll-visible` | harmonize test |
+| Harmonize: cohort column list | `components/harmonize/CohortEditor.tsx` (`vocab-columns`) | Wide files; `max-h-56` | `scroll-visible` | harmonize test |
+| Harmonize: column dropdowns | `components/harmonize/CohortEditor.tsx`, `SetupStage.tsx`, `ui/select.tsx` | Wide files, many entity types | shared Select | covered by the shared Select |
+| Harmonize: result tables | `components/harmonize/common.tsx` (`DataTable`: links, groups, per-cohort counts, withheld, possible misses, unresolved, review queue, run setup) | Many rows (paged at 100) and wide columns, both axes | `scroll-visible` box with a `max-h-*` per site | harmonize test (`groups-table`) |
+| Harmonize: arm-difference node list | `components/harmonize/ReviewSummary.tsx` (`DiffList`, many-cohort) | Node chips; `max-h-48` (paged at 100) | `scroll-visible` | covered by the shared class |
+| Harmonize: review items table | `components/harmonize/ReviewSummary.tsx` (`ReviewQueueView`) | Wide rows; `max-h-96` (paged at 25) | `scroll-visible` | covered by the shared class |
+| Harmonize: review item and item detail sheets | `components/harmonize/ReviewSummary.tsx`, `FlagItems.tsx` (`SheetContent`) | Long detail on short windows | `scroll-visible` on the sheet | covered by the shared class |
+| Harmonize: identifier lists in detail sheets | `components/harmonize/ReviewSummary.tsx` (`SideBlock`), `FlagItems.tsx` (shared identifiers) | Many identifiers; `max-h-40` | `scroll-visible` | covered by the shared class |
+| Harmonize: item members table | `components/harmonize/FlagItems.tsx` (item detail) | Groups with many members; `max-h-64` | `scroll-visible` | covered by the shared class |
+| Harmonize: flag items table | `components/harmonize/FlagItems.tsx` (`items-table`) | 100 items per page; `max-h-[32rem]` | `scroll-visible` | harmonize test |
+| Harmonize: export tables list | `components/harmonize/ExportStage.tsx` | Wide on narrow windows (no height cap) | `scroll-visible` | covered by the shared class |
 
 ## Select
 
