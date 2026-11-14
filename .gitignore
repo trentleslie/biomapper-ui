@@ -67,3 +67,7 @@ artifacts/python-api/data/harmonize/
 
 # python virtualenv
 .venv/
+
+# Playwright output
+artifacts/frontend/test-results/
+artifacts/frontend/playwright-report/

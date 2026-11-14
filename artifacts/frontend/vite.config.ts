@@ -2,7 +2,25 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
+import { execFileSync } from "child_process";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+
+// The build stamp in the navigation rail. BUILD_SHA overrides; otherwise the checkout's HEAD. When neither is
+// available the stamp is left out of the UI rather than shown empty.
+function buildSha(): string | null {
+  if (process.env.BUILD_SHA) return process.env.BUILD_SHA.slice(0, 7);
+  try {
+    const sha = execFileSync("git", ["rev-parse", "--short=7", "HEAD"], {
+      cwd: import.meta.dirname,
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .toString()
+      .trim();
+    return sha || null;
+  } catch {
+    return null;
+  }
+}
 
 const rawPort = process.env.PORT;
 
@@ -28,6 +46,9 @@ if (!basePath) {
 
 export default defineConfig({
   base: basePath,
+  define: {
+    __BUILD_SHA__: JSON.stringify(buildSha()),
+  },
   plugins: [
     react(),
     tailwindcss(),
