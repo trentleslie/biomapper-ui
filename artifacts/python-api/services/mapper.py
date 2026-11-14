@@ -227,4 +227,17 @@ class MapperService:
         }
         kg_equiv = getattr(result, "kg_equivalent_ids", None)
         processed["kgEquivalentIds"] = dict(kg_equiv) if kg_equiv is not None else {}
+        # What biomapper.harmonize.harmonize() reads beyond the fields above, so two finished
+        # jobs can be linked offline: the chosen node (it seeds the identifier set and the
+        # "node" basis; primaryCurie is a different value), the certificate state (a
+        # "contradicted" one is a possible-miss reason) and the engine's mixture flag, which
+        # harmonize() takes as name_is_mixture OR lipid_resolution.name_is_mixture.
+        certificate = getattr(result, "certificate", None)
+        lipid = getattr(result, "lipid_resolution", None)
+        name_is_mixture = getattr(result, "name_is_mixture", None)
+        if lipid is not None and lipid.name_is_mixture is True:
+            name_is_mixture = True
+        processed["chosenKgId"] = getattr(result, "chosen_kg_id", None)
+        processed["certificateState"] = certificate.state if certificate is not None else None
+        processed["nameIsMixture"] = name_is_mixture
         return processed

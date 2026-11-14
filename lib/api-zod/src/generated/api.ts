@@ -171,6 +171,24 @@ export const GetMappingResultResponse = zod.object({
         .describe(
           'Map of CURIE prefix to list of equivalent local identifiers from the\nknowledge graph node. Keys are native CURIE prefixes (e.g. \"HMDB\",\n\"KEGG.COMPOUND\"). Empty object when no KG match.\n',
         ),
+      chosenKgId: zod
+        .string()
+        .nullish()
+        .describe(
+          "The knowledge graph node the resolver chose. Not the same value as primaryCurie.\nAbsent from results mapped before harmonizing finished jobs was supported.\n",
+        ),
+      certificateState: zod
+        .string()
+        .nullish()
+        .describe(
+          "The resolution certificate's state (for example corroborated, uncorroborated,\ncontradicted, unavailable, not_applicable). null when the engine sent none.\n",
+        ),
+      nameIsMixture: zod
+        .boolean()
+        .nullish()
+        .describe(
+          "The engine's flag that the name lists alternative compounds (its top-level flag or\nthe lipid resolution's). null when the engine did not say.\n",
+        ),
       providedIds: zod
         .record(
           zod.string(),
@@ -329,6 +347,24 @@ export const GetJobResponse = zod
               .describe(
                 'Map of CURIE prefix to list of equivalent local identifiers from the\nknowledge graph node. Keys are native CURIE prefixes (e.g. \"HMDB\",\n\"KEGG.COMPOUND\"). Empty object when no KG match.\n',
               ),
+            chosenKgId: zod
+              .string()
+              .nullish()
+              .describe(
+                "The knowledge graph node the resolver chose. Not the same value as primaryCurie.\nAbsent from results mapped before harmonizing finished jobs was supported.\n",
+              ),
+            certificateState: zod
+              .string()
+              .nullish()
+              .describe(
+                "The resolution certificate's state (for example corroborated, uncorroborated,\ncontradicted, unavailable, not_applicable). null when the engine sent none.\n",
+              ),
+            nameIsMixture: zod
+              .boolean()
+              .nullish()
+              .describe(
+                "The engine's flag that the name lists alternative compounds (its top-level flag or\nthe lipid resolution's). null when the engine did not say.\n",
+              ),
             providedIds: zod
               .record(
                 zod.string(),
@@ -457,6 +493,24 @@ export const UpdateJobResponse = zod
               .describe(
                 'Map of CURIE prefix to list of equivalent local identifiers from the\nknowledge graph node. Keys are native CURIE prefixes (e.g. \"HMDB\",\n\"KEGG.COMPOUND\"). Empty object when no KG match.\n',
               ),
+            chosenKgId: zod
+              .string()
+              .nullish()
+              .describe(
+                "The knowledge graph node the resolver chose. Not the same value as primaryCurie.\nAbsent from results mapped before harmonizing finished jobs was supported.\n",
+              ),
+            certificateState: zod
+              .string()
+              .nullish()
+              .describe(
+                "The resolution certificate's state (for example corroborated, uncorroborated,\ncontradicted, unavailable, not_applicable). null when the engine sent none.\n",
+              ),
+            nameIsMixture: zod
+              .boolean()
+              .nullish()
+              .describe(
+                "The engine's flag that the name lists alternative compounds (its top-level flag or\nthe lipid resolution's). null when the engine did not say.\n",
+              ),
             providedIds: zod
               .record(
                 zod.string(),
@@ -554,7 +608,11 @@ export const SubmitHarmonizeCohortsResponse = zod
       "unknown",
     ]),
     reason: zod.string().nullish(),
-    kind: zod.enum(["harmonize_cohorts", "harmonize_many"]),
+    kind: zod.enum([
+      "harmonize_cohorts",
+      "harmonize_many",
+      "harmonize_results",
+    ]),
     labels: zod.array(zod.string()),
     entity: zod.string(),
     createdAt: zod
@@ -646,7 +704,11 @@ export const SubmitHarmonizeManyResponse = zod
       "unknown",
     ]),
     reason: zod.string().nullish(),
-    kind: zod.enum(["harmonize_cohorts", "harmonize_many"]),
+    kind: zod.enum([
+      "harmonize_cohorts",
+      "harmonize_many",
+      "harmonize_results",
+    ]),
     labels: zod.array(zod.string()),
     entity: zod.string(),
     createdAt: zod
@@ -731,7 +793,116 @@ export const SubmitHarmonizeExampleResponse = zod
       "unknown",
     ]),
     reason: zod.string().nullish(),
-    kind: zod.enum(["harmonize_cohorts", "harmonize_many"]),
+    kind: zod.enum([
+      "harmonize_cohorts",
+      "harmonize_many",
+      "harmonize_results",
+    ]),
+    labels: zod.array(zod.string()),
+    entity: zod.string(),
+    createdAt: zod
+      .string()
+      .describe("When this app recorded the run (UTC, ISO 8601)"),
+    stage: zod
+      .enum(["queued", "mapping", "building", "capture", "placing", "done"])
+      .optional(),
+    cohorts: zod
+      .array(
+        zod.object({
+          label: zod.string(),
+          rows: zod.number(),
+        }),
+      )
+      .optional(),
+    entitiesTotal: zod.number().optional(),
+    entitiesMapped: zod.number().optional(),
+    rowsErrored: zod.number().optional(),
+    etaS: zod.number().nullish(),
+    kgBuild: zod.string().optional(),
+    kgVerified: zod.boolean().optional(),
+    owner: zod
+      .object({
+        host: zod.string().nullish(),
+        pid: zod.number().nullish(),
+      })
+      .nullish(),
+    createdUtc: zod.string().optional(),
+    updatedUtc: zod.string().optional(),
+    summary: zod.record(zod.string(), zod.unknown()).nullish(),
+    reviewItems: zod
+      .object({
+        row: zod.number(),
+        link: zod.number(),
+        skippedNoNode: zod.number(),
+        candidatesCaptured: zod.number(),
+        candidatesNotCaptured: zod.number(),
+      })
+      .nullish(),
+    progress: zod
+      .object({
+        function: zod.string(),
+        arm: zod
+          .string()
+          .describe("names_only, identifier or (two cohorts only) review"),
+        cohort: zod.string().nullish(),
+        cohorts: zod.array(zod.string()).optional(),
+        entitiesDone: zod.number(),
+        entitiesTotal: zod.number(),
+      })
+      .optional()
+      .describe(
+        "The latest progress update of the running arm (and cohort, on two-cohort runs)",
+      ),
+  })
+  .describe(
+    "The package's HarmonizeStatus with camelCase keys, plus this app's kind, labels, entity and createdAt. summary is the package's compact summary, passed through with its own (snake_case and data) keys. Server paths (the package's output_dir, store_dir and each cohort's path) are never included. A listed run the job runner no longer knows carries only jobId, state \"unknown\", reason, kind, labels, entity and createdAt.",
+  );
+
+/**
+ * Runs synchronously with biomapper's local harmonize() over the two jobs' stored results and records a finished run of kind harmonize_results. Its report, items, flags and exports are served from disk; it has no review items and cannot be resumed or cancelled.
+ * @summary Harmonize two of the caller's finished mapping jobs, with no re-mapping
+ */
+export const submitHarmonizeFromJobsBodyLinkByNameDefault = false;
+
+export const SubmitHarmonizeFromJobsBody = zod.object({
+  jobA: zod.string().describe("A finished mapping job's id (cohort A)"),
+  jobB: zod
+    .string()
+    .describe(
+      "A finished mapping job's id (cohort B), of the same entity type",
+    ),
+  aLabel: zod.string(),
+  bLabel: zod.string(),
+  linkByName: zod
+    .boolean()
+    .default(submitHarmonizeFromJobsBodyLinkByNameDefault)
+    .describe(
+      "Also link resolved rows whose names match (off links by identifier only)",
+    ),
+});
+
+export const SubmitHarmonizeFromJobsResponse = zod
+  .object({
+    jobId: zod.string(),
+    state: zod.enum([
+      "queued",
+      "running",
+      "paused",
+      "stalled",
+      "expired",
+      "cancelled",
+      "complete",
+      "failed",
+      "owned_elsewhere",
+      "partial",
+      "unknown",
+    ]),
+    reason: zod.string().nullish(),
+    kind: zod.enum([
+      "harmonize_cohorts",
+      "harmonize_many",
+      "harmonize_results",
+    ]),
     labels: zod.array(zod.string()),
     entity: zod.string(),
     createdAt: zod
@@ -812,7 +983,11 @@ export const ListHarmonizeRunsResponseItem = zod
       "unknown",
     ]),
     reason: zod.string().nullish(),
-    kind: zod.enum(["harmonize_cohorts", "harmonize_many"]),
+    kind: zod.enum([
+      "harmonize_cohorts",
+      "harmonize_many",
+      "harmonize_results",
+    ]),
     labels: zod.array(zod.string()),
     entity: zod.string(),
     createdAt: zod
@@ -900,7 +1075,11 @@ export const GetHarmonizeRunResponse = zod
       "unknown",
     ]),
     reason: zod.string().nullish(),
-    kind: zod.enum(["harmonize_cohorts", "harmonize_many"]),
+    kind: zod.enum([
+      "harmonize_cohorts",
+      "harmonize_many",
+      "harmonize_results",
+    ]),
     labels: zod.array(zod.string()),
     entity: zod.string(),
     createdAt: zod
@@ -985,7 +1164,11 @@ export const ResumeHarmonizeRunResponse = zod
       "unknown",
     ]),
     reason: zod.string().nullish(),
-    kind: zod.enum(["harmonize_cohorts", "harmonize_many"]),
+    kind: zod.enum([
+      "harmonize_cohorts",
+      "harmonize_many",
+      "harmonize_results",
+    ]),
     labels: zod.array(zod.string()),
     entity: zod.string(),
     createdAt: zod
@@ -1070,7 +1253,11 @@ export const CancelHarmonizeRunResponse = zod
       "unknown",
     ]),
     reason: zod.string().nullish(),
-    kind: zod.enum(["harmonize_cohorts", "harmonize_many"]),
+    kind: zod.enum([
+      "harmonize_cohorts",
+      "harmonize_many",
+      "harmonize_results",
+    ]),
     labels: zod.array(zod.string()),
     entity: zod.string(),
     createdAt: zod
@@ -1141,7 +1328,11 @@ export const GetHarmonizeReportParams = zod.object({
 export const GetHarmonizeReportResponse = zod
   .object({
     schema_version: zod.number(),
-    kind: zod.enum(["harmonize_cohorts", "harmonize_many"]),
+    kind: zod.enum([
+      "harmonize_cohorts",
+      "harmonize_many",
+      "harmonize_results",
+    ]),
   })
   .describe("report.json as the package wrote it (snake_case keys)");
 

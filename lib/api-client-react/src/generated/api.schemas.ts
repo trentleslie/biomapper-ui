@@ -192,6 +192,18 @@ knowledge graph node. Keys are native CURIE prefixes (e.g. "HMDB",
 "KEGG.COMPOUND"). Empty object when no KG match.
  */
   kgEquivalentIds?: MappingResultItemKgEquivalentIds;
+  /** The knowledge graph node the resolver chose. Not the same value as primaryCurie.
+Absent from results mapped before harmonizing finished jobs was supported.
+ */
+  chosenKgId?: string | null;
+  /** The resolution certificate's state (for example corroborated, uncorroborated,
+contradicted, unavailable, not_applicable). null when the engine sent none.
+ */
+  certificateState?: string | null;
+  /** The engine's flag that the name lists alternative compounds (its top-level flag or
+the lipid resolution's). null when the engine did not say.
+ */
+  nameIsMixture?: boolean | null;
   /** Original provided ID values from user's uploaded file, keyed by original column name */
   providedIds?: MappingResultItemProvidedIds;
   error?: string | null;
@@ -337,6 +349,17 @@ export interface HarmonizeExampleRequest {
   kind: HarmonizeExampleRequestKind;
 }
 
+export interface HarmonizeFromJobsRequest {
+  /** A finished mapping job's id (cohort A) */
+  jobA: string;
+  /** A finished mapping job's id (cohort B), of the same entity type */
+  jobB: string;
+  aLabel: string;
+  bLabel: string;
+  /** Also link resolved rows whose names match (off links by identifier only) */
+  linkByName?: boolean;
+}
+
 export interface HarmonizeCohortStatus {
   label: string;
   rows: number;
@@ -391,6 +414,7 @@ export type HarmonizeRunStatusKind =
 export const HarmonizeRunStatusKind = {
   harmonize_cohorts: "harmonize_cohorts",
   harmonize_many: "harmonize_many",
+  harmonize_results: "harmonize_results",
 } as const;
 
 export type HarmonizeRunStatusStage =
@@ -441,6 +465,7 @@ export type HarmonizeReportKind =
 export const HarmonizeReportKind = {
   harmonize_cohorts: "harmonize_cohorts",
   harmonize_many: "harmonize_many",
+  harmonize_results: "harmonize_results",
 } as const;
 
 /**

@@ -16,6 +16,10 @@ def _make_mock_result(**overrides):
     result.ids_for = MagicMock(return_value=[])
     result.kg_equivalent_ids = overrides.get("kg_equivalent_ids", {})
     result.chosen_kg_id_review = overrides.get("chosen_kg_id_review", None)
+    result.chosen_kg_id = overrides.get("chosen_kg_id", None)
+    result.certificate = overrides.get("certificate", None)
+    result.lipid_resolution = overrides.get("lipid_resolution", None)
+    result.name_is_mixture = overrides.get("name_is_mixture", None)
     return result
 
 
@@ -166,6 +170,60 @@ class TestProcessResult:
         row = MapperService._process_result("x", result)
 
         assert row["reviewReason"] is None
+
+
+class TestHarmonizeFields:
+    """The fields biomapper.harmonize.harmonize() reads, stored so a finished job can be linked."""
+
+    def _result(self, **fields):
+        from biomapper import MappingResult
+
+        return MappingResult(query_name="x", **fields)
+
+    def test_chosen_kg_id_is_stored_apart_from_primary_curie(self):
+        row = MapperService._process_result("x", self._result(
+            resolved=True, primary_curie="RM:0129894", chosen_kg_id="CHEBI:17234"))
+
+        assert row["chosenKgId"] == "CHEBI:17234"
+        assert row["primaryCurie"] == "RM:0129894"
+
+    def test_unresolved_row_stores_nulls(self):
+        row = MapperService._process_result("x", self._result())
+
+        assert row["chosenKgId"] is None
+        assert row["certificateState"] is None
+        assert row["nameIsMixture"] is None
+
+    def test_certificate_state_is_stored(self):
+        from biomapper.models import ResolutionCertificate
+
+        row = MapperService._process_result("x", self._result(
+            resolved=True, chosen_kg_id="CHEBI:1",
+            certificate=ResolutionCertificate(state="contradicted")))
+
+        assert row["certificateState"] == "contradicted"
+
+    def test_engine_mixture_flag_is_stored(self):
+        row = MapperService._process_result("x", self._result(name_is_mixture=False))
+        assert row["nameIsMixture"] is False
+
+    def test_lipid_mixture_flag_counts_even_when_top_level_says_false(self):
+        """harmonize() treats name_is_mixture and lipid_resolution.name_is_mixture as an OR."""
+        from biomapper.models import LipidResolution
+
+        row = MapperService._process_result("x", self._result(
+            name_is_mixture=False, lipid_resolution=LipidResolution(name_is_mixture=True)))
+
+        assert row["nameIsMixture"] is True
+
+    def test_existing_fields_are_computed_as_before(self):
+        before = {k: v for k, v in MapperService._process_result("x", _make_mock_result()).items()
+                  if k not in ("chosenKgId", "certificateState", "nameIsMixture")}
+
+        assert set(before) == {"name", "resolved", "primaryCurie", "confidenceScore",
+                               "confidenceTier", "maxAnnotatorScore", "reviewReason",
+                               "chosenKgIdReview", "needsReview", "identifiers",
+                               "kgEquivalentIds"}
 
 
 class TestProvidedIds:

@@ -8,7 +8,7 @@ Conventions the checker needs:
 
 - Routes are under `/harmonize`. Every route takes the `x-clerk-user-id` header (400 when missing); a run owned by another user is a 404.
 - Report fields are written as they appear in `GET /harmonize/runs/{jobId}/report` (snake_case). Run status and items are camelCase.
-- A "run" is two-cohort (`POST /harmonize/cohorts`, report `kind` `harmonize_cohorts`) or many-cohort (`POST /harmonize/many`, report `kind` `harmonize_many`).
+- A "run" is two-cohort (`POST /harmonize/cohorts`, report `kind` `harmonize_cohorts`), many-cohort (`POST /harmonize/many`, report `kind` `harmonize_many`) or from finished jobs (`POST /harmonize/from-jobs`, report `kind` `harmonize_results`). A from-jobs run is complete as soon as it starts; it has no review items and cannot be resumed or cancelled. Its result sits under `arms.names_only` and `arms.identifier` is null, so the run, items, flags and exports lines read it the same way.
 - Inputs are panel metadata only (names and identifier columns). Data rule, stated once and referenced elsewhere: when a recorded run for that kind (two-cohort or many-cohort) is installed, the checker may use the replay backend; until then the checker supplies its own panel-metadata files (2 for two-cohort, 3 to 12 for many-cohort) against a live backend. No recorded run is committed yet (see P-02 and P-03).
 
 ## Start a run
@@ -26,8 +26,13 @@ Conventions the checker needs:
 | H-09 | Choosing a column that is not in the file is refused with the message as written, for example "Column 'zzz' is not in file 'a.tsv'. Columns found: name, hmdb." | 400 from `/cohorts` and `/many` |
 | H-10 | Start a new many-cohort run with the "remap all" option on, to re-map every row instead of reusing saved mappings. | `spec.remapAll` on `POST /harmonize/many` |
 | H-11 | See, on every cohort run, whether name linking is on and the reason, as read-only text. There is no on/off control on cohort runs. | report `name_linking.enabled`, `name_linking.reason` |
+| H-60 | Start a from-jobs run by choosing two of the user's own finished mapping jobs of the same entity type, and set each side's label. Only finished jobs can be chosen; two jobs of different entity types are refused with the message as written. The screen then shows the new run as complete. | mapping jobs from `GET /jobs` (`status`), each job's entity type from `GET /jobs/{jobId}` (`config.entity_type`); `POST /harmonize/from-jobs` (`jobA`, `jobB`, `aLabel`, `bLabel`); 400 for different entity types, 409 for an unfinished job |
+| H-61 | On a from-jobs run, turn link-by-name on or off before starting (off by default), and see the choice and its reason on the run afterwards. | `POST /harmonize/from-jobs` `linkByName`; report `name_linking.enabled`, `name_linking.decided_by` (`user`), `name_linking.reason` |
+| H-62 | Be told, when a chosen job was mapped before harmonizing finished jobs was supported: "This job was mapped before harmonizing finished jobs was supported. Map the file again, then harmonize." | `POST /harmonize/from-jobs` 400 |
 
 How to check H-05 to H-07: use a file whose header has unusual column names; the pickers must offer exactly those names.
+
+How to check H-60 to H-62: map two small panel-metadata files of the same entity type in entity resolution first, and wait for both to finish. H-62 needs a job mapped before this release; a checker without one accepts a team's recorded 400 rendered in the screen.
 
 How to check H-10: the checker only confirms that the option exists and that the run starts. Whether saved mappings are reused is not part of the gate.
 
@@ -142,6 +147,7 @@ Reviewers check these in the diff, not the checker:
 - The shell (`AppShell.tsx`), the scroll utilities and `ScrollArea`, and `lib/sankey.ts` are used unchanged from this branch.
 - A harmonization screen is not required to show a Sankey. If a team's screen includes one, it must use the shared Sankey component with the user's selected vocabularies.
 - Id H-35 is unused (withdrawn); ids were not renumbered.
+- P-01 (harmonize two finished mapping jobs) joined the gate as H-60 to H-62.
 
 ## Pending owner decision (not part of the gate until resolved)
 
@@ -149,7 +155,6 @@ These are not gate lines. They have no backing yet. They join the gate only when
 
 | Id | Capability | Why pending |
 |---|---|---|
-| P-01 | Harmonize two finished mapping jobs, with a link-by-name control. | No route exists. Stored mapping results lack fields the package needs. |
 | P-02 | Load the built-in example from the screen. | `POST /harmonize/example` exists but answers 400 "The example dataset is not installed." No example data is committed yet. |
 | P-03 | Any many-cohort check that needs a recorded many-cohort run on real panel metadata. | The many-cohort routes exist and H-02, H-10 and the many-cohort lines are gate lines, but no many-cohort test data or recording is available yet. Until one is installed, the checker follows the data rule in Conventions: its own 3 to 12 files against a live backend. |
 | P-04 | Many-cohort "remap all" having an observable effect. | Each run has its own store, so remap all has no earlier mappings to reuse and its effect cannot be seen. Whether runs should share a per-user store is an owner decision. H-10 stays as "the option exists and the run starts". |

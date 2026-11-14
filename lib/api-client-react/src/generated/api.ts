@@ -32,6 +32,7 @@ import type {
   HarmonizeExampleRequest,
   HarmonizeFlagsRequest,
   HarmonizeFlagsResult,
+  HarmonizeFromJobsRequest,
   HarmonizeInspectBody,
   HarmonizeInspectResult,
   HarmonizeItemsPage,
@@ -1633,6 +1634,94 @@ export const useSubmitHarmonizeExample = <
   TContext
 > => {
   return useMutation(getSubmitHarmonizeExampleMutationOptions(options));
+};
+
+/**
+ * Runs synchronously with biomapper's local harmonize() over the two jobs' stored results and records a finished run of kind harmonize_results. Its report, items, flags and exports are served from disk; it has no review items and cannot be resumed or cancelled.
+ * @summary Harmonize two of the caller's finished mapping jobs, with no re-mapping
+ */
+export const getSubmitHarmonizeFromJobsUrl = () => {
+  return `/api/harmonize/from-jobs`;
+};
+
+export const submitHarmonizeFromJobs = async (
+  harmonizeFromJobsRequest: HarmonizeFromJobsRequest,
+  options?: RequestInit,
+): Promise<HarmonizeRunStatus> => {
+  return customFetch<HarmonizeRunStatus>(getSubmitHarmonizeFromJobsUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(harmonizeFromJobsRequest),
+  });
+};
+
+export const getSubmitHarmonizeFromJobsMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitHarmonizeFromJobs>>,
+    TError,
+    { data: BodyType<HarmonizeFromJobsRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof submitHarmonizeFromJobs>>,
+  TError,
+  { data: BodyType<HarmonizeFromJobsRequest> },
+  TContext
+> => {
+  const mutationKey = ["submitHarmonizeFromJobs"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof submitHarmonizeFromJobs>>,
+    { data: BodyType<HarmonizeFromJobsRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return submitHarmonizeFromJobs(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SubmitHarmonizeFromJobsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof submitHarmonizeFromJobs>>
+>;
+export type SubmitHarmonizeFromJobsMutationBody =
+  BodyType<HarmonizeFromJobsRequest>;
+export type SubmitHarmonizeFromJobsMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Harmonize two of the caller's finished mapping jobs, with no re-mapping
+ */
+export const useSubmitHarmonizeFromJobs = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitHarmonizeFromJobs>>,
+    TError,
+    { data: BodyType<HarmonizeFromJobsRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof submitHarmonizeFromJobs>>,
+  TError,
+  { data: BodyType<HarmonizeFromJobsRequest> },
+  TContext
+> => {
+  return useMutation(getSubmitHarmonizeFromJobsMutationOptions(options));
 };
 
 /**

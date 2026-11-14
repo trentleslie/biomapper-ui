@@ -521,6 +521,51 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /harmonize/from-jobs:
+    post:
+      operationId: submitHarmonizeFromJobs
+      tags: [harmonize]
+      summary: Harmonize two of the caller's finished mapping jobs, with no re-mapping
+      description: >-
+        Runs synchronously with biomapper's local harmonize() over the two jobs' stored results
+        and records a finished run of kind harmonize_results. Its report, items, flags and
+        exports are served from disk; it has no review items and cannot be resumed or
+        cancelled.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HarmonizeFromJobsRequest"
+      responses:
+        "200":
+          description: The finished run's status (state complete)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HarmonizeRunStatus"
+        "400":
+          description: >-
+            Missing user ID header, jobs of different entity types, a job mapped before
+            harmonizing finished jobs was supported (map the file again), equal labels, or a
+            job that lists one name more than once
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No such mapping job for this user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: A mapping job has not finished
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /harmonize/runs:
     get:
       operationId: listHarmonizeRuns
@@ -605,6 +650,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: The run harmonized two finished mapping jobs, so there is nothing to resume
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /harmonize/runs/{jobId}/cancel:
     post:
@@ -636,6 +687,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: The run harmonized two finished mapping jobs, so there is nothing to cancel
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /harmonize/runs/{jobId}/report:
     get:
@@ -652,7 +709,7 @@ paths:
         "200":
           description: >-
             The report exactly as the package wrote it (snake_case keys, schema_version 1,
-            kind harmonize_cohorts or harmonize_many)
+            kind harmonize_cohorts, harmonize_many or harmonize_results)
           content:
             application/json:
               schema:
@@ -1244,6 +1301,24 @@ components:
             type: array
             items:
               type: string
+        chosenKgId:
+          type: string
+          nullable: true
+          description: |
+            The knowledge graph node the resolver chose. Not the same value as primaryCurie.
+            Absent from results mapped before harmonizing finished jobs was supported.
+        certificateState:
+          type: string
+          nullable: true
+          description: |
+            The resolution certificate's state (for example corroborated, uncorroborated,
+            contradicted, unavailable, not_applicable). null when the engine sent none.
+        nameIsMixture:
+          type: boolean
+          nullable: true
+          description: |
+            The engine's flag that the name lists alternative compounds (its top-level flag or
+            the lipid resolution's). null when the engine did not say.
         providedIds:
           type: object
           description: Original provided ID values from user's uploaded file, keyed by original column name
@@ -1508,6 +1583,30 @@ components:
       required:
         - kind
 
+    HarmonizeFromJobsRequest:
+      type: object
+      properties:
+        jobA:
+          type: string
+          description: A finished mapping job's id (cohort A)
+        jobB:
+          type: string
+          description: A finished mapping job's id (cohort B), of the same entity type
+        aLabel:
+          type: string
+        bLabel:
+          type: string
+        linkByName:
+          type: boolean
+          default: false
+          description: Also link resolved rows whose names match (off links by identifier only)
+      required:
+        - jobA
+        - jobB
+        - aLabel
+        - bLabel
+      additionalProperties: false
+
     HarmonizeCohortStatus:
       type: object
       properties:
@@ -1595,7 +1694,7 @@ components:
           nullable: true
         kind:
           type: string
-          enum: [harmonize_cohorts, harmonize_many]
+          enum: [harmonize_cohorts, harmonize_many, harmonize_results]
         labels:
           type: array
           items:
@@ -1659,7 +1758,7 @@ components:
           type: integer
         kind:
           type: string
-          enum: [harmonize_cohorts, harmonize_many]
+          enum: [harmonize_cohorts, harmonize_many, harmonize_results]
       required:
         - schema_version
         - kind

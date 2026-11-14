@@ -12,4 +12,5 @@ export type HarmonizeReportKind =
 export const HarmonizeReportKind = {
   harmonize_cohorts: "harmonize_cohorts",
   harmonize_many: "harmonize_many",
+  harmonize_results: "harmonize_results",
 } as const;

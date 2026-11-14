@@ -32,6 +32,7 @@ export * from "./harmonizeExportTable";
 export * from "./harmonizeFlagFilter";
 export * from "./harmonizeFlagsRequest";
 export * from "./harmonizeFlagsResult";
+export * from "./harmonizeFromJobsRequest";
 export * from "./harmonizeInspectBody";
 export * from "./harmonizeInspectResult";
 export * from "./harmonizeItem";

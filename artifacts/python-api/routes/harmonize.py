@@ -18,6 +18,10 @@ No absolute server path reaches the client: run status drops ``output_dir``, ``s
 each cohort's ``path``, and every response body and error message has the harmonize-home
 prefix removed from its strings (see :func:`scrub`).
 
+A run of kind ``harmonize_results`` (``POST /from-jobs``: two finished mapping jobs harmonized
+offline) has no backend job. Its status, report, items, flags and exports are served from its
+``report.json`` on disk; it has no review items and cannot be resumed or cancelled (409).
+
 ``JobError`` messages are written for end users and are passed through: 400, except the
 runner's unfinished-jobs cap (409) and results asked for before the run finished (409).
 """
@@ -35,7 +39,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
-from biomapper.jobs import FINISHED_STATES, CohortSpec, HarmonizeStatus, JobError
+from biomapper.jobs import FINISHED_STATES, CohortSpec, HarmonizeStatus, JobError, ReviewItemsPage
 from biomapper.mcp.config import ServerConfig
 from fastapi import APIRouter, File, Form, Header, HTTPException, Query, Response, UploadFile
 from fastapi.concurrency import run_in_threadpool
@@ -55,12 +59,20 @@ from services.harmonize_export import (
     skipped_one_sided,
 )
 from services.harmonize_items import FlaggedItem, Item, items_from_report, with_flags
+from services.harmonize_offline import (
+    KIND_RESULTS,
+    REMAP_MESSAGE,
+    entity_type,
+    harmonize_finished_jobs,
+    is_stale_row,
+)
 from services.harmonize_storage import (
     MAX_COHORT_BYTES,
     CohortFileError,
     new_run_dir,
     read_header,
     remove_run_dir,
+    runs_root,
     save_cohort_file,
 )
 
@@ -75,6 +87,9 @@ EXAMPLES_DIR = Path(__file__).resolve().parent.parent / "data" / "harmonize_exam
 # checks it before saving anything because a rejected upload should leave no files behind.
 MAX_COHORTS: int = next(
     f.default for f in dataclasses.fields(ServerConfig) if f.name == "harmonize_max_cohorts"
+)
+REVIEW_PAGE_DEFAULT: int = next(
+    f.default for f in dataclasses.fields(ServerConfig) if f.name == "review_page_default"
 )
 
 
@@ -122,6 +137,14 @@ class ManySpec(_CamelModel):
 
 class ExampleRequest(_CamelModel):
     kind: Literal["two_cohort"]
+
+
+class FromJobsRequest(_CamelModel):
+    job_a: str
+    job_b: str
+    a_label: str
+    b_label: str
+    link_by_name: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -242,6 +265,84 @@ async def _finished_or_409(backend: HarmonizeBackend, job_id: str, exc: JobError
 
 def _now_utc() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
+# ---------------------------------------------------------------------------
+# Runs that harmonized two finished mapping jobs (kind harmonize_results)
+# ---------------------------------------------------------------------------
+#
+# Such a run has no backend job: it was computed synchronously and lives only as
+# ``<runs_root>/<upload_id>/out/report.json`` plus its harmonize_runs row. Every route serves
+# it from disk.
+
+REPORT_FILENAME = "report.json"
+NO_REVIEW_ITEMS = ("This run harmonized two finished mapping jobs, so it has no review items: "
+                   "no evidence was captured.")
+
+
+def _is_results(run: dict[str, Any]) -> bool:
+    return run["kind"] == KIND_RESULTS
+
+
+def _results_report_path(run: dict[str, Any]) -> Path:
+    return runs_root() / run["upload_id"] / "out" / REPORT_FILENAME
+
+
+def _read_results_report(run: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return json.loads(_results_report_path(run).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raise HTTPException(status_code=400,
+                            detail="This run's report is missing or unreadable.") from None
+
+
+def _load_report(run: dict[str, Any]) -> dict[str, Any]:
+    """The run's report.json: from disk for a harmonize_results run, else from the runner
+    (which raises JobError while the run is unfinished)."""
+    if _is_results(run):
+        return _read_results_report(run)
+    return get_backend().load_report(run["job_id"])
+
+
+def _results_status_json(run: dict[str, Any], report: dict[str, Any]) -> dict[str, Any]:
+    """A finished run's status, in the same JSON shape :func:`_run_json` gives the others."""
+    arm = report["arms"]["names_only"]
+    summary = arm["summary"]
+    totals = {label: summary[label]["total"] for label in run["labels"]}
+    total = sum(totals.values())
+    return {
+        "jobId": run["job_id"], "state": "complete", "reason": None, "kind": run["kind"],
+        "stage": "done", "cohorts": [{"label": lb, "rows": n} for lb, n in totals.items()],
+        "entity": run["entity"], "entitiesTotal": total, "entitiesMapped": total,
+        "rowsErrored": sum(summary[label]["errors"] for label in run["labels"]),
+        "etaS": None, "kgBuild": "unknown", "kgVerified": False, "owner": None,
+        "createdUtc": run["created_at"], "updatedUtc": run["created_at"],
+        "summary": scrub(summary), "reviewItems": None, "progress": None,
+        "labels": run["labels"], "createdAt": run["created_at"],
+    }
+
+
+async def _run_status(run: dict[str, Any]) -> dict[str, Any]:
+    if _is_results(run):
+        return _results_status_json(run, _read_results_report(run))
+    return await _status_json(get_backend(), run)
+
+
+def _no_review_items_page(job_id: str, offset: int, limit: int | None) -> dict[str, Any]:
+    """An empty review-items page in the runner's shape: there is no captured evidence."""
+    page = ReviewItemsPage(job_id=job_id, total=0, counts={"row": 0, "link": 0},
+                           skipped_no_node=0, offset=max(offset, 0),
+                           limit=REVIEW_PAGE_DEFAULT if limit is None else limit,
+                           next_offset=None, items=[])
+    return camelize(page.model_dump(mode="json"))
+
+
+def _not_for_results(run: dict[str, Any], action: str) -> None:
+    if _is_results(run):
+        raise HTTPException(
+            status_code=409,
+            detail=f"This run harmonized two finished mapping jobs, so there is nothing to {action}.",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -429,6 +530,64 @@ async def submit_example(
     )
 
 
+async def _finished_mapping_job(job_id: str, user_id: str) -> dict[str, Any]:
+    job = await database.get_job(job_id)
+    if job is None or job.get("user_id") != user_id:
+        raise HTTPException(status_code=404, detail="Mapping job not found")
+    if job.get("status") != "complete":
+        name = job.get("display_name") or job_id
+        raise HTTPException(
+            status_code=409,
+            detail=f"Mapping job '{name}' is {job.get('status')}, not complete. Only finished "
+                   "mapping jobs can be harmonized.",
+        )
+    return job
+
+
+@router.post("/from-jobs")
+async def submit_from_jobs(
+    body: FromJobsRequest,
+    x_clerk_user_id: str | None = Header(None),
+) -> dict[str, Any]:
+    """Harmonize two of the caller's finished mapping jobs offline, with no re-mapping.
+
+    Runs synchronously (biomapper's local ``harmonize()``), writes ``report.json`` into a new
+    run directory and records the run as kind ``harmonize_results``. Another user's job is a
+    404, an unfinished one a 409; jobs of different entity types, or a job mapped before
+    harmonizing finished jobs was supported, are a 400.
+    """
+    user_id = _require_user(x_clerk_user_id)
+    job_a = await _finished_mapping_job(body.job_a, user_id)
+    job_b = await _finished_mapping_job(body.job_b, user_id)
+    entity_a, entity_b = entity_type(job_a), entity_type(job_b)
+    if entity_a != entity_b:
+        raise HTTPException(
+            status_code=400,
+            detail=f"The two jobs map different entity types ({entity_a} and {entity_b}). "
+                   "Choose two jobs of the same entity type.",
+        )
+    if any(is_stale_row(r) for j in (job_a, job_b) for r in j.get("results") or []):
+        raise HTTPException(status_code=400, detail=REMAP_MESSAGE)
+    try:
+        report = await run_in_threadpool(
+            harmonize_finished_jobs, job_a, job_b, a_label=body.a_label, b_label=body.b_label,
+            link_by_name=body.link_by_name)
+    except ValueError as exc:  # StaleMappingJobError included
+        raise HTTPException(status_code=400, detail=_message(exc)) from None
+
+    upload_id, run_dir = new_run_dir()
+    run = {"job_id": upload_id, "user_id": user_id, "kind": KIND_RESULTS,
+           "labels": [body.a_label, body.b_label], "entity": entity_a,
+           "upload_id": upload_id, "created_at": _now_utc()}
+    try:
+        (run_dir / "out" / REPORT_FILENAME).write_text(json.dumps(report), encoding="utf-8")
+        await database.insert_harmonize_run(**run)
+    except Exception:
+        _remove_quietly(run_dir)
+        raise
+    return _results_status_json(run, report)
+
+
 # ---------------------------------------------------------------------------
 # Routes: runs
 # ---------------------------------------------------------------------------
@@ -438,17 +597,21 @@ async def submit_example(
 async def list_runs(x_clerk_user_id: str | None = Header(None)) -> list[dict[str, Any]]:
     """The caller's runs, newest first, each with its status.
 
-    A run the job runner no longer knows (its job record is gone) is listed with state
-    ``unknown`` and the runner's message as ``reason``, so it is not silently dropped.
+    A run the job runner no longer knows (its job record is gone), or a harmonize_results run
+    whose report is gone, is listed with state ``unknown`` and the message as ``reason``, so it
+    is not silently dropped. A harmonize_results run is read from disk, never from the runner.
     """
     user_id = _require_user(x_clerk_user_id)
-    backend = get_backend()
     out = []
     for run in await database.list_harmonize_runs(user_id):
         try:
-            out.append(_run_json(await backend.status(run["job_id"]), run))
-        except JobError as exc:
-            out.append({"jobId": run["job_id"], "state": "unknown", "reason": _message(exc),
+            if _is_results(run):
+                out.append(_results_status_json(run, _read_results_report(run)))
+            else:
+                out.append(_run_json(await get_backend().status(run["job_id"]), run))
+        except (HTTPException, JobError) as exc:
+            reason = exc.detail if isinstance(exc, HTTPException) else _message(exc)
+            out.append({"jobId": run["job_id"], "state": "unknown", "reason": reason,
                         "kind": run["kind"], "labels": run["labels"], "entity": run["entity"],
                         "createdAt": run["created_at"]})
     return out
@@ -457,12 +620,13 @@ async def list_runs(x_clerk_user_id: str | None = Header(None)) -> list[dict[str
 @router.get("/runs/{job_id}")
 async def get_run(job_id: str, x_clerk_user_id: str | None = Header(None)) -> dict[str, Any]:
     run = await _owned_run(job_id, _require_user(x_clerk_user_id))
-    return await _status_json(get_backend(), run)
+    return await _run_status(run)
 
 
 @router.post("/runs/{job_id}/resume")
 async def resume_run(job_id: str, x_clerk_user_id: str | None = Header(None)) -> dict[str, Any]:
     run = await _owned_run(job_id, _require_user(x_clerk_user_id))
+    _not_for_results(run, "resume")
     try:
         status = await get_backend().resume(job_id)
     except JobError as exc:
@@ -473,6 +637,7 @@ async def resume_run(job_id: str, x_clerk_user_id: str | None = Header(None)) ->
 @router.post("/runs/{job_id}/cancel")
 async def cancel_run(job_id: str, x_clerk_user_id: str | None = Header(None)) -> dict[str, Any]:
     run = await _owned_run(job_id, _require_user(x_clerk_user_id))
+    _not_for_results(run, "cancel")
     try:
         status = await get_backend().cancel(job_id)
     except JobError as exc:
@@ -483,7 +648,9 @@ async def cancel_run(job_id: str, x_clerk_user_id: str | None = Header(None)) ->
 @router.get("/runs/{job_id}/report")
 async def get_report(job_id: str, x_clerk_user_id: str | None = Header(None)) -> dict[str, Any]:
     """``report.json`` as the package wrote it (snake_case, ``schema_version: 1``)."""
-    await _owned_run(job_id, _require_user(x_clerk_user_id))
+    run = await _owned_run(job_id, _require_user(x_clerk_user_id))
+    if _is_results(run):
+        return scrub(_read_results_report(run))
     backend = get_backend()
     try:
         return scrub(backend.load_report(job_id))
@@ -499,7 +666,9 @@ async def list_review_items(
     limit: int | None = Query(None),
     x_clerk_user_id: str | None = Header(None),
 ) -> dict[str, Any]:
-    await _owned_run(job_id, _require_user(x_clerk_user_id))
+    run = await _owned_run(job_id, _require_user(x_clerk_user_id))
+    if _is_results(run):
+        return _no_review_items_page(job_id, offset, limit)
     backend = get_backend()
     try:
         page = backend.review_items(job_id, kind=kind, offset=offset, limit=limit)
@@ -512,7 +681,9 @@ async def list_review_items(
 async def get_review_item(
     job_id: str, ref: str, x_clerk_user_id: str | None = Header(None),
 ) -> dict[str, Any]:
-    await _owned_run(job_id, _require_user(x_clerk_user_id))
+    run = await _owned_run(job_id, _require_user(x_clerk_user_id))
+    if _is_results(run):
+        raise HTTPException(status_code=400, detail=NO_REVIEW_ITEMS)
     backend = get_backend()
     try:
         detail = backend.review_item(job_id, ref)
@@ -577,21 +748,21 @@ def clear_items_cache() -> None:
     _items_cache.clear()
 
 
-def _build_items(backend: HarmonizeBackend, job_id: str) -> list[Item]:
-    return items_from_report(backend.load_report(job_id))
+def _build_items(run: dict[str, Any]) -> list[Item]:
+    return items_from_report(_load_report(run))
 
 
-async def _run_items(job_id: str) -> list[Item]:
+async def _run_items(run: dict[str, Any]) -> list[Item]:
     """The finished run's items, built off the event loop and cached per run."""
+    job_id = run["job_id"]
     cached = _items_cache.get(job_id)
     if cached is not None:
         _items_cache.move_to_end(job_id)
         return cached
-    backend = get_backend()
     try:
-        items = await run_in_threadpool(_build_items, backend, job_id)
+        items = await run_in_threadpool(_build_items, run)
     except JobError as exc:
-        raise await _finished_or_409(backend, job_id, exc) from None
+        raise await _finished_or_409(get_backend(), job_id, exc) from None
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=_message(exc)) from None
     _items_cache[job_id] = items
@@ -665,8 +836,8 @@ async def list_items(
     of the run.
     """
     user_id = _require_user(x_clerk_user_id)
-    await _owned_run(job_id, user_id)
-    every = await _flagged_items(job_id, user_id, await _run_items(job_id))
+    run = await _owned_run(job_id, user_id)
+    every = await _flagged_items(job_id, user_id, await _run_items(run))
 
     def page() -> dict[str, Any]:
         chosen = [f for f in every
@@ -684,8 +855,8 @@ async def set_flags(
 ) -> dict[str, Any]:
     """Flag or de-flag the items named by ``refs``; a ref that matches no item is a 400."""
     user_id = _require_user(x_clerk_user_id)
-    await _owned_run(job_id, user_id)
-    items = await _run_items(job_id)
+    run = await _owned_run(job_id, user_id)
+    items = await _run_items(run)
     wanted = set(await run_in_threadpool(_known_refs, items, body.refs))
     chosen = await run_in_threadpool(lambda: [i for i in items if i.ref in wanted])
     return await _set_flags(job_id, user_id, items, chosen, body.flagged)
@@ -697,8 +868,8 @@ async def bulk_flags(
 ) -> dict[str, Any]:
     """Flag or de-flag every item matching the filter; ``updated`` counts the matches."""
     user_id = _require_user(x_clerk_user_id)
-    await _owned_run(job_id, user_id)
-    items = await _run_items(job_id)
+    run = await _owned_run(job_id, user_id)
+    items = await _run_items(run)
     chosen = await run_in_threadpool(lambda: [i for i in items if body.filter.matches(i)])
     return await _set_flags(job_id, user_id, items, chosen, body.flagged)
 
@@ -711,8 +882,8 @@ async def reset_flags(
     """Drop the organizer's overrides (all of them when ``refs`` is omitted), so those items
     return to biomapper's suggestion."""
     user_id = _require_user(x_clerk_user_id)
-    await _owned_run(job_id, user_id)
-    items = await _run_items(job_id)
+    run = await _owned_run(job_id, user_id)
+    items = await _run_items(run)
     refs = (None if body is None or body.refs is None
             else await run_in_threadpool(_known_refs, items, body.refs))
     await database.reset_harmonize_flags(job_id, user_id, refs)
@@ -741,7 +912,7 @@ async def export_run(
     flagged items it could not hold.
     """
     user_id = _require_user(x_clerk_user_id)
-    await _owned_run(job_id, user_id)
+    run = await _owned_run(job_id, user_id)
     if table not in TABLES:
         raise HTTPException(status_code=400,
                             detail=f"Unknown table '{table}'. Tables: {', '.join(TABLES)}.")
@@ -752,11 +923,10 @@ async def export_run(
         raise HTTPException(status_code=400,
                             detail="The EITL pairs file is CSV or JSON: the expert-in-the-loop "
                                    "upload does not read TSV.")
-    flagged = await _flagged_items(job_id, user_id, await _run_items(job_id))
-    backend = get_backend()
+    flagged = await _flagged_items(job_id, user_id, await _run_items(run))
 
     def build() -> tuple[bytes, str, str]:
-        report = backend.load_report(job_id)
+        report = _load_report(run)
         header, rows = export_rows(report, flagged, table, nested=fmt == "json")
         body, media_type = render(scrub(header), scrub(rows), fmt)
         return body, media_type, export_filename(report, table, fmt)
@@ -764,7 +934,7 @@ async def export_run(
     try:
         body, media_type, filename = await run_in_threadpool(build)
     except JobError as exc:
-        raise await _finished_or_409(backend, job_id, exc) from None
+        raise await _finished_or_409(get_backend(), job_id, exc) from None
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
     if table == "eitl_pairs":
         headers[SKIPPED_ONE_SIDED_HEADER] = str(
