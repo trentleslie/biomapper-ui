@@ -28,6 +28,23 @@ import { ItemPanel, ReviewItemPanel, ReviewQueueView } from "@/components/harmon
 import { ArmStrip, ExportPanel, RunDetailsPanel } from "@/components/harmonize/ReportPanels";
 
 const LAST_RUN_KEY = "harmonize:last-run";
+const RUNS_COLLAPSED_KEY = "harmonize:runs-collapsed";
+
+function readFlag(key: string): boolean {
+  try {
+    return window.localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeFlag(key: string, value: boolean) {
+  try {
+    window.localStorage.setItem(key, value ? "1" : "0");
+  } catch {
+    /* storage unavailable */
+  }
+}
 
 function rememberRun(jobId: string) {
   try {
@@ -178,6 +195,7 @@ export default function HarmonizePage() {
   const [setupOpen, setSetupOpen] = useState(false);
   const [setupTab, setSetupTab] = useState<SetupTab>("files");
   const [dock, setDock] = useState<DockState>({ kind: "none" });
+  const [runsCollapsed, setRunsCollapsed] = useState(() => readFlag(RUNS_COLLAPSED_KEY));
 
   const runs = useListHarmonizeRuns({
     query: {
@@ -287,6 +305,11 @@ export default function HarmonizePage() {
         onRetry={() => void runs.refetch()}
         selectedId={routeJobId}
         onNewRun={() => openSetup("files")}
+        collapsed={runsCollapsed}
+        onCollapsedChange={(c) => {
+          setRunsCollapsed(c);
+          writeFlag(RUNS_COLLAPSED_KEY, c);
+        }}
       />
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         {(example.busy || example.error) && (

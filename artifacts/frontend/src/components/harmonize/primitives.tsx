@@ -85,15 +85,18 @@ export function SkeletonRows({ rows = 5 }: { rows?: number }) {
 export function NativeSelect({
   label,
   hideLabel,
+  inline,
   className,
   children,
   id,
   ...props
-}: SelectHTMLAttributes<HTMLSelectElement> & { label: string; hideLabel?: boolean }) {
+}: SelectHTMLAttributes<HTMLSelectElement> & { label: string; hideLabel?: boolean; inline?: boolean }) {
   const selectId = id ?? `sel-${label.replace(/\W+/g, "-").toLowerCase()}`;
   return (
-    <label htmlFor={selectId} className={cn("flex flex-col gap-1 text-xs font-medium text-neutral-600", className)}>
-      <span className={hideLabel ? "sr-only" : undefined}>{label}</span>
+    <div className={cn("flex gap-1 text-xs font-medium text-neutral-600", inline ? "items-center gap-1.5" : "flex-col", className)}>
+      <label htmlFor={selectId} className={hideLabel ? "sr-only" : undefined}>
+        {label}
+      </label>
       <select
         id={selectId}
         className="h-8 min-w-0 rounded border border-neutral-300 bg-white px-2 text-sm font-normal text-neutral-900 focus-visible:ring-2 focus-visible:ring-ph-navy disabled:opacity-50"
@@ -101,7 +104,7 @@ export function NativeSelect({
       >
         {children}
       </select>
-    </label>
+    </div>
   );
 }
 

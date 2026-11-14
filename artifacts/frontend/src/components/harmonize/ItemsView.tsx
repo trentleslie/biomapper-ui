@@ -38,6 +38,13 @@ export interface ItemFilters {
 
 export const NO_FILTERS: ItemFilters = { kind: "", arm: "", flagged: "" };
 
+/** A short accessible name for an item: what it is and its first rows' names. */
+export function itemName(item: HarmonizeItem): string {
+  const names = item.members.slice(0, 2).map((m) => (m.name && m.name !== m.key ? `${m.name} (${m.key})` : m.key));
+  const more = item.members.length > 2 ? ` and ${item.members.length - 2} more` : "";
+  return `${describeItem(item).title}, ${armLabel(item.arm).toLowerCase()} arm: ${names.join(" / ") || "no rows"}${more}`;
+}
+
 function memberText(m: HarmonizeItem["members"][number]): string {
   return `${m.cohort}: ${m.name ?? m.key} (${m.key})`;
 }
@@ -209,7 +216,7 @@ export function FlagToggle({
     <button
       type="button"
       aria-pressed={item.flagged}
-      aria-label={`${item.flagged ? "Flagged" : "Not flagged"}: ${name}`}
+      aria-label={`Flag ${name}`}
       title={item.flagged ? "Flagged. Click to de-flag." : "Not flagged. Click to flag."}
       disabled={busy}
       onClick={(e) => {
@@ -230,7 +237,7 @@ export function FlagToggle({
 
 export function SourceText({ item }: { item: HarmonizeItem }) {
   return item.source === "organizer" ? (
-    <ToneBadge tone="info">You</ToneBadge>
+    <ToneBadge tone="info">organizer</ToneBadge>
   ) : (
     <ToneBadge tone="neutral">biomapper</ToneBadge>
   );
@@ -357,8 +364,8 @@ export function ItemsView({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-end gap-2 border-b border-neutral-200 px-3 py-2">
-        <NativeSelect id="filter-kind" label="Kind" value={filters.kind} onChange={(e) => setFilters({ ...filters, kind: e.target.value as ItemFilters["kind"] })}>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-neutral-200 px-3 py-2">
+        <NativeSelect inline id="filter-kind" label="Kind" value={filters.kind} onChange={(e) => setFilters({ ...filters, kind: e.target.value as ItemFilters["kind"] })}>
           <option value="">All kinds</option>
           {kinds.map((k) => (
             <option key={k} value={k}>
@@ -366,7 +373,7 @@ export function ItemsView({
             </option>
           ))}
         </NativeSelect>
-        <NativeSelect id="filter-arm" label="Arm" value={filters.arm} onChange={(e) => setFilters({ ...filters, arm: e.target.value as ItemFilters["arm"] })}>
+        <NativeSelect inline id="filter-arm" label="Arm" value={filters.arm} onChange={(e) => setFilters({ ...filters, arm: e.target.value as ItemFilters["arm"] })}>
           <option value="">Both arms</option>
           {armsAvailable.map((a) => (
             <option key={a} value={a}>
@@ -374,7 +381,7 @@ export function ItemsView({
             </option>
           ))}
         </NativeSelect>
-        <NativeSelect id="filter-flagged" label="Flag" value={filters.flagged} onChange={(e) => setFilters({ ...filters, flagged: e.target.value as ItemFilters["flagged"] })}>
+        <NativeSelect inline id="filter-flagged" label="Flag state" value={filters.flagged} onChange={(e) => setFilters({ ...filters, flagged: e.target.value as ItemFilters["flagged"] })}>
           <option value="">Flagged and not flagged</option>
           <option value="true">Flagged only</option>
           <option value="false">Not flagged only</option>
@@ -396,13 +403,19 @@ export function ItemsView({
 
       {/* Counts, selection actions and the result of the last action */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-neutral-100 bg-neutral-50 px-3 py-1.5 text-xs text-neutral-700">
-        <span data-testid="items-total">
-          <span className="tabular font-semibold text-neutral-900">{total.toLocaleString()}</span> {total === 1 ? "item" : "items"}
-          {filtered ? " match the filters" : ""}
-        </span>
-        <span data-testid="flagged-total">
-          <span className="tabular font-semibold text-ph-crimson">{flaggedTotal.toLocaleString()}</span> flagged in this run
-        </span>
+        {q.data ? (
+          <>
+            <span data-testid="items-total">
+              <span className="tabular font-semibold text-neutral-900">{total.toLocaleString()}</span> {total === 1 ? "item" : "items"}
+              {filtered ? " match the filters" : " in this run"}
+            </span>
+            <span data-testid="flagged-total">
+              <span className="tabular font-semibold text-ph-crimson">{flaggedTotal.toLocaleString()}</span> flagged in this run
+            </span>
+          </>
+        ) : (
+          <span>{q.isError ? "Items unavailable" : "Loading items"}</span>
+        )}
         {checked.size > 0 && (
           <span className="flex flex-wrap items-center gap-1">
             <span className="font-medium">{checked.size} ticked:</span>
@@ -450,18 +463,19 @@ export function ItemsView({
                   />
                 </th>
                 <th className="px-2 py-2">Flag</th>
+                <th className="px-2 py-2">Kind</th>
                 <th className="px-2 py-2">Item</th>
                 <th className="px-2 py-2">Arm</th>
                 <th className="px-2 py-2">Members</th>
                 <th className="px-2 py-2">Details</th>
-                <th className="px-2 py-2" title="Where the flag state came from">Flag set by</th>
+                <th className="px-2 py-2" title="Where the flag state came from">Flag source</th>
                 <th className="px-2 py-2">Suggested</th>
               </tr>
             </thead>
             <tbody>
-              {items.map((item, index) => {
+              {items.map((item) => {
                 const d = describeItem(item);
-                const name = `${d.title}, ${item.members.map(memberText).slice(0, 2).join("; ")}`;
+                const name = itemName(item);
                 const selected = item.ref === selectedRef;
                 return (
                   <tr
@@ -474,7 +488,7 @@ export function ItemsView({
                     <td className="px-2 py-1.5" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
-                        aria-label={`Tick item ${offset + index + 1}: ${name}`}
+                        aria-label={`Tick ${name}`}
                         checked={checked.has(item.ref)}
                         onChange={(e) =>
                           setChecked((s) => {
@@ -489,32 +503,33 @@ export function ItemsView({
                     <td className="px-2 py-1.5">
                       <FlagToggle item={item} name={name} busy={busyRefs.has(item.ref)} onToggle={() => void toggle(item)} />
                     </td>
+                    <td className="whitespace-nowrap px-2 py-1.5 text-xs text-neutral-700">{ITEM_KIND_LABELS[item.kind]}</td>
                     <td className="px-2 py-1.5">
-                      <button
-                        type="button"
-                        className="text-left font-medium text-ph-navy hover:underline"
-                        aria-label={`Open item ${offset + index + 1}: ${name}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onOpen(item, items);
-                        }}
-                      >
-                        {d.title}
-                      </button>
-                      <div className="mt-0.5 flex flex-wrap gap-1">
-                        <ToneBadge tone="neutral">{ITEM_KIND_LABELS[item.kind]}</ToneBadge>
-                        {d.badges.map((b) => (
-                          <ToneBadge key={b.text} tone={b.tone}>
-                            {b.text}
-                          </ToneBadge>
-                        ))}
+                      <div className="flex items-center gap-1.5 whitespace-nowrap">
+                        <button
+                          type="button"
+                          className="flex items-center gap-1.5 text-left font-medium text-ph-navy hover:underline"
+                          aria-label={`Open ${name}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpen(item, items);
+                          }}
+                        >
+                          {item.kind === "link" || item.kind === "group" ? null : d.title}
+                          {d.badges.map((b) => (
+                            <ToneBadge key={b.text} tone={b.tone}>
+                              {b.text}
+                            </ToneBadge>
+                          ))}
+                          {(item.kind === "link" || item.kind === "group") && d.badges.length === 0 && d.title}
+                        </button>
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-2 py-1.5 text-neutral-700">{armLabel(item.arm)}</td>
                     <td className="max-w-[22rem] px-2 py-1.5">
                       <ul className="space-y-0.5">
                         {item.members.slice(0, 3).map((m, i) => (
-                          <li key={`${m.cohort}-${m.key}-${i}`} className="truncate" title={memberText(m)}>
+                          <li key={`${m.cohort}-${m.key}-${i}`} className="truncate whitespace-nowrap" title={memberText(m)}>
                             <span className="text-xs text-neutral-500">{m.cohort}</span>{" "}
                             <span className="text-neutral-900">{m.name ?? m.key}</span>{" "}
                             <span className="font-mono text-[11px] text-neutral-500">{m.key}</span>
@@ -540,7 +555,7 @@ export function ItemsView({
       </div>
 
       {/* Pager */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 px-3 py-1.5 text-xs text-neutral-700">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 py-1.5 pl-3 pr-16 text-xs text-neutral-700">
         <span data-testid="items-range">
           Showing {first.toLocaleString()} to {last.toLocaleString()} of {total.toLocaleString()}
         </span>

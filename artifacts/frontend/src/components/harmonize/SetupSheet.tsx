@@ -130,15 +130,15 @@ function CohortCard({
       {insp.state === "error" && <ErrorBox className="mt-2" title="This file cannot be used" message={insp.message} />}
       {insp.state === "ok" && (
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <label htmlFor={`${idp}-label`} className="flex flex-col gap-1 text-xs font-medium text-neutral-600">
-            Cohort label
+          <div className="flex flex-col gap-1 text-xs font-medium text-neutral-600">
+            <label htmlFor={`${idp}-label`}>Cohort label</label>
             <Input
               id={`${idp}-label`}
               className="h-8"
               value={draft.label}
               onChange={(e) => onChange({ ...draft, label: e.target.value })}
             />
-          </label>
+          </div>
           <NativeSelect
             id={`${idp}-name`}
             label="Name column"
@@ -282,7 +282,7 @@ function FilePickButton({ label, multiple, onFiles, testId }: { label: string; m
         accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain"
         multiple={multiple}
         className="sr-only"
-        aria-label={label}
+        aria-hidden="true"
         tabIndex={-1}
         onChange={(e) => {
           const files = Array.from(e.target.files ?? []);
@@ -331,11 +331,11 @@ function EntityFields({ entity, setEntity, category, setCategory }: { entity: st
         {q.isLoading && <p className="mt-1 text-xs text-neutral-500">Loading the full list of entity types</p>}
         {q.isError && <p className="mt-1 text-xs text-neutral-600">The full list could not be loaded ({apiErrorMessage(q.error)}); the common types are offered.</p>}
       </div>
-      <label htmlFor="harm-category" className="flex flex-col gap-1 text-xs font-medium text-neutral-600">
-        Category override (optional)
-        <Input id="harm-category" className="h-8" placeholder="Leave blank to use the entity type" value={category} onChange={(e) => setCategory(e.target.value)} />
-        <span className="font-normal text-neutral-500">A Biolink category, for example biolink:ClinicalMeasurement. Sent as written.</span>
-      </label>
+      <div className="flex flex-col gap-1 text-xs font-medium text-neutral-600">
+        <label htmlFor="harm-category">Category override (optional)</label>
+        <Input id="harm-category" aria-describedby="harm-category-hint" className="h-8" placeholder="Leave blank to use the entity type" value={category} onChange={(e) => setCategory(e.target.value)} />
+        <span id="harm-category-hint" className="font-normal text-neutral-500">A Biolink category, for example biolink:ClinicalMeasurement. Sent as written.</span>
+      </div>
     </div>
   );
 }
@@ -561,10 +561,10 @@ function JobsTab({ onStarted }: { onStarted: (run: HarmonizeRunStatus) => void }
                 {options(side === "a" ? jobB : jobA)}
               </NativeSelect>
               <JobEntity jobId={id} />
-              <label htmlFor={`job-${side}-label`} className="flex flex-col gap-1 text-xs font-medium text-neutral-600">
-                {side === "a" ? "Label for job A" : "Label for job B"}
+              <div className="flex flex-col gap-1 text-xs font-medium text-neutral-600">
+                <label htmlFor={`job-${side}-label`}>{side === "a" ? "Label for job A" : "Label for job B"}</label>
                 <Input id={`job-${side}-label`} className="h-8" value={side === "a" ? aLabel : bLabel} onChange={(e) => (side === "a" ? setALabel : setBLabel)(e.target.value)} />
-              </label>
+              </div>
             </div>
           );
         })}

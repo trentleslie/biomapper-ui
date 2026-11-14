@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { Ban, Loader2, Play, Plus } from "lucide-react";
+import { Ban, Loader2, PanelLeftClose, PanelLeftOpen, Play, Plus } from "lucide-react";
 import {
   cancelHarmonizeRun,
   getGetHarmonizeRunQueryKey,
@@ -52,6 +52,8 @@ export function RunList({
   onRetry,
   selectedId,
   onNewRun,
+  collapsed,
+  onCollapsedChange,
 }: {
   runs: HarmonizeRunStatus[] | undefined;
   isLoading: boolean;
@@ -59,11 +61,28 @@ export function RunList({
   onRetry: () => void;
   selectedId: string | null;
   onNewRun: () => void;
+  collapsed: boolean;
+  onCollapsedChange: (collapsed: boolean) => void;
 }) {
+  if (collapsed) {
+    return (
+      <aside aria-label="Harmonization runs" className="flex w-11 shrink-0 flex-col items-center gap-2 rounded border border-neutral-200 bg-white py-2">
+        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Show your runs" title="Show your runs" onClick={() => onCollapsedChange(false)}>
+          <PanelLeftOpen aria-hidden />
+        </Button>
+        <Button size="icon" className="h-8 w-8" aria-label="New run" title="New run" onClick={onNewRun}>
+          <Plus aria-hidden />
+        </Button>
+      </aside>
+    );
+  }
   return (
-    <aside aria-label="Harmonization runs" className="flex w-64 shrink-0 flex-col rounded border border-neutral-200 bg-white">
-      <div className="flex items-center justify-between gap-2 border-b border-neutral-200 px-3 py-2">
-        <h2 className="text-sm font-semibold text-neutral-900">Your runs</h2>
+    <aside aria-label="Harmonization runs" className="flex w-60 shrink-0 flex-col rounded border border-neutral-200 bg-white">
+      <div className="flex items-center justify-between gap-1 border-b border-neutral-200 px-2 py-2">
+        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Hide your runs" title="Hide your runs" onClick={() => onCollapsedChange(true)}>
+          <PanelLeftClose aria-hidden />
+        </Button>
+        <h2 className="flex-1 text-sm font-semibold text-neutral-900">Your runs</h2>
         <Button size="sm" onClick={onNewRun}>
           <Plus aria-hidden /> New run
         </Button>
@@ -199,7 +218,7 @@ export function ProgressPanel({ run }: { run: HarmonizeRunStatus }) {
       <div className="w-full max-w-xl space-y-4">
         <div className="flex items-center gap-3">
           <StateBadge state={run.state} />
-          <p className="text-sm text-neutral-700">{STATE_EXPLAINERS[run.state] ?? stateLabel(run.state)}</p>
+          {(!run.reason || isActive(run.state)) && <p className="text-sm text-neutral-700">{STATE_EXPLAINERS[run.state] ?? stateLabel(run.state)}</p>}
         </div>
         {run.reason && (
           <p className="rounded border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-800" data-testid="run-reason">

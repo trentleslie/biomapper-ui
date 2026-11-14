@@ -56,7 +56,7 @@ export default defineConfig({
       // The signed-in surface: the dev-only auth bypass in App.tsx renders AppShell without a Clerk session.
       name: "bypass",
       use: { baseURL: `http://localhost:${BYPASS_PORT}` },
-      testMatch: /(shell|scroll)\.spec\.ts/,
+      testMatch: /(shell|scroll|harmonize)\.spec\.ts/,
       grep: /@app/,
     },
   ],

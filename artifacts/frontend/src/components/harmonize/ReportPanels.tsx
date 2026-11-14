@@ -38,6 +38,13 @@ import { EITL_PREVIEW_KEY } from "./ItemsView";
 // The strip over the table: both arms side by side, and how they differ
 // ---------------------------------------------------------------------------
 
+const DIFF_SHORT: Record<string, string> = {
+  "Only the names-only arm found": "Names-only arm only",
+  "Only the identifier arm found": "Identifier arm only",
+  "Both arms found": "Both arms",
+  "Groups whose membership changed": "Membership changed",
+};
+
 export function ArmStrip({ report, onOpenDetails }: { report: Report; onOpenDetails: () => void }) {
   const diff = diffView(report);
   const sg = statusAndGrade(report);
@@ -61,31 +68,39 @@ export function ArmStrip({ report, onOpenDetails }: { report: Report; onOpenDeta
                     </span>
                   ))}
                 </p>
-                <p className="mt-0.5 flex flex-wrap gap-x-3 text-[11px] text-neutral-500">
-                  {s.perCohort.map((pc) => {
-                    const unresolved = pc.counts.filter((c) => ["Unresolved", "Errored", "No node"].includes(c.label)).reduce((a, c) => a + c.value, 0);
-                    return (
-                      <span key={pc.cohort}>
-                        {pc.cohort}: {unresolved} not {isMany(report) ? "grouped" : "resolved"}
-                      </span>
-                    );
-                  })}
-                </p>
+                {(() => {
+                  const parts = s.perCohort.map((pc) => {
+                    const n = pc.counts.filter((c) => ["Unresolved", "Errored", "No node"].includes(c.label)).reduce((a, c) => a + c.value, 0);
+                    return `${pc.cohort} ${n}`;
+                  });
+                  const text = `Not ${isMany(report) ? "grouped" : "resolved"}: ${parts.join(" · ")}`;
+                  return (
+                    <p className="mt-0.5 truncate text-[11px] text-neutral-500" title={text}>
+                      {text}
+                    </p>
+                  );
+                })()}
               </>
             )}
           </section>
         );
       })}
-      <div className="flex flex-col justify-between gap-1 rounded border border-neutral-200 bg-white px-3 py-2">
+      <div className="flex flex-col gap-0.5 rounded border border-neutral-200 bg-white px-3 py-2 lg:max-w-xs">
         {diff && (
           <p className="text-xs text-neutral-700" data-testid="diff-strip">
             {diff.counts.map((c, i) => (
               <span key={c.label}>
                 {i > 0 && " · "}
-                {c.label.replace("Only the ", "").replace(" found", " only").replace("Both arms", "both").replace("Groups whose membership changed", "membership changed")}{" "}
+                {DIFF_SHORT[c.label] ?? c.label}{" "}
                 <span className="tabular font-semibold text-neutral-900">{c.value}</span>
               </span>
             ))}
+          </p>
+        )}
+        {nameLinking(report) && (
+          <p className="text-xs text-neutral-700" title={nameLinking(report)?.reason ?? undefined}>
+            Name links <span className="font-semibold">{nameLinking(report)?.enabled ? "on" : "off"}</span>
+            {nameLinking(report)?.decidedBy && <> (decided by {nameLinking(report)?.decidedBy})</>}
           </p>
         )}
         {sg.status && (

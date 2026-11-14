@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ITEM_KIND_LABELS, apiErrorMessage, armLabel, basisLabel, describeItem, originLabel } from "@/lib/harmonize";
 import { EmptyState, ErrorBox, Mono, NativeSelect, SectionTitle, SkeletonRows, ToneBadge } from "./primitives";
-import { FlagToggle, SourceText, afterFlag, useFlagActions } from "./ItemsView";
+import { FlagToggle, SourceText, afterFlag, itemName, useFlagActions } from "./ItemsView";
 
 // ---------------------------------------------------------------------------
 // The dock: a panel beside the table
@@ -25,7 +25,7 @@ export function Dock({ title, onClose, children, testId }: { title: string; onCl
     <aside
       aria-label={title}
       data-testid={testId}
-      className="flex w-[26rem] max-w-[45%] shrink-0 flex-col rounded border border-neutral-200 bg-white"
+      className="flex w-[24rem] max-w-[45%] shrink-0 flex-col rounded border border-neutral-200 bg-white"
       onKeyDown={(e) => {
         if (e.key === "Escape") onClose();
       }}
@@ -36,7 +36,7 @@ export function Dock({ title, onClose, children, testId }: { title: string; onCl
           <X aria-hidden />
         </Button>
       </div>
-      <div className="min-h-0 flex-1 scroll-visible p-3">{children}</div>
+      <div className="min-h-0 flex-1 scroll-visible p-3 pb-16">{children}</div>
     </aside>
   );
 }
@@ -69,7 +69,7 @@ function Value({ value }: { value: unknown }): ReactNode {
       <dl className="grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-2 gap-y-0.5">
         {entries.map(([k, v]) => (
           <div key={k} className="contents">
-            <dt className="text-neutral-500">{humanKey(k)}</dt>
+            <dt className="text-neutral-500">{k}</dt>
             <dd className="min-w-0">
               <Value value={v} />
             </dd>
@@ -129,7 +129,7 @@ export function ItemPanel({
   const [error, setError] = useState<string | null>(null);
   const d = describeItem(item);
   const detail = item.detail as Record<string, unknown>;
-  const name = `${d.title}, ${item.members.map((m) => `${m.cohort}: ${m.name ?? m.key}`).slice(0, 2).join("; ")}`;
+  const name = itemName(item);
 
   async function run(fn: () => Promise<unknown>, next: HarmonizeItem) {
     setBusy(true);
@@ -185,7 +185,7 @@ export function ItemPanel({
             </Button>
           </div>
           <p className="mt-2 flex items-center gap-1 text-xs text-neutral-700">
-            Flag set by <SourceText item={item} /> · biomapper suggests {item.suggested ? "flagging" : "no flag"}
+            Flag source <SourceText item={item} /> · biomapper suggests {item.suggested ? "flagging" : "no flag"}
           </p>
           {error && <ErrorBox className="mt-2" title="The flag was not changed" message={error} />}
         </div>
@@ -353,7 +353,7 @@ export function ReviewQueueView({
           </table>
         )}
       </div>
-      <div className="flex items-center justify-between border-t border-neutral-200 px-3 py-1.5 text-xs text-neutral-700">
+      <div className="flex items-center justify-between border-t border-neutral-200 py-1.5 pl-3 pr-16 text-xs text-neutral-700">
         <span>
           Showing {total === 0 ? 0 : offset + 1} to {Math.min(offset + items.length, total)} of {total}
         </span>
