@@ -23,7 +23,10 @@ The staged four-step screen ("gates": Set up cohorts, Run, Review and flag, Expo
 - The researchers were model-played personas invented for this run, not people, and not derived from user data.
 - One session per persona per screen. There is no measure of session-to-session spread.
 - Judges read action logs and written accounts, not video or screenshots.
-- The winner was first with either judge family alone. It was not the fastest: it took the most actions, and it won none of the presenter comparisons, where the workbench's item drill-downs did better.
+- The result is not robust to the choice of judge family. With Gemini's verdicts alone the winner is first outright (4 wins, 2 draws, 0 losses). With Claude's verdicts alone the winner and the workbench are tied on wins (winner 3 wins, 2 draws, 1 loss; workbench 3 wins, 0 draws, 3 losses), and the tie-break set before judging (fewer backtracks plus failed commands) puts the workbench first, because the workbench had 0 and the winner had 2. An earlier version of this file said the winner was first with either family alone; that was wrong and was corrected on 2026-11-14 after the tally was re-derived with a sensitivity check.
+- The combined result (7 wins to 4) holds, and so does the check that counts the two "partly reached" sessions as failures (the winner stays on 7 wins).
+- The winner was not the fastest: it took the most actions, and it won none of the presenter comparisons, where the workbench's item drill-downs did better.
+- The workbench screen is kept on the `competition/workbench` branch so the two can be compared before anything is promoted to production.
 - Runs used a recorded backend and a local stand-in for the sign-in proxy.
 - Real people should check the screen on the dev server before it goes to production.
 
