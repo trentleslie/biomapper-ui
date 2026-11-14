@@ -296,7 +296,7 @@ export const GLOSSARY = {
   // linking.py, NAME_CASEFOLD_MIN_LENGTH_EXCLUSIVE and harmonize()
   withheld: {
     term: "Withheld name match",
-    text: "Two names that are equal only when letter case is ignored, where either name is 4 characters or shorter, are not linked and are listed here instead (Co, cobalt, against CO, carbon monoxide).",
+    text: "Two names that are equal only when letter case is ignored, where either name is 4 characters or shorter, are not linked and are listed instead. For example Co (cobalt) and CO (carbon monoxide).",
   },
   // linking.py, PossibleMiss
   possibleMiss: {

@@ -726,8 +726,10 @@ export function skippedFromHeader(header: string | null | undefined): number | n
 
 export interface EitlPair {
   sourceText: string;
+  sourceId: string;
   sourceDataset: string;
   targetText: string;
+  targetId: string;
   targetDataset: string;
 }
 
@@ -745,8 +747,10 @@ export function eitlPairs(text: string): EitlPair[] | null {
     const o = asObject(r) ?? {};
     return {
       sourceText: String(o.source_text ?? ""),
+      sourceId: String(o.source_id ?? ""),
       sourceDataset: String(o.source_dataset ?? ""),
       targetText: String(o.target_text ?? ""),
+      targetId: String(o.target_id ?? ""),
       targetDataset: String(o.target_dataset ?? ""),
     };
   });

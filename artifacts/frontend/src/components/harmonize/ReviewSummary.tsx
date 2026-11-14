@@ -693,6 +693,9 @@ function ReviewItemDetail({
     query: { queryKey: getGetHarmonizeReviewItemQueryKey(jobId, refId ?? ""), enabled: !!refId },
   });
   const d = q.data;
+  const why = d
+    ? Array.from(new Set([...reasons, ...(d.row?.weakTrigger ? [d.row.weakTrigger] : []), ...(d.link?.reviewReasons ?? [])]))
+    : [];
   return (
     <Sheet open={!!refId} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="w-full overflow-y-auto scroll-visible sm:max-w-xl">
@@ -711,12 +714,10 @@ function ReviewItemDetail({
                 <Badge variant="neutral">{d.kind === "link" ? "Link" : "Row"}</Badge>
                 <span className="ml-2 text-xs text-neutral-500">Impact {d.impact}</span>
               </p>
-              {(reasons.length > 0 || (d.link?.reviewReasons?.length ?? 0) > 0) && (
+              {why.length > 0 && (
                 <div className="rounded border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm" data-testid="review-item-why">
                   <p className="text-xs text-neutral-500">Why biomapper lists it</p>
-                  <p className="text-neutral-900">
-                    {Array.from(new Set([...reasons, ...(d.link?.reviewReasons ?? [])])).map(humanize).join(", ")}
-                  </p>
+                  <p className="text-neutral-900">{why.map(humanize).join(", ")}</p>
                 </div>
               )}
               {d.link?.question && (
@@ -724,11 +725,10 @@ function ReviewItemDetail({
                   {d.link.question}
                 </Note>
               )}
-              {d.note && <p className="text-sm text-neutral-700">{d.note}</p>}
+
               {d.row && (
                 <dl className="space-y-2 text-sm">
                   <div><dt className="text-xs text-neutral-500">Name</dt><dd><Untrusted value={d.row.name} /></dd></div>
-                  <div><dt className="text-xs text-neutral-500">Why it is here</dt><dd>{d.row.weakTrigger ? humanize(d.row.weakTrigger) : "Not given"}</dd></div>
                   <div><dt className="text-xs text-neutral-500">Engine's choice</dt><dd><Mono>{d.row.engineChoice ?? "None: the engine chose no node"}</Mono></dd></div>
                   <div><dt className="text-xs text-neutral-500">Certificate state</dt><dd><CertificateLine state={d.row.certificateState} /></dd></div>
                   <div>
@@ -753,6 +753,7 @@ function ReviewItemDetail({
                   </div>
                 </div>
               )}
+              {d.note && <p className="text-xs text-neutral-500">{d.note}</p>}
             </>
           )}
         </div>

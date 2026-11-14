@@ -264,7 +264,7 @@ test.describe("harmonize @app", () => {
     await expect(page.getByTestId("eitl-skipped")).toContainText("1 flagged item is left out");
     await expect(page.getByTestId("eitl-counts")).toHaveText("2 items flagged in this run. The file holds 1 pair. 1 flagged item gives no pair.");
     await expect(page.getByTestId("eitl-counts-why")).toContainText("a link found by both arms is written once");
-    await expect(page.getByTestId("eitl-pairs-preview")).toContainText("name a13 example_cohort_a with name b13 example_cohort_b");
+    await expect(page.getByTestId("eitl-pairs-preview")).toContainText("name a13 (example_cohort_a a13) with name b13 (example_cohort_b b13)");
     await expect(page.getByRole("heading", { name: "Pairs file for expert-in-the-loop (EITL), the expert review app" })).toBeVisible();
     await expect(page.getByTestId("matched-pairs")).toContainText("Matched pairs (links table)");
     const download = page.waitForEvent("download");

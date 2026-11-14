@@ -119,9 +119,14 @@ export function ExportStage({ run, flaggedTotal }: { run: HarmonizeRunStatus; fl
               <ol className="scroll-visible max-h-64 divide-y divide-neutral-100 rounded border border-neutral-200 text-sm" data-testid="eitl-pairs-preview">
                 {pairs.slice(0, PREVIEW_ROWS).map((p, i) => (
                   <li key={i} className="px-3 py-1.5">
-                    <span className="text-neutral-900">{p.sourceText}</span> <Mono className="text-neutral-500">{p.sourceDataset}</Mono>{" "}
+                    <span className="text-neutral-900">{p.sourceText}</span>{" "}
+                    <Mono className="text-neutral-500">
+                      ({p.sourceDataset} {p.sourceId})
+                    </Mono>{" "}
                     <span className="text-neutral-500">with</span> <span className="text-neutral-900">{p.targetText}</span>{" "}
-                    <Mono className="text-neutral-500">{p.targetDataset}</Mono>
+                    <Mono className="text-neutral-500">
+                      ({p.targetDataset} {p.targetId})
+                    </Mono>
                   </li>
                 ))}
               </ol>

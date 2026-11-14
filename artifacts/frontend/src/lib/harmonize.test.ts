@@ -302,7 +302,9 @@ describe("items and exports", () => {
     const text = JSON.stringify([
       { source_text: "Creatinine", source_id: "a01", source_dataset: "a", target_text: "creatinine", target_id: "b01", target_dataset: "b" },
     ]);
-    expect(eitlPairs(text)).toEqual([{ sourceText: "Creatinine", sourceDataset: "a", targetText: "creatinine", targetDataset: "b" }]);
+    expect(eitlPairs(text)).toEqual([
+      { sourceText: "Creatinine", sourceId: "a01", sourceDataset: "a", targetText: "creatinine", targetId: "b01", targetDataset: "b" },
+    ]);
     expect(eitlPairs("[]")).toEqual([]);
     expect(eitlPairs("<html>")).toBeNull();
   });
