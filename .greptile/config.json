@@ -1,3 +1,4 @@
 {
-  "includeBranches": ["main", "dev"]
+  "includeBranches": ["main", "dev"],
+  "ignorePatterns": "pnpm-lock.yaml\nlib/api-zod/src/generated/**\nlib/api-client-react/src/generated/**\nartifacts/python-api/data/harmonize_examples/**/recording/**\nartifacts/frontend/public/fonts/**\n**/*.png"
 }
