@@ -161,13 +161,11 @@ test.describe("harmonize @app", () => {
       { state: "complete", progress: progress("review", 3, 3), stage: "done" },
     ];
     const { stubs } = runStubs(states);
-    let runsListed = false;
     await isolate(page, {
       ...stubs,
-      "/api/harmonize/runs": async (route: Route) => route.fulfill({ json: runsListed ? [] : [] }),
+      "/api/harmonize/runs": [],
       "/api/harmonize/example": async (route: Route) => {
         expect(route.request().postDataJSON()).toEqual({ kind: "two_cohort" });
-        runsListed = true;
         return route.fulfill({ json: { ...RUN_BASE, state: "queued", stage: "queued" } });
       },
     });
