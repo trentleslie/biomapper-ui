@@ -17,8 +17,7 @@ import HarmonizePage from "@/pages/harmonize";
 
 import NotFound from "@/pages/not-found";
 import { EnvProvider } from "@/contexts/env-context";
-import { AppShell } from "@/components/AppShell";
-import { DemoShell } from "@/components/DemoShell";
+import { AppShell, AdaptiveShell } from "@/components/AppShell";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 if (!clerkPubKey) {
@@ -92,10 +91,11 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 
 function DemoRouteGate() {
   const { isLoaded, isSignedIn } = useUser();
-  if (isLoaded && isSignedIn) {
-    return <AppShell><DemoContent /></AppShell>;
-  }
-  return <DemoShell><DemoContent /></DemoShell>;
+  return (
+    <AdaptiveShell mode={isLoaded && isSignedIn ? "app" : "demo"}>
+      <DemoContent />
+    </AdaptiveShell>
+  );
 }
 
 function JobRouteGate() {
@@ -105,10 +105,11 @@ function JobRouteGate() {
   const isDemo = params.get("demo") === "true";
 
   if (isDemo) {
-    if (isLoaded && isSignedIn) {
-      return <AppShell><DashboardPage /></AppShell>;
-    }
-    return <DemoShell><DashboardPage /></DemoShell>;
+    return (
+      <AdaptiveShell mode={isLoaded && isSignedIn ? "app" : "demo"}>
+        <DashboardPage />
+      </AdaptiveShell>
+    );
   }
 
   return <ProtectedRoute component={DashboardPage} />;
