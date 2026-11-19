@@ -91,7 +91,7 @@ test.describe("app shell @app", () => {
 
     const nav = page.getByTestId("app-nav");
     await expect(nav.getByRole("link", { name: "BioMapper home" })).toHaveAttribute("href", "/");
-    await expect(nav.getByRole("link", { name: "New job" })).toHaveAttribute("href", "/");
+    await expect(nav.getByRole("link", { name: "New job" })).toHaveAttribute("href", "/upload");
     await expect(nav.getByRole("link", { name: "Benchmark" })).toHaveAttribute("href", "/benchmark");
     await expect(nav.getByRole("link", { name: "Flagged Annotations" })).toHaveAttribute("href", "/flagged");
     // Recent jobs: named jobs by name, unnamed ones by their short id, then the full history.
@@ -107,11 +107,20 @@ test.describe("app shell @app", () => {
     await expectSelfHostedInter(page, googleFontRequests);
   });
 
+  test("demo page renders inside AppShell in signed-in/bypass mode @app", async ({ page }) => {
+    await isolate(page);
+    await goto(page, "/demo");
+    await expect(page.getByTestId("app-shell")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "See BioMapper in Action" })).toBeVisible();
+    await expect(page.getByTestId("app-nav").getByRole("link", { name: "BioMapper home" })).toHaveAttribute("href", "/");
+    await expect(page.getByText("Demo Mode")).toHaveCount(0);
+  });
+
   test("screenshot of the upload page @app", async ({ browser }) => {
     test.skip(!TAKE_SCREENSHOTS, "set SHELL_SCREENSHOTS=1 to refresh the PR screenshots");
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2, baseURL: test.info().project.use.baseURL });
     await isolate(page);
-    await goto(page, "/");
+    await goto(page, "/upload");
     await expect(page.getByTestId("app-shell")).toBeVisible();
     await page.evaluate(() => document.fonts.ready);
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "shell-upload.png") });

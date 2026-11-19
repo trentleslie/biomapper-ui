@@ -7,7 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 import UploadPage from "@/pages/upload";
 import DashboardPage from "@/pages/dashboard";
-import DemoPage from "@/pages/demo";
+import DemoPage, { DemoContent } from "@/pages/demo";
 import JobsPage from "@/pages/jobs";
 import FlaggedPage from "@/pages/flagged";
 import BenchmarkPage from "@/pages/benchmark";
@@ -90,12 +90,24 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   return <AppShell><Component /></AppShell>;
 }
 
+function DemoRouteGate() {
+  const { isLoaded, isSignedIn } = useUser();
+  if (isLoaded && isSignedIn) {
+    return <AppShell><DemoContent /></AppShell>;
+  }
+  return <DemoShell><DemoContent /></DemoShell>;
+}
+
 function JobRouteGate() {
+  const { isLoaded, isSignedIn } = useUser();
   const searchString = useSearch();
   const params = new URLSearchParams(searchString);
   const isDemo = params.get("demo") === "true";
 
   if (isDemo) {
+    if (isLoaded && isSignedIn) {
+      return <AppShell><DashboardPage /></AppShell>;
+    }
     return <DemoShell><DashboardPage /></DemoShell>;
   }
 
@@ -110,8 +122,8 @@ function Router() {
         {() => <ProtectedRoute component={UploadPage} />}
       </Route>
 
-      {/* /demo = unauthenticated demo experience */}
-      <Route path="/demo" component={DemoPage} />
+      {/* /demo = demo experience (AppShell when signed in, DemoShell when unauthenticated) */}
+      <Route path="/demo" component={DemoRouteGate} />
 
       {/* /login = canonical sign-in entry per spec */}
       <Route path="/login/*?" component={LoginPage} />
@@ -202,6 +214,7 @@ function DevBypassApp() {
           <AppShell>
             <Switch>
               <Route path="/">{() => <UploadPage />}</Route>
+              <Route path="/demo">{() => <DemoContent />}</Route>
               <Route path="/upload">{() => <UploadPage />}</Route>
               <Route path="/job/:jobId">{() => <DashboardPage />}</Route>
               <Route path="/jobs">{() => <JobsPage />}</Route>

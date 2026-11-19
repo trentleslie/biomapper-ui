@@ -26,9 +26,9 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   {
     label: "New job",
-    href: "/",
+    href: "/upload",
     icon: UploadCloud,
-    isActive: (location) => location === "/" || location === "/upload",
+    isActive: (location) => location === "/upload",
   },
   {
     label: "Harmonize cohorts",
