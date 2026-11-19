@@ -151,7 +151,7 @@ test.describe("scroll bars on the signed-in surface @app", () => {
       "/api/discovery/entity-types": entityTypes,
       "/api/discovery/vocabularies": vocabularies,
     });
-    await goto(page, "/");
+    await goto(page, "/upload");
     const columns = Array.from({ length: 60 }, (_, i) => `column_${i}`);
     const csv = `${columns.join(",")}\n${columns.map((_, i) => `value ${i}`).join(",")}\n`;
     await page.locator("input[type=file]").setInputFiles({ name: "wide.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });

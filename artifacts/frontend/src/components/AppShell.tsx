@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
-import { useRoute, Link, useLocation } from "wouter";
+import { useRoute, Link, useLocation, useSearch } from "wouter";
 import { useUser, useClerk } from "@clerk/react";
-import { UploadCloud, BarChart3, List, Flag, Target, LogOut, GitMerge, type LucideIcon } from "lucide-react";
+import { UploadCloud, BarChart3, List, Flag, Target, LogOut, LogIn, GitMerge, type LucideIcon } from "lucide-react";
 import { useListJobs, getListJobsQueryKey } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EnvToggle } from "@/components/EnvToggle";
@@ -26,9 +26,9 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   {
     label: "New job",
-    href: "/",
+    href: "/upload",
     icon: UploadCloud,
-    isActive: (location) => location === "/" || location === "/upload",
+    isActive: (location) => location === "/upload",
   },
   {
     label: "Harmonize cohorts",
@@ -227,10 +227,80 @@ function RecentJobs({ currentJobId, collapsed }: { currentJobId: string | null; 
   );
 }
 
-export function AppShell({ children }: { children: ReactNode }) {
+function demoHeader(expanded: boolean) {
+  return (
+    <>
+      {!expanded && (
+        <span
+          aria-hidden
+          className="mx-auto mb-2 block w-fit rounded bg-on-chrome/12 px-1 py-0.5 text-[10px] font-semibold text-on-chrome"
+        >
+          DEMO
+        </span>
+      )}
+      <span
+        className={
+          expanded
+            ? "mx-3 mb-2 block w-fit whitespace-nowrap rounded bg-on-chrome/12 px-2 py-0.5 text-xs font-semibold text-on-chrome"
+            : "sr-only"
+        }
+      >
+        Demo Mode
+      </span>
+    </>
+  );
+}
+
+function demoFoot(expanded: boolean) {
+  return (
+    <Link
+      href="/login"
+      aria-label={expanded ? undefined : "Sign In"}
+      title={expanded ? undefined : "Sign In"}
+      className={cn(
+        railItemClass,
+        "text-on-chrome hover:bg-on-chrome/8",
+      )}
+    >
+      <LogIn aria-hidden className="h-4 w-4 shrink-0" />
+      {expanded && <span>Sign In</span>}
+    </Link>
+  );
+}
+
+function AppNav({ expanded }: { expanded: boolean }) {
   const [location] = useLocation();
   const [isJobRoute, jobParams] = useRoute("/job/:jobId");
   const jobId = isJobRoute ? (jobParams as { jobId: string }).jobId : null;
+  const isDemoJob = new URLSearchParams(useSearch()).get("demo") === "true";
+
+  return (
+    <>
+      {NAV_ITEMS.map((item) => (
+        <RailLink
+          key={item.href}
+          href={item.href}
+          icon={<item.icon className="h-4 w-4 shrink-0" />}
+          label={item.label}
+          active={item.isActive(location)}
+          collapsed={!expanded}
+        />
+      ))}
+      {jobId && (
+        <RailLink
+          href={isDemoJob ? `/job/${jobId}?demo=true` : `/job/${jobId}`}
+          icon={<BarChart3 className="h-4 w-4 shrink-0" />}
+          label={`Job: ${jobId.slice(0, 8)}...`}
+          active
+          collapsed={!expanded}
+        />
+      )}
+      <RecentJobs currentJobId={isDemoJob ? null : jobId} collapsed={!expanded} />
+    </>
+  );
+}
+
+function AppFoot({ expanded }: { expanded: boolean }) {
   const { user } = useUser();
   const { signOut } = useClerk();
   const { env } = useEnv();
@@ -238,77 +308,75 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <>
+      {/* The API environment toggle, moved from the old top bar. One instance in both forms (see ShellFrame);
+          at rest the rail shows which API new jobs go to. */}
+      {!expanded && (
+        <span
+          aria-hidden
+          title={env === "dev" ? "Development API" : "Production API"}
+          className={cn(
+            "mx-auto mb-1 block w-fit rounded px-1 py-0.5 text-[10px] font-semibold",
+            env === "dev" ? "bg-warning-bg text-warning" : "text-on-chrome-muted",
+          )}
+        >
+          {env === "dev" ? "DEV" : "PROD"}
+        </span>
+      )}
+      <div className={expanded ? "mb-2 px-1.5" : "sr-only"}>
+        <div className="w-fit rounded-md bg-neutral-0 p-0.5">
+          <EnvToggle />
+        </div>
+      </div>
+      {email && (
+        <p title={email} className={expanded ? "truncate px-3 pt-1 text-on-chrome-muted" : "sr-only"}>
+          {email}
+        </p>
+      )}
+      <button
+        type="button"
+        onClick={() => void signOut()}
+        aria-label={expanded ? undefined : "Sign out"}
+        title={expanded ? undefined : "Sign out"}
+        className={cn(railItemClass, "w-full text-left", railItemTone(false))}
+      >
+        <LogOut aria-hidden className="h-4 w-4 shrink-0" />
+        {expanded && <span>Sign out</span>}
+      </button>
+      <BuildStamp className={expanded ? "block whitespace-nowrap px-3 pt-1" : "sr-only"} />
+    </>
+  );
+}
+
+/**
+ * Shared adaptive shell keeping `<ShellFrame>{children}</ShellFrame>` at the same tree position across
+ * `"demo"` -> `"app"` transitions so `children` stays mounted when auth settles.
+ */
+export function AdaptiveShell({
+  mode,
+  children,
+}: {
+  mode: "app" | "demo";
+  children: ReactNode;
+}) {
+  const isApp = mode === "app";
+
+  return (
+    <>
       <ShellFrame
-        homeHref="/"
-        homeLabel="BioMapper home"
-        nav={(expanded) => (
-          <>
-            {NAV_ITEMS.map((item) => (
-              <RailLink
-                key={item.href}
-                href={item.href}
-                icon={<item.icon className="h-4 w-4 shrink-0" />}
-                label={item.label}
-                active={item.isActive(location)}
-                collapsed={!expanded}
-              />
-            ))}
-            {jobId && (
-              <RailLink
-                href={`/job/${jobId}`}
-                icon={<BarChart3 className="h-4 w-4 shrink-0" />}
-                label={`Job: ${jobId.slice(0, 8)}...`}
-                active
-                collapsed={!expanded}
-              />
-            )}
-            <RecentJobs currentJobId={jobId} collapsed={!expanded} />
-          </>
-        )}
-        foot={(expanded) => (
-          <>
-            {/* The API environment toggle, moved from the old top bar. One instance in both forms (see ShellFrame);
-                at rest the rail shows which API new jobs go to. */}
-            {!expanded && (
-              <span
-                aria-hidden
-                title={env === "dev" ? "Development API" : "Production API"}
-                className={cn(
-                  "mx-auto mb-1 block w-fit rounded px-1 py-0.5 text-[10px] font-semibold",
-                  env === "dev" ? "bg-warning-bg text-warning" : "text-on-chrome-muted",
-                )}
-              >
-                {env === "dev" ? "DEV" : "PROD"}
-              </span>
-            )}
-            <div className={expanded ? "mb-2 px-1.5" : "sr-only"}>
-              <div className="w-fit rounded-md bg-neutral-0 p-0.5">
-                <EnvToggle />
-              </div>
-            </div>
-            {email && (
-              <p title={email} className={expanded ? "truncate px-3 pt-1 text-on-chrome-muted" : "sr-only"}>
-                {email}
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={() => void signOut()}
-              aria-label={expanded ? undefined : "Sign out"}
-              title={expanded ? undefined : "Sign out"}
-              className={cn(railItemClass, "w-full text-left", railItemTone(false))}
-            >
-              <LogOut aria-hidden className="h-4 w-4 shrink-0" />
-              {expanded && <span>Sign out</span>}
-            </button>
-            <BuildStamp className={expanded ? "block whitespace-nowrap px-3 pt-1" : "sr-only"} />
-          </>
-        )}
+        homeHref={isApp ? "/" : "/demo"}
+        homeLabel={isApp ? "BioMapper home" : "BioMapper demo home"}
+        header={isApp ? undefined : demoHeader}
+        nav={(expanded) => (isApp ? <AppNav expanded={expanded} /> : null)}
+        foot={(expanded) => (isApp ? <AppFoot expanded={expanded} /> : demoFoot(expanded))}
       >
         {children}
       </ShellFrame>
 
-      <FeedbackButton />
+      {isApp && <FeedbackButton />}
     </>
   );
+}
+
+export function AppShell({ children }: { children: ReactNode }) {
+  return <AdaptiveShell mode="app">{children}</AdaptiveShell>;
 }

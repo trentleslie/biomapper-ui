@@ -7,7 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 import UploadPage from "@/pages/upload";
 import DashboardPage from "@/pages/dashboard";
-import DemoPage from "@/pages/demo";
+import DemoPage, { DemoContent } from "@/pages/demo";
 import JobsPage from "@/pages/jobs";
 import FlaggedPage from "@/pages/flagged";
 import BenchmarkPage from "@/pages/benchmark";
@@ -17,8 +17,7 @@ import HarmonizePage from "@/pages/harmonize";
 
 import NotFound from "@/pages/not-found";
 import { EnvProvider } from "@/contexts/env-context";
-import { AppShell } from "@/components/AppShell";
-import { DemoShell } from "@/components/DemoShell";
+import { AppShell, AdaptiveShell } from "@/components/AppShell";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 if (!clerkPubKey) {
@@ -90,13 +89,27 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   return <AppShell><Component /></AppShell>;
 }
 
+function DemoRouteGate() {
+  const { isLoaded, isSignedIn } = useUser();
+  return (
+    <AdaptiveShell mode={isLoaded && isSignedIn ? "app" : "demo"}>
+      <DemoContent />
+    </AdaptiveShell>
+  );
+}
+
 function JobRouteGate() {
+  const { isLoaded, isSignedIn } = useUser();
   const searchString = useSearch();
   const params = new URLSearchParams(searchString);
   const isDemo = params.get("demo") === "true";
 
   if (isDemo) {
-    return <DemoShell><DashboardPage /></DemoShell>;
+    return (
+      <AdaptiveShell mode={isLoaded && isSignedIn ? "app" : "demo"}>
+        <DashboardPage />
+      </AdaptiveShell>
+    );
   }
 
   return <ProtectedRoute component={DashboardPage} />;
@@ -110,8 +123,8 @@ function Router() {
         {() => <ProtectedRoute component={UploadPage} />}
       </Route>
 
-      {/* /demo = unauthenticated demo experience */}
-      <Route path="/demo" component={DemoPage} />
+      {/* /demo = demo experience (AppShell when signed in, DemoShell when unauthenticated) */}
+      <Route path="/demo" component={DemoRouteGate} />
 
       {/* /login = canonical sign-in entry per spec */}
       <Route path="/login/*?" component={LoginPage} />
@@ -202,6 +215,7 @@ function DevBypassApp() {
           <AppShell>
             <Switch>
               <Route path="/">{() => <UploadPage />}</Route>
+              <Route path="/demo">{() => <DemoContent />}</Route>
               <Route path="/upload">{() => <UploadPage />}</Route>
               <Route path="/job/:jobId">{() => <DashboardPage />}</Route>
               <Route path="/jobs">{() => <JobsPage />}</Route>

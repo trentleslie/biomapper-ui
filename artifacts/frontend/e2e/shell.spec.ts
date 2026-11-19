@@ -70,6 +70,90 @@ test.describe("demo shell @demo", () => {
     await expect(nav).toHaveAttribute("data-expanded", "true");
   });
 
+  test("keeps DemoContent mounted and loading state intact when Clerk resolves signed-in @demo", async ({ page }) => {
+    let releaseClerk!: () => void;
+    const clerkReady = new Promise<void>((resolve) => {
+      releaseClerk = resolve;
+    });
+    let releaseStartDemo!: () => void;
+    const demoStarted = new Promise<void>((resolve) => {
+      releaseStartDemo = resolve;
+    });
+    let startDemoPosts = 0;
+
+    await isolate(page, {
+      "/api/map/demo": async (route) => {
+        if (route.request().method() === "POST") {
+          startDemoPosts += 1;
+          await demoStarted;
+          return route.fulfill({ json: { job_id: "demo-transition-1" } });
+        }
+        return route.fulfill({ json: { count: 100, categories: { "amino acid": 40, lipid: 60 }, entity_type: "metabolite" } });
+      },
+      "/api/map/stream/demo-transition-1": (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: "text/event-stream",
+          body: `event: progress\ndata: ${JSON.stringify({ job_id: "demo-transition-1", status: "complete", completed: 1, total: 1, error_count: 0, results: [] })}\n\n`,
+        }),
+      "/api/map/result/demo-transition-1": { job_id: "demo-transition-1", status: "complete", completed: 1, total: 1, error_count: 0, results: [] },
+    });
+
+    await page.route(/clerk\.browser\.js/, async (route) => {
+      await clerkReady;
+      return route.fulfill({
+        status: 200,
+        contentType: "application/javascript",
+        body: `
+          window.Clerk = {
+            loaded: true,
+            user: { id: "user_test", primaryEmailAddress: { emailAddress: "researcher@phenomehealth.org" } },
+            session: { id: "sess_test" },
+            client: { signedInSessions: [{ id: "sess_test" }] },
+            __internal_lastEmittedResources: {
+              user: { id: "user_test", primaryEmailAddress: { emailAddress: "researcher@phenomehealth.org" } },
+              session: { id: "sess_test" },
+              client: { signedInSessions: [{ id: "sess_test" }] },
+              organization: null,
+            },
+            addListener(cb) {
+              cb(this.__internal_lastEmittedResources);
+              return () => {};
+            },
+            signOut: async () => {},
+          };
+        `,
+      });
+    });
+
+    await page.goto("/demo", { waitUntil: "domcontentloaded" });
+    await page.mouse.move(1200, 10);
+    await expect(page.getByText("Demo Mode")).toBeAttached();
+    const startButton = page.getByRole("button", { name: "Start Demo" });
+    await expect(startButton).toBeEnabled();
+
+    // Start the demo before Clerk finishes loading; button enters loading state.
+    await startButton.click();
+    const loadingButton = page.getByRole("button", { name: "Starting Demo..." });
+    await expect(loadingButton).toBeVisible();
+    await expect(loadingButton).toBeDisabled();
+
+    // Clerk resolves signed-in: AdaptiveShell switches to app mode without remounting DemoContent.
+    releaseClerk();
+    await expect(page.getByTestId("app-nav").getByRole("link", { name: "BioMapper home" })).toHaveAttribute("href", "/");
+    await expect(page.getByText("Demo Mode")).toHaveCount(0);
+    await expect(loadingButton).toBeVisible();
+    await expect(loadingButton).toBeDisabled();
+    expect(startDemoPosts).toBe(1);
+
+    releaseStartDemo();
+    await expect(page).toHaveURL(/\/job\/demo-transition-1\?demo=true$/);
+    await expect(page.getByTestId("app-nav").getByRole("link", { name: "Job: demo-tra..." })).toHaveAttribute(
+      "href",
+      "/job/demo-transition-1?demo=true",
+    );
+  });
+
   test("screenshot of the demo page @demo", async ({ browser }) => {
     test.skip(!TAKE_SCREENSHOTS, "set SHELL_SCREENSHOTS=1 to refresh the PR screenshots");
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2, baseURL: test.info().project.use.baseURL });
@@ -91,7 +175,7 @@ test.describe("app shell @app", () => {
 
     const nav = page.getByTestId("app-nav");
     await expect(nav.getByRole("link", { name: "BioMapper home" })).toHaveAttribute("href", "/");
-    await expect(nav.getByRole("link", { name: "New job" })).toHaveAttribute("href", "/");
+    await expect(nav.getByRole("link", { name: "New job" })).toHaveAttribute("href", "/upload");
     await expect(nav.getByRole("link", { name: "Benchmark" })).toHaveAttribute("href", "/benchmark");
     await expect(nav.getByRole("link", { name: "Flagged Annotations" })).toHaveAttribute("href", "/flagged");
     // Recent jobs: named jobs by name, unnamed ones by their short id, then the full history.
@@ -107,11 +191,39 @@ test.describe("app shell @app", () => {
     await expectSelfHostedInter(page, googleFontRequests);
   });
 
+  test("demo page renders inside AppShell in signed-in/bypass mode @app", async ({ page }) => {
+    await isolate(page);
+    await goto(page, "/demo");
+    await expect(page.getByTestId("app-shell")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "See BioMapper in Action" })).toBeVisible();
+    await expect(page.getByTestId("app-nav").getByRole("link", { name: "BioMapper home" })).toHaveAttribute("href", "/");
+    await expect(page.getByText("Demo Mode")).toHaveCount(0);
+  });
+
+  test("active job rail link preserves ?demo=true in signed-in/bypass mode @app", async ({ page }) => {
+    const jobId = JOBS[0].jobId;
+    await isolate(page, {
+      [`/api/map/stream/${jobId}`]: (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: "text/event-stream",
+          body: `event: progress\ndata: ${JSON.stringify({ job_id: jobId, status: "complete", completed: 1, total: 1, error_count: 0, results: [] })}\n\n`,
+        }),
+      [`/api/map/result/${jobId}`]: { job_id: jobId, status: "complete", completed: 1, total: 1, error_count: 0, results: [] },
+    });
+    await goto(page, `/job/${jobId}?demo=true`);
+    const nav = page.getByTestId("app-nav");
+    const activeJobLink = nav.getByRole("link", { name: `Job: ${jobId.slice(0, 8)}...` });
+    await expect(activeJobLink).toHaveAttribute("href", `/job/${jobId}?demo=true`);
+    await expect(activeJobLink).toHaveAttribute("aria-current", "page");
+    await expect(nav.getByRole("link", { name: JOBS[0].displayName! })).not.toHaveAttribute("aria-current", "page");
+  });
+
   test("screenshot of the upload page @app", async ({ browser }) => {
     test.skip(!TAKE_SCREENSHOTS, "set SHELL_SCREENSHOTS=1 to refresh the PR screenshots");
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2, baseURL: test.info().project.use.baseURL });
     await isolate(page);
-    await goto(page, "/");
+    await goto(page, "/upload");
     await expect(page.getByTestId("app-shell")).toBeVisible();
     await page.evaluate(() => document.fonts.ready);
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "shell-upload.png") });
